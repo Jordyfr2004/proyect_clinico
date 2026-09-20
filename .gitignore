@@ -1,0 +1,20 @@
+# Environment
+.env
+.env.local
+
+# PostgreSQL Data volumes (if mounted locally)
+pgdata/
+data/
+*.log
+
+# Backups
+backups/
+*.dump
+*.sql.gz
+*.tar.gz
+
+# OS / IDE
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
