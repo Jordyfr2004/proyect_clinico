@@ -1,0 +1,21 @@
+@import "tailwindcss";
+
+@theme {
+  --color-clinic-50: #eff8ff;
+  --color-clinic-100: #dff0ff;
+  --color-clinic-200: #b8e2ff;
+  --color-clinic-500: #1685e6;
+  --color-clinic-600: #096bc5;
+  --color-clinic-700: #08559f;
+  --color-ink-950: #0b1739;
+  --font-sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}
+
+:root { font-family: var(--font-sans); color: #14213d; background: #f7f9fc; font-synthesis: none; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
+* { box-sizing: border-box; }
+html { min-width: 320px; background: #f7f9fc; }
+body { margin: 0; min-width: 320px; min-height: 100vh; }
+button, input, select, textarea { font: inherit; }
+button, a { -webkit-tap-highlight-color: transparent; }
+button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visible, select:focus-visible { outline: 3px solid rgba(22, 133, 230, .25); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; } }
