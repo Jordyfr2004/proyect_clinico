@@ -1,5 +1,5 @@
 import { BarChart3, Boxes, CalendarDays, ChevronDown, CircleHelp, LayoutDashboard, LogOut, Menu, Settings, Stethoscope, UserRound, UsersRound, X } from 'lucide-react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 
 const navItems = [
@@ -15,7 +15,15 @@ function Sidebar({ close }: { close?: () => void }) {
 
 export function AppLayout() {
   const [open, setOpen] = useState(false)
+  useEffect(() => {
+    if (!open) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+    document.addEventListener('keydown', onKeyDown)
+    return () => document.removeEventListener('keydown', onKeyDown)
+  }, [open])
   const location = useLocation()
   const title = navItems.find((item) => item.to === '/' ? location.pathname === '/' : location.pathname.startsWith(item.to))?.label ?? 'Expediente clínico'
-  return <div className="min-h-screen bg-slate-50 lg:grid lg:grid-cols-[248px_1fr]"><aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] border-r border-slate-200 lg:block"><Sidebar/></aside>{open ? <div className="fixed inset-0 z-40 lg:hidden"><button aria-label="Cerrar menú" className="absolute inset-0 bg-slate-950/30" onClick={() => setOpen(false)}/><aside className="relative h-full w-[286px] max-w-[85vw] border-r border-slate-200 shadow-xl"><Sidebar close={() => setOpen(false)}/></aside></div> : null}<div className="min-w-0 lg:col-start-2"><header className="sticky top-0 z-20 flex h-17 items-center border-b border-slate-200 bg-white/95 px-4 backdrop-blur sm:px-7"><button aria-label="Abrir menú" className="mr-3 rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden" onClick={() => setOpen(true)}><Menu/></button><p className="font-semibold text-ink-950">{title}</p><div className="ml-auto flex items-center gap-3"><span className="hidden items-center gap-2 text-xs font-medium text-slate-500 sm:flex"><span className="size-2 rounded-full bg-slate-400"/>Backend no conectado</span><span className="h-7 w-px bg-slate-200"/><button className="flex items-center gap-2 rounded-lg p-1.5 text-slate-600 hover:bg-slate-100" type="button"><span className="grid size-8 place-items-center rounded-full bg-slate-100"><UserRound size={17}/></span><span className="hidden text-sm sm:inline">Cuenta</span><ChevronDown size={14}/></button></div></header><main className="mx-auto w-full max-w-[1500px] p-4 sm:p-7 lg:p-8"><Outlet/></main></div></div>
+  return <div className="min-h-screen bg-slate-50 lg:grid lg:grid-cols-[248px_1fr]"><aside className="fixed inset-y-0 left-0 z-30 hidden w-[248px] border-r border-slate-200 lg:block"><Sidebar/></aside>{open ? <div className="fixed inset-0 z-40 lg:hidden"><button aria-label="Cerrar navegación" className="absolute inset-0 bg-slate-950/30" onClick={() => setOpen(false)}/><aside className="relative h-full w-[286px] max-w-[85vw] border-r border-slate-200 shadow-xl"><Sidebar close={() => setOpen(false)}/></aside></div> : null}<div className="min-w-0 lg:col-start-2"><header className="sticky top-0 z-20 flex h-17 items-center border-b border-slate-200 bg-white/95 px-4 backdrop-blur sm:px-7"><button aria-label="Abrir menú" aria-expanded={open} className="mr-3 rounded-lg p-2 text-slate-600 hover:bg-slate-100 lg:hidden" onClick={() => setOpen(true)}><Menu/></button><p className="font-semibold text-ink-950">{title}</p><div className="ml-auto flex items-center gap-3"><span className="hidden items-center gap-2 text-xs font-medium text-slate-500 sm:flex"><span className="size-2 rounded-full bg-slate-400"/>Backend no conectado</span><span className="h-7 w-px bg-slate-200"/><button className="flex items-center gap-2 rounded-lg p-1.5 text-slate-600 hover:bg-slate-100" type="button"><span className="grid size-8 place-items-center rounded-full bg-slate-100"><UserRound size={17}/></span><span className="hidden text-sm sm:inline">Cuenta</span><ChevronDown size={14}/></button></div></header><main className="mx-auto w-full max-w-[1500px] p-4 sm:p-7 lg:p-8"><Outlet/></main></div></div>
 }

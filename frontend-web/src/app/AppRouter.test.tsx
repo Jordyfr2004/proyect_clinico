@@ -1,7 +1,8 @@
-import { fireEvent, render, screen } from '@testing-library/react'
+import { act, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it } from 'vitest'
 import { AppRouter } from './AppRouter'
+import { AUTH_FORBIDDEN_EVENT } from '../services/apiClient'
 
 describe('AppRouter', () => {
   it('redirects unauthenticated users from protected pages to login', () => {
@@ -27,10 +28,16 @@ describe('AppRouter', () => {
     expect(screen.getByText('No hay pacientes para mostrar.')).toBeInTheDocument()
   })
 
-  it('shows access denied after a forbidden response', () => {
-    render(<MemoryRouter><AppRouter accessDenied authStatus="authenticated" /></MemoryRouter>)
+  it('shows a dismissible notice after a forbidden response without blocking the current page', () => {
+    render(<MemoryRouter><AppRouter authStatus="authenticated" /></MemoryRouter>)
+
+    act(() => window.dispatchEvent(new Event(AUTH_FORBIDDEN_EVENT)))
 
     expect(screen.getByRole('heading', { name: 'Acceso no autorizado' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Bienvenido' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar aviso' }))
+    expect(screen.queryByRole('heading', { name: 'Acceso no autorizado' })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Bienvenido' })).toBeInTheDocument()
   })
 
   it('opens and closes the mobile navigation with Escape', () => {
