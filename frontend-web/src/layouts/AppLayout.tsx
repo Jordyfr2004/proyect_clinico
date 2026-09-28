@@ -1,10 +1,10 @@
-import { BarChart3, Boxes, CalendarDays, ChevronDown, CircleHelp, LayoutDashboard, LogOut, Menu, Settings, Stethoscope, UserRound, UsersRound, X } from 'lucide-react'
+import { BarChart3, CalendarDays, ChevronDown, CircleHelp, LayoutDashboard, LogOut, Menu, Settings, Stethoscope, UserRound, UsersRound, X } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 
 const navItems = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard }, { to: '/agenda', label: 'Agenda', icon: CalendarDays },
-  { to: '/pacientes', label: 'Pacientes', icon: UsersRound }, { to: '/inventario', label: 'Inventario', icon: Boxes },
+  { to: '/pacientes', label: 'Pacientes', icon: UsersRound },
   { to: '/reportes', label: 'Reportes', icon: BarChart3 }, { to: '/usuarios', label: 'Usuarios', icon: UserRound },
   { to: '/configuracion', label: 'Configuración', icon: Settings },
 ]

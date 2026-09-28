@@ -1,14 +1,13 @@
 import type { LucideIcon } from 'lucide-react'
-import { Boxes, CalendarDays, FileBarChart, Settings, ShieldCheck, UsersRound } from 'lucide-react'
+import { CalendarDays, FileBarChart, Settings, ShieldCheck, UsersRound } from 'lucide-react'
 import { EmptyState } from '../../components/states/EmptyState'
 import { IntegrationPending } from '../../components/states/IntegrationPending'
 
-type ModuleKey = 'agenda' | 'pacientes' | 'inventario' | 'reportes' | 'usuarios' | 'configuracion'
+type ModuleKey = 'agenda' | 'pacientes' | 'reportes' | 'usuarios' | 'configuracion'
 type ModuleDefinition = { title: string; description: string; emptyTitle: string; emptyDescription: string; icon: LucideIcon }
 const modules: Record<ModuleKey, ModuleDefinition> = {
   agenda: { title: 'Agenda', description: 'Organiza citas, disponibilidad y lista de espera.', emptyTitle: 'No hay citas para mostrar.', emptyDescription: 'Las citas se mostrarán cuando el servicio de agenda esté disponible.', icon: CalendarDays },
   pacientes: { title: 'Pacientes', description: 'Consulta y administra expedientes clínicos.', emptyTitle: 'No hay pacientes registrados.', emptyDescription: 'Los pacientes se mostrarán cuando el backend publique el servicio correspondiente.', icon: UsersRound },
-  inventario: { title: 'Inventario', description: 'Controla insumos odontológicos y niveles de stock.', emptyTitle: 'No hay insumos para mostrar.', emptyDescription: 'El inventario aparecerá cuando su contrato de API esté disponible.', icon: Boxes },
   reportes: { title: 'Reportes', description: 'Consulta información clínica, operativa y financiera.', emptyTitle: 'No hay reportes disponibles.', emptyDescription: 'Los reportes requieren fuentes de datos reales del backend.', icon: FileBarChart },
   usuarios: { title: 'Usuarios', description: 'Administra accesos, roles y permisos del equipo.', emptyTitle: 'No hay usuarios para mostrar.', emptyDescription: 'Los usuarios y permisos se cargarán desde el servicio de autenticación.', icon: ShieldCheck },
   configuracion: { title: 'Configuración', description: 'Define horarios, disponibilidad y parámetros de la clínica.', emptyTitle: 'Configuración no disponible.', emptyDescription: 'Los horarios y parámetros se habilitarán con su contrato de backend.', icon: Settings },

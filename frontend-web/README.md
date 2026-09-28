@@ -29,3 +29,7 @@ npm run build
 - `src/services`: cliente HTTP y futuros servicios por recurso.
 
 El frontend no contiene datos simulados ni contratos de API inventados. Los módulos dependientes del backend muestran estados vacíos o de integración pendiente hasta disponer de endpoints verificables.
+
+## Contexto para desarrollo
+
+Antes de implementar funcionalidades, revisa [el contexto operativo](docs/frontend-context.md) y [las decisiones del frontend](docs/frontend-decisions.md). El código no debe adelantarse a contratos reales del backend ni rellenarse con datos simulados.
