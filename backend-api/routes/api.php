@@ -20,7 +20,6 @@ use App\Http\Controllers\Api\Clinica\HistorialClinicoController;
 use App\Http\Controllers\Api\Clinica\DiagnosticoController;
 use App\Http\Controllers\Api\Clinica\TratamientoController;
 use App\Http\Controllers\Api\Clinica\OdontogramaController;
-use App\Http\Controllers\Api\Clinica\RecetaController;
 use App\Http\Controllers\Api\Clinica\RadiografiaController;
 
 use App\Http\Controllers\Api\Inventario\InsumoController;
@@ -43,6 +42,8 @@ Route::get('/user', function (Request $request) {
 Route::prefix('auth')->group(function () {
     Route::post('/login', [AuthController::class, 'login']);
 
+    Route::post('/register-paciente', [AuthController::class, 'registerPaciente']);
+
     Route::post('/forgot-password', [PasswordController::class, 'forgotPassword']);
 
     Route::post('/reset-password', [PasswordController::class, 'resetPassword']);
@@ -56,7 +57,7 @@ Route::prefix('auth')->group(function () {
 
 
 // Usuarios
-Route::middleware('auth:sanctum')->group(function () {
+Route::middleware('auth:sanctum', 'role:doctora,asistente')->group(function () {
 
     Route::prefix('usuarios')->group(function () {
         Route::get('/', [UsuarioController::class, 'index']);
@@ -151,19 +152,6 @@ Route::middleware('auth:sanctum')->prefix('odontogramas')->group(function () {
     Route::put('/{id}', [OdontogramaController::class, 'update']);
 
 });
-
-
-
-// Recetas
-Route::middleware('auth:sanctum')->prefix('recetas')->group(function () {
-
-    Route::get('/paciente/{pacienteId}', [RecetaController::class, 'porPaciente']);
-    Route::get('/{id}', [RecetaController::class, 'show']);
-    Route::post('/', [RecetaController::class, 'store']);
-    Route::put('/{id}', [RecetaController::class, 'update']);
-
-});
-
 
 
 // Radiografías
