@@ -3,7 +3,6 @@
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
-
 use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\Auth\PasswordController;
 
@@ -29,9 +28,6 @@ use App\Http\Controllers\Api\Reporte\ReporteController;
 use App\Http\Controllers\Api\Notificacion\NotificacionController;
 
 
-
-
-
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
@@ -55,6 +51,7 @@ Route::prefix('auth')->group(function () {
 });
 
 
+// Estado de la API
 
 // Usuarios
 Route::middleware('auth:sanctum', 'role:doctora,asistente')->group(function () {
