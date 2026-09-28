@@ -1,0 +1,33 @@
+services:
+  database:
+    image: postgres:16-alpine
+    container_name: odontologia_postgres_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-clinica_odontologica}
+      POSTGRES_USER: ${POSTGRES_USER:-clinica_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-ClinicaPassSecure2026!}
+      TZ: ${TZ:-America/Guayaquil}
+      PGTZ: ${TZ:-America/Guayaquil}
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./sql:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-clinica_admin} -d ${POSTGRES_DB:-clinica_odontologica}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    networks:
+      - odontologia_network
+
+networks:
+  odontologia_network:
+    name: odontologia_network
+    driver: bridge
+
+volumes:
+  postgres_data:
+    name: odontologia_postgres_data
