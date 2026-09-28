@@ -9,7 +9,7 @@ CREATE TABLE IF NOT EXISTS archivos_clinicos (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     paciente_id UUID NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
     cita_id UUID REFERENCES citas(id) ON DELETE SET NULL,
-    subido_por_usuario_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE RESTRICT,
+    subido_por_usuario_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     
     categoria VARCHAR(40) NOT NULL CHECK (
         categoria IN (

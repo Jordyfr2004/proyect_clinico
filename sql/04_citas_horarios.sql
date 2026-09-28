@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS horarios_excepciones (
 CREATE TABLE IF NOT EXISTS citas (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     paciente_id UUID NOT NULL REFERENCES pacientes(id) ON DELETE RESTRICT,
-    doctor_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE RESTRICT,
+    doctor_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     fecha DATE NOT NULL,
     hora_inicio TIME NOT NULL,
     hora_fin TIME NOT NULL,
@@ -48,7 +48,7 @@ CREATE TABLE IF NOT EXISTS citas (
     
     notas_asistente TEXT,
     notas_cancelacion TEXT,
-    cancelada_por_usuario_id UUID REFERENCES usuarios(id) ON DELETE SET NULL,
+    cancelada_por_usuario_id UUID REFERENCES users(id) ON DELETE SET NULL,
     
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
@@ -65,7 +65,7 @@ CREATE INDEX idx_citas_checkin_qr ON citas(codigo_checkin_qr);
 CREATE TABLE IF NOT EXISTS citas_historial_cambios (
     id SERIAL PRIMARY KEY,
     cita_id UUID NOT NULL REFERENCES citas(id) ON DELETE CASCADE,
-    usuario_id UUID REFERENCES usuarios(id) ON DELETE SET NULL,
+    usuario_id UUID REFERENCES users(id) ON DELETE SET NULL,
     estado_anterior VARCHAR(30),
     estado_nuevo VARCHAR(30) NOT NULL,
     fecha_anterior DATE,

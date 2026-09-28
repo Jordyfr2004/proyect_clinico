@@ -24,7 +24,7 @@ CREATE TABLE IF NOT EXISTS notas_evolucion (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     historia_clinica_id UUID NOT NULL REFERENCES historias_clinicas(id) ON DELETE CASCADE,
     cita_id UUID REFERENCES citas(id) ON DELETE SET NULL,
-    doctor_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE RESTRICT,
+    doctor_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     fecha_atencion TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
     subjetivo TEXT, -- Síntomas referidos por el paciente
     objetivo TEXT,   -- Hallazgos clínicos / exploración física
@@ -52,7 +52,7 @@ CREATE TABLE IF NOT EXISTS diagnosticos_paciente (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     historia_clinica_id UUID NOT NULL REFERENCES historias_clinicas(id) ON DELETE CASCADE,
     diagnostico_catalogo_id INT NOT NULL REFERENCES catalogo_diagnosticos(id) ON DELETE RESTRICT,
-    doctor_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE RESTRICT,
+    doctor_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     pieza_dental_num INT, -- Opcional, si el diagnóstico es sobre una pieza específica
     tipo_diagnostico VARCHAR(30) DEFAULT 'PRESUNTIVO' CHECK (tipo_diagnostico IN ('PRESUNTIVO', 'DEFINITIVO')),
     observaciones TEXT,
@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS catalogo_procedimientos (
 CREATE TABLE IF NOT EXISTS planes_tratamiento (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     historia_clinica_id UUID NOT NULL REFERENCES historias_clinicas(id) ON DELETE CASCADE,
-    doctor_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE RESTRICT,
+    doctor_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     titulo VARCHAR(200) NOT NULL,
     descripcion TEXT,
     costo_total_estimado NUMERIC(10, 2) NOT NULL DEFAULT 0.00,
@@ -101,7 +101,7 @@ CREATE TABLE IF NOT EXISTS tratamientos_detalle (
     plan_tratamiento_id UUID NOT NULL REFERENCES planes_tratamiento(id) ON DELETE CASCADE,
     procedimiento_id INT NOT NULL REFERENCES catalogo_procedimientos(id) ON DELETE RESTRICT,
     cita_id UUID REFERENCES citas(id) ON DELETE SET NULL,
-    doctor_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE RESTRICT,
+    doctor_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     pieza_dental_num INT,
     superficie_dental VARCHAR(20),
     costo NUMERIC(10, 2) NOT NULL,

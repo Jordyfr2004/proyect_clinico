@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS catalogo_condiciones_dentales (
 CREATE TABLE IF NOT EXISTS odontogramas (
     id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
     paciente_id UUID NOT NULL REFERENCES pacientes(id) ON DELETE CASCADE,
-    doctor_id UUID NOT NULL REFERENCES usuarios(id) ON DELETE RESTRICT,
+    doctor_id UUID NOT NULL REFERENCES users(id) ON DELETE RESTRICT,
     cita_id UUID REFERENCES citas(id) ON DELETE SET NULL,
     tipo_odontograma VARCHAR(30) DEFAULT 'EVOLUCION' CHECK (tipo_odontograma IN ('INICIAL', 'EVOLUCION', 'FINAL')),
     fecha_registro TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP NOT NULL,
