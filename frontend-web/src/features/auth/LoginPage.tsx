@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail, ShieldCheck } from 'lucide-react'
+import { ArrowRight, Eye, EyeOff, LockKeyhole, Mail } from 'lucide-react'
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { Link } from 'react-router-dom'
@@ -21,7 +21,7 @@ export function LoginPage() {
       <div className="login-card">
         <h1 className="login-title">Bienvenido <span>de nuevo</span></h1>
         <p className="login-description">Ingresa con tus credenciales para acceder al sistema</p>
-        <form className="login-form" noValidate onSubmit={handleSubmit(onSubmit)}>
+        <form className="login-form" noValidate onChange={() => setPendingIntegration(false)} onSubmit={handleSubmit(onSubmit)}>
           <div className="login-field">
             <label htmlFor="email">Correo electrónico</label>
             <div className="login-input-wrap">
@@ -32,7 +32,7 @@ export function LoginPage() {
                 autoComplete="email"
                 className="login-input"
                 id="email"
-                placeholder="tu.correo@clinica.com"
+                placeholder="correo@ejemplo.com"
                 type="email"
                 {...register('email')}
               />
@@ -71,7 +71,7 @@ export function LoginPage() {
           </button>
         </form>
         {pendingIntegration ? <div className="mt-5"><IntegrationPending compact detail="El formulario está validado. El inicio de sesión se conectará cuando el backend publique su contrato de autenticación Sanctum."/></div> : null}
-        <p className="login-authorized"><ShieldCheck aria-hidden="true"/>Uso exclusivo de personal autorizado</p>
+        <p className="login-create-account">¿No tienes una cuenta? <Link className="login-text-link" to="/registro">Crear cuenta</Link></p>
       </div>
     </div>
   )
