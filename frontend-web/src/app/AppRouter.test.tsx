@@ -15,6 +15,31 @@ describe('AppRouter', () => {
     expect(screen.getByRole('heading', { name: 'Bienvenido de nuevo' })).toBeInTheDocument()
   })
 
+  it('links public login to pending client registration and back', () => {
+    render(<MemoryRouter initialEntries={['/login']}><AppRouter authStatus="guest"/></MemoryRouter>)
+
+    fireEvent.click(screen.getByRole('link', { name: 'Crear cuenta' }))
+    expect(screen.getByRole('heading', { name: 'Crear cuenta' })).toBeInTheDocument()
+    expect(screen.getByText('El registro de clientes aún no está disponible.')).toBeInTheDocument()
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+
+    fireEvent.click(screen.getByRole('link', { name: 'Volver al inicio de sesión' }))
+    expect(screen.getByRole('heading', { name: 'Bienvenido de nuevo' })).toBeInTheDocument()
+  })
+
+  it('clears the pending integration notice when login values change after submission', async () => {
+    render(<MemoryRouter initialEntries={['/login']}><AppRouter authStatus="guest"/></MemoryRouter>)
+
+    fireEvent.change(screen.getByLabelText(/Correo electr/i), { target: { value: 'usuario@ejemplo.com' } })
+    fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'valid-password-123' } })
+    fireEvent.click(screen.getByRole('button', { name: /Iniciar sesi/i }))
+
+    expect(await screen.findByRole('status')).toHaveTextContent('Integración pendiente')
+
+    fireEvent.change(screen.getByLabelText(/Correo electr/i), { target: { value: 'otro@ejemplo.com' } })
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+  })
+
   it('renders the dashboard empty states for an authenticated session', () => {
     render(
       <MemoryRouter initialEntries={['/']}>

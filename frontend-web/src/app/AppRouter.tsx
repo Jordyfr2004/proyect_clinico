@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { AUTH_FORBIDDEN_EVENT } from '../services/apiClient'
 import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage'
 import { LoginPage } from '../features/auth/LoginPage'
+import { RegisterPage } from '../features/auth/RegisterPage'
 import { DashboardPage } from '../features/dashboard/DashboardPage'
 import { ModulePage } from '../features/modules/ModulePage'
 import { PatientSection, PatientWorkspace } from '../features/patients/PatientWorkspace'
@@ -29,6 +30,7 @@ export function AppRouter({ authStatus }: { authStatus: AuthStatus }) {
     <Routes>
       <Route element={<PublicLayout/>}>
         <Route element={authStatus === 'authenticated' ? <Navigate replace to="/"/> : <LoginPage/>} path="/login"/>
+        <Route element={authStatus === 'authenticated' ? <Navigate replace to="/"/> : <RegisterPage/>} path="/registro"/>
         <Route element={<ForgotPasswordPage/>} path="/recuperar-contrasena"/>
       </Route>
       <Route element={<ProtectedArea authStatus={authStatus} dismissForbidden={() => setForbidden(false)} forbidden={forbidden}/> }>
