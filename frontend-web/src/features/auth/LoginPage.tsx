@@ -39,7 +39,7 @@ export function LoginPage() {
         <p className="login-description">Ingresa con tus credenciales para acceder al sistema</p>
         <form className="login-form" noValidate onChange={() => setLoginError(null)} onSubmit={handleSubmit(onSubmit)}>
           <div className="login-field">
-            <label htmlFor="username">Cédula</label>
+            <label htmlFor="username">Usuario o cédula</label>
             <div className="login-input-wrap">
               <IdCard aria-hidden="true" className="login-input-icon"/>
               <input
@@ -48,7 +48,7 @@ export function LoginPage() {
                 autoComplete="username"
                 className="login-input"
                 id="username"
-                placeholder="Ingresa tu número de cédula"
+                placeholder="Ingresa tu usuario o cédula"
                 type="text"
                 {...register('username')}
               />

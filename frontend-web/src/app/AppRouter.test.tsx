@@ -44,14 +44,14 @@ describe('AppRouter', () => {
     const login = vi.fn().mockRejectedValue({ isAxiosError: true, response: { status: 422, data: { message: 'Credenciales incorrectas.' } } })
     renderRouter('guest', '/login', login)
 
-    fireEvent.change(screen.getByLabelText('Cédula'), { target: { value: '1234567890' } })
+    fireEvent.change(screen.getByLabelText('Usuario o cédula'), { target: { value: '1234567890' } })
     fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'valid-password-123' } })
     fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
 
     expect(await screen.findByRole('alert')).toHaveTextContent('Credenciales incorrectas.')
     expect(login).toHaveBeenCalledWith({ username: '1234567890', password: 'valid-password-123' })
 
-    fireEvent.change(screen.getByLabelText('Cédula'), { target: { value: '0987654321' } })
+    fireEvent.change(screen.getByLabelText('Usuario o cédula'), { target: { value: '0987654321' } })
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
@@ -59,7 +59,7 @@ describe('AppRouter', () => {
     const login = vi.fn().mockRejectedValue({ isAxiosError: true })
     renderRouter('guest', '/login', login)
 
-    fireEvent.change(screen.getByLabelText('Cédula'), { target: { value: '1234567890' } })
+    fireEvent.change(screen.getByLabelText('Usuario o cédula'), { target: { value: '1234567890' } })
     fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'valid-password-123' } })
     fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
 

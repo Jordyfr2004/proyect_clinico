@@ -33,7 +33,7 @@ describe('AuthProvider', () => {
     vi.mocked(authService.login).mockResolvedValue({ message: 'Inicio de sesión correcto.', token_type: 'Bearer', access_token: 'token-confirmado', user: confirmedUser })
     render(<MemoryRouter initialEntries={['/login']}><AuthProvider><AppRouter/></AuthProvider></MemoryRouter>)
 
-    fireEvent.change(await screen.findByLabelText('Cédula'), { target: { value: '1234567890' } })
+    fireEvent.change(await screen.findByLabelText('Usuario o cédula'), { target: { value: '1234567890' } })
     fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'valid-password-123' } })
     fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
 
