@@ -14,4 +14,4 @@
 
 ## 2026-09-30
 
-- El backend confirmó el inicio de sesión con cédula (`username`) y tokens Bearer de Laravel Sanctum. El frontend envía el token en `Authorization` y lo conserva únicamente en `sessionStorage`, mediante un módulo aislado y provisional para esta V1.
+- El backend confirmó que el inicio de sesión utiliza `username`: la doctora usa su nombre de usuario y los pacientes pueden usar su cédula. La autenticación emplea tokens Bearer de Laravel Sanctum. El frontend envía el token en `Authorization` y conserva únicamente el `access_token` en `sessionStorage`, de forma provisional para esta V1; el usuario se reconstruye con `GET /user`.

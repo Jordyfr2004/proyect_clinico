@@ -7,16 +7,17 @@ import { AuthProvider } from './AuthProvider'
 import { useAuth } from './authContext'
 import * as authService from './authService'
 import { getAccessToken, setAccessToken } from './authStorage'
+import type { AuthUser } from './authService'
 
 vi.mock('./authService', () => ({ login: vi.fn(), getCurrentUser: vi.fn(), logout: vi.fn() }))
 
-const confirmedUser = { id: '...', name: '...', username: '...', role: '...', paciente_id: '...' }
+const confirmedUser: AuthUser = { id: 'user-id', name: 'Doctora', username: 'doctora', role: 'doctora', paciente_id: null, activo: true }
 
 function SessionProbe() {
   const { status, user, sessionError, login, logout } = useAuth()
   return <>
     <span data-testid="auth-status">{status}</span>
-    <span data-testid="auth-user">{user ? 'present' : 'none'}</span>
+    <span data-testid="auth-user">{user ? `${user.role}:${user.paciente_id ?? 'null'}:${user.activo}` : 'none'}</span>
     {sessionError ? <span role="alert">{sessionError}</span> : null}
     <button onClick={() => { void login({ username: '1234567890', password: 'valid-password-123' }) }}>Login</button>
     <button onClick={() => { void logout() }}>Logout</button>
@@ -51,13 +52,14 @@ describe('AuthProvider', () => {
     expect(await screen.findByText('authenticated')).toBeInTheDocument()
     expect(getAccessToken()).toBe('token-confirmado')
     expect(sessionStorage.length).toBe(1)
-    expect(screen.getByTestId('auth-user')).toHaveTextContent('present')
+    expect(screen.getByTestId('auth-user')).toHaveTextContent('doctora:null:true')
+    expect([...Array(sessionStorage.length)].map((_, index) => sessionStorage.key(index))).toEqual(['clinic.access_token'])
     expect(vi.mocked(authService.login)).toHaveBeenCalledWith({ username: '1234567890', password: 'valid-password-123' })
   })
 
   it('restores an existing session through GET /user without exposing protected content while loading', async () => {
     setAccessToken('token-existente')
-    let resolveUser!: (user: unknown) => void
+    let resolveUser!: (user: AuthUser) => void
     vi.mocked(authService.getCurrentUser).mockReturnValue(new Promise((resolve) => { resolveUser = resolve }))
     render(<AuthProvider><SessionProbe/></AuthProvider>)
 
@@ -65,7 +67,7 @@ describe('AuthProvider', () => {
     await act(async () => { resolveUser(confirmedUser) })
 
     expect(screen.getByTestId('auth-status')).toHaveTextContent('authenticated')
-    expect(screen.getByTestId('auth-user')).toHaveTextContent('present')
+    expect(screen.getByTestId('auth-user')).toHaveTextContent('doctora:null:true')
     expect(vi.mocked(authService.getCurrentUser)).toHaveBeenCalledOnce()
   })
 

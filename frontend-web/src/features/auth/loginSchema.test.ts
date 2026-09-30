@@ -7,7 +7,7 @@ describe('loginSchema', () => {
 
     expect(result.success).toBe(false)
     if (!result.success) {
-      expect(result.error.flatten().fieldErrors.username).toContain('La cédula es obligatoria.')
+      expect(result.error.flatten().fieldErrors.username).toContain('El usuario o cédula es obligatorio.')
       expect(result.error.flatten().fieldErrors.password).toContain('La contraseña es obligatoria.')
     }
   })
@@ -26,5 +26,8 @@ describe('loginSchema', () => {
 
     expect(result).toEqual({ username: 'ABC1234567', password: 'Clave segura 2026' })
   })
-})
 
+  it('accepts the textual username doctora', () => {
+    expect(loginSchema.parse({ username: 'doctora', password: 'Clave segura 2026' }).username).toBe('doctora')
+  })
+})

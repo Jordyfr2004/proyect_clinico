@@ -1,11 +1,12 @@
 import { createContext, useContext } from 'react'
 import type { LoginValues } from './loginSchema'
+import type { AuthUser } from './authService'
 
 export type AuthStatus = 'loading' | 'authenticated' | 'guest'
 
 type AuthContextValue = {
   status: AuthStatus
-  user: unknown | null
+  user: AuthUser | null
   sessionError: string | null
   login: (values: LoginValues) => Promise<void>
   logout: () => Promise<void>

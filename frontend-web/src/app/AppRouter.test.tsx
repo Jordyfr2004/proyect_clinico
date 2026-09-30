@@ -1,19 +1,24 @@
-﻿import { act, fireEvent, render, screen } from '@testing-library/react'
+﻿import { act, fireEvent, render, screen, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { describe, expect, it, vi } from 'vitest'
 import { AppRouter } from './AppRouter'
 import { AUTH_FORBIDDEN_EVENT } from '../services/apiClient'
 import { AuthContext, type AuthStatus } from '../features/auth/authContext'
 import type { LoginValues } from '../features/auth/loginSchema'
+import type { AuthUser, UserRole } from '../features/auth/authService'
 
-function renderRouter(status: AuthStatus, path = '/', login: (values: LoginValues) => Promise<void> = async () => {}) {
+function renderRouter(status: AuthStatus, path = '/', login: (values: LoginValues) => Promise<void> = async () => {}, user: AuthUser | null = null) {
   render(
     <MemoryRouter initialEntries={[path]}>
-      <AuthContext.Provider value={{ status, user: null, sessionError: null, login, logout: async () => {} }}>
+      <AuthContext.Provider value={{ status, user, sessionError: null, login, logout: async () => {} }}>
         <AppRouter/>
       </AuthContext.Provider>
     </MemoryRouter>,
   )
+}
+
+function authenticatedUser(role: UserRole): AuthUser {
+  return { id: 'user-id', name: 'Nombre de sesión', username: 'usuario', role, paciente_id: null, activo: true }
 }
 
 describe('AppRouter', () => {
@@ -98,4 +103,47 @@ describe('AppRouter', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
   })
+
+  it.each([
+    ['doctora', true, true, 'Doctora'],
+    ['asistente', false, true, 'Asistente'],
+    ['paciente', false, false, 'Paciente'],
+  ] as const)('shows confirmed navigation and real identity for %s', (role, seesUsers, seesPatients, label) => {
+    renderRouter('authenticated', '/', undefined, authenticatedUser(role))
+
+    const navigation = within(screen.getByRole('navigation', { name: 'Navegación principal' }))
+    expect(Boolean(navigation.queryByRole('link', { name: 'Usuarios' }))).toBe(seesUsers)
+    expect(Boolean(navigation.queryByRole('link', { name: 'Pacientes' }))).toBe(seesPatients)
+    expect(Boolean(screen.queryByRole('link', { name: 'Registrar paciente' }))).toBe(seesPatients)
+    expect(Boolean(screen.queryByRole('link', { name: 'Ir a pacientes' }))).toBe(seesPatients)
+    expect(screen.getByRole('link', { name: 'Ir a la agenda' })).toBeInTheDocument()
+    expect(screen.getByText('Nombre de sesión')).toBeInTheDocument()
+    expect(within(screen.getByRole('banner')).getByText(label)).toBeInTheDocument()
+  })
+
+  it.each([
+    ['doctora', '/usuarios', true],
+    ['doctora', '/pacientes', true],
+    ['asistente', '/usuarios', false],
+    ['asistente', '/pacientes', true],
+    ['paciente', '/usuarios', false],
+    ['paciente', '/pacientes', false],
+    ['paciente', '/pacientes/patient-id/historial', false],
+    ['doctora', '/pacientes/patient-id/resumen', true],
+    ['asistente', '/pacientes/patient-id/historial', true],
+  ] as const)('applies confirmed access for %s at %s', (role, route, permitted) => {
+    renderRouter('authenticated', route, undefined, authenticatedUser(role))
+
+    if (permitted) {
+      expect(screen.getByRole('heading', { name: route === '/usuarios' ? 'Usuarios' : route.startsWith('/pacientes/') ? 'Paciente sin información disponible' : 'Pacientes' })).toBeInTheDocument()
+      expect(screen.queryByRole('heading', { name: 'Acceso no autorizado' })).not.toBeInTheDocument()
+    } else {
+      expect(screen.getByRole('heading', { name: 'Acceso no autorizado' })).toBeInTheDocument()
+      const back = screen.getByRole('link', { name: 'Volver al Dashboard' })
+      expect(back).toHaveAttribute('href', '/')
+      fireEvent.click(back)
+      expect(screen.getByRole('heading', { name: 'Bienvenido' })).toBeInTheDocument()
+    }
+  })
+
 })

@@ -5,10 +5,11 @@ import { getCurrentUser, login as requestLogin, logout as requestLogout } from '
 import { clearAccessToken, getAccessToken, setAccessToken } from './authStorage'
 import { AuthContext, type AuthStatus } from './authContext'
 import type { LoginValues } from './loginSchema'
+import type { AuthUser } from './authService'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>(() => getAccessToken() ? 'loading' : 'guest')
-  const [user, setUser] = useState<unknown | null>(null)
+  const [user, setUser] = useState<AuthUser | null>(null)
   const [sessionError, setSessionError] = useState<string | null>(null)
 
   useEffect(() => {

@@ -1,13 +1,18 @@
+import { z } from 'zod'
 import { apiClient } from '../../services/apiClient'
 import type { LoginValues } from './loginSchema'
 
-export type AuthUser = {
-  id: string
-  name: string
-  username: string
-  role: string
-  paciente_id: string
-}
+const authUserSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  username: z.string(),
+  role: z.enum(['doctora', 'asistente', 'paciente']),
+  paciente_id: z.string().nullable(),
+  activo: z.boolean(),
+})
+
+export type UserRole = z.infer<typeof authUserSchema.shape.role>
+export type AuthUser = z.infer<typeof authUserSchema>
 
 export type LoginResponse = {
   message: string
@@ -26,14 +31,13 @@ export async function login(values: LoginValues): Promise<LoginResponse> {
   if (!data || data.token_type !== 'Bearer' || typeof data.access_token !== 'string' || !data.access_token || !data.user || typeof data.user !== 'object' || Array.isArray(data.user)) {
     throw new Error('Invalid login response')
   }
-  return data
+  return { ...data, user: authUserSchema.parse(data.user) }
 }
 
-export async function getCurrentUser(): Promise<unknown> {
+export async function getCurrentUser(): Promise<AuthUser> {
   requireApiBaseUrl()
   const { data } = await apiClient.get<unknown>('/user')
-  if (!data || typeof data !== 'object' || Array.isArray(data)) throw new Error('Invalid current user response')
-  return data
+  return authUserSchema.parse(data)
 }
 
 export async function logout(): Promise<void> {
