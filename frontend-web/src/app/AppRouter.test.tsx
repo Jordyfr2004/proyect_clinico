@@ -1,22 +1,35 @@
-import { act, fireEvent, render, screen } from '@testing-library/react'
+﻿import { act, fireEvent, render, screen } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { AppRouter } from './AppRouter'
 import { AUTH_FORBIDDEN_EVENT } from '../services/apiClient'
+import { AuthContext, type AuthStatus } from '../features/auth/authContext'
+import type { LoginValues } from '../features/auth/loginSchema'
+
+function renderRouter(status: AuthStatus, path = '/', login: (values: LoginValues) => Promise<void> = async () => {}) {
+  render(
+    <MemoryRouter initialEntries={[path]}>
+      <AuthContext.Provider value={{ status, user: null, sessionError: null, login, logout: async () => {} }}>
+        <AppRouter/>
+      </AuthContext.Provider>
+    </MemoryRouter>,
+  )
+}
 
 describe('AppRouter', () => {
   it('redirects unauthenticated users from protected pages to login', () => {
-    render(
-      <MemoryRouter initialEntries={['/pacientes']}>
-        <AppRouter authStatus="guest" />
-      </MemoryRouter>,
-    )
-
+    renderRouter('guest', '/pacientes')
     expect(screen.getByRole('heading', { name: 'Bienvenido de nuevo' })).toBeInTheDocument()
   })
 
+  it('holds protected content while authentication is loading', () => {
+    renderRouter('loading', '/pacientes')
+    expect(screen.getByText('Verificando sesión…')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Pacientes' })).not.toBeInTheDocument()
+  })
+
   it('links public login to pending client registration and back', () => {
-    render(<MemoryRouter initialEntries={['/login']}><AppRouter authStatus="guest"/></MemoryRouter>)
+    renderRouter('guest', '/login')
 
     fireEvent.click(screen.getByRole('link', { name: 'Crear cuenta' }))
     expect(screen.getByRole('heading', { name: 'Crear cuenta' })).toBeInTheDocument()
@@ -27,25 +40,34 @@ describe('AppRouter', () => {
     expect(screen.getByRole('heading', { name: 'Bienvenido de nuevo' })).toBeInTheDocument()
   })
 
-  it('clears the pending integration notice when login values change after submission', async () => {
-    render(<MemoryRouter initialEntries={['/login']}><AppRouter authStatus="guest"/></MemoryRouter>)
+  it('sends username and password and shows a backend 422 message', async () => {
+    const login = vi.fn().mockRejectedValue({ isAxiosError: true, response: { status: 422, data: { message: 'Credenciales incorrectas.' } } })
+    renderRouter('guest', '/login', login)
 
-    fireEvent.change(screen.getByLabelText(/Correo electr/i), { target: { value: 'usuario@ejemplo.com' } })
+    fireEvent.change(screen.getByLabelText('Cédula'), { target: { value: '1234567890' } })
     fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'valid-password-123' } })
-    fireEvent.click(screen.getByRole('button', { name: /Iniciar sesi/i }))
+    fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
 
-    expect(await screen.findByRole('status')).toHaveTextContent('Integración pendiente')
+    expect(await screen.findByRole('alert')).toHaveTextContent('Credenciales incorrectas.')
+    expect(login).toHaveBeenCalledWith({ username: '1234567890', password: 'valid-password-123' })
 
-    fireEvent.change(screen.getByLabelText(/Correo electr/i), { target: { value: 'otro@ejemplo.com' } })
-    expect(screen.queryByRole('status')).not.toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Cédula'), { target: { value: '0987654321' } })
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('shows a safe message when the login request cannot reach the server', async () => {
+    const login = vi.fn().mockRejectedValue({ isAxiosError: true })
+    renderRouter('guest', '/login', login)
+
+    fireEvent.change(screen.getByLabelText('Cédula'), { target: { value: '1234567890' } })
+    fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'valid-password-123' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('No fue posible comunicarse con el servidor.')
   })
 
   it('renders the dashboard empty states for an authenticated session', () => {
-    render(
-      <MemoryRouter initialEntries={['/']}>
-        <AppRouter authStatus="authenticated" />
-      </MemoryRouter>,
-    )
+    renderRouter('authenticated')
 
     expect(screen.getByRole('heading', { name: 'Bienvenido' })).toBeInTheDocument()
     expect(screen.getByText('Hora')).toBeInTheDocument()
@@ -54,7 +76,7 @@ describe('AppRouter', () => {
   })
 
   it('shows a dismissible notice after a forbidden response without blocking the current page', () => {
-    render(<MemoryRouter><AppRouter authStatus="authenticated" /></MemoryRouter>)
+    renderRouter('authenticated')
 
     act(() => window.dispatchEvent(new Event(AUTH_FORBIDDEN_EVENT)))
 
@@ -66,7 +88,7 @@ describe('AppRouter', () => {
   })
 
   it('opens and closes the mobile navigation with Escape', () => {
-    render(<MemoryRouter><AppRouter authStatus="authenticated" /></MemoryRouter>)
+    renderRouter('authenticated')
     const trigger = screen.getByRole('button', { name: 'Abrir menú' })
 
     fireEvent.click(trigger)

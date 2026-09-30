@@ -11,3 +11,7 @@
 ## 2026-09-28
 
 - El registro público corresponde únicamente a clientes, sin selector de rol. La doctora será la única superadmin y creará a los asistentes desde el área administrativa. La integración del registro queda pendiente hasta confirmar el contrato del backend.
+
+## 2026-09-30
+
+- El backend confirmó el inicio de sesión con cédula (`username`) y tokens Bearer de Laravel Sanctum. El frontend envía el token en `Authorization` y lo conserva únicamente en `sessionStorage`, mediante un módulo aislado y provisional para esta V1.

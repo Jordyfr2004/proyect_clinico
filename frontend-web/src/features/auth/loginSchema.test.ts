@@ -2,20 +2,29 @@ import { describe, expect, it } from 'vitest'
 import { loginSchema } from './loginSchema'
 
 describe('loginSchema', () => {
-  it('rejects an invalid email and a short password', () => {
-    const result = loginSchema.safeParse({ email: 'correo-invalido', password: '123' })
+  it('requires a username and a password', () => {
+    const result = loginSchema.safeParse({ username: '   ', password: '' })
 
     expect(result.success).toBe(false)
     if (!result.success) {
-      expect(result.error.flatten().fieldErrors.email).toContain('Ingresa un correo válido.')
+      expect(result.error.flatten().fieldErrors.username).toContain('La cédula es obligatoria.')
+      expect(result.error.flatten().fieldErrors.password).toContain('La contraseña es obligatoria.')
+    }
+  })
+
+  it('rejects a password shorter than eight characters', () => {
+    const result = loginSchema.safeParse({ username: '1234567890', password: '123' })
+
+    expect(result.success).toBe(false)
+    if (!result.success) {
       expect(result.error.flatten().fieldErrors.password).toContain('La contraseña debe tener al menos 8 caracteres.')
     }
   })
 
-  it('normalizes a valid email without altering the password', () => {
-    const result = loginSchema.parse({ email: '  DOCTORA@CLINICA.COM ', password: 'Clave segura 2026' })
+  it('accepts a username without requiring an email or changing case', () => {
+    const result = loginSchema.parse({ username: '  ABC1234567 ', password: 'Clave segura 2026' })
 
-    expect(result).toEqual({ email: 'doctora@clinica.com', password: 'Clave segura 2026' })
+    expect(result).toEqual({ username: 'ABC1234567', password: 'Clave segura 2026' })
   })
 })
 
