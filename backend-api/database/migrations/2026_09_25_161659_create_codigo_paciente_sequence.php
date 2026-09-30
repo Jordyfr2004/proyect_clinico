@@ -7,11 +7,15 @@ return new class extends Migration
 {
     public function up(): void
     {
-        DB::statement('CREATE SEQUENCE codigo_paciente_seq START 1');
+        DB::statement(
+            'CREATE SEQUENCE IF NOT EXISTS codigo_paciente_seq START 1'
+        );
     }
 
     public function down(): void
     {
-        DB::statement('DROP SEQUENCE IF EXISTS codigo_paciente_seq');
+        DB::statement(
+            'DROP SEQUENCE IF EXISTS codigo_paciente_seq'
+        );
     }
 };

@@ -19,16 +19,5 @@ class UserSeeder extends Seeder
                 'paciente_id' => null,
             ]
         );
-
-        User::firstOrCreate(
-            ['username' => 'asistente'],
-            [
-                'name' => 'Asistente',
-                'email' => 'asistente@clinica.com',
-                'password' => '12345678',
-                'role' => 'asistente',
-                'paciente_id' => null,
-            ]
-        );
     }
 }

@@ -31,7 +31,17 @@ class AuthController extends Controller
             ]);
         }
 
-        $token = $user->createToken('auth_token')->plainTextToken;
+        if (!$user->activo) {
+            throw ValidationException::withMessages([
+                'username' => [
+                    'Esta cuenta se encuentra desactivada.',
+                ],
+            ]);
+        }
+
+        $token = $user
+            ->createToken('auth_token')
+            ->plainTextToken;
 
         return response()->json([
             'message' => 'Inicio de sesión correcto.',
@@ -43,6 +53,7 @@ class AuthController extends Controller
                 'username' => $user->username,
                 'role' => $user->role,
                 'paciente_id' => $user->paciente_id,
+                'activo' => $user->activo,
             ],
         ]);
     }
@@ -117,6 +128,7 @@ class AuthController extends Controller
                 'password' => $datos['password'],
                 'role' => 'paciente',
                 'paciente_id' => $paciente->id,
+                'activo' => true,
             ]);
 
             $token = $user
@@ -142,6 +154,7 @@ class AuthController extends Controller
                 'paciente_id' => $resultado['paciente']->id,
                 'codigo_paciente' =>
                     $resultado['paciente']->codigo_paciente,
+                'activo' => $resultado['user']->activo,
             ],
         ], 201);
     }

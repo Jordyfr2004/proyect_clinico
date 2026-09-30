@@ -54,20 +54,22 @@ Route::prefix('auth')->group(function () {
 // Estado de la API
 
 // Usuarios
-Route::middleware('auth:sanctum', 'role:doctora,asistente')->group(function () {
+Route::middleware('auth:sanctum', 'role:doctora')->group(function () {
 
     Route::prefix('usuarios')->group(function () {
         Route::get('/', [UsuarioController::class, 'index']);
         Route::get('/{id}', [UsuarioController::class, 'show']);
-        Route::post('/', [UsuarioController::class, 'store']);
+        Route::post('/asistente', [UsuarioController::class, 'crearAsistente']);
         Route::put('/{id}', [UsuarioController::class, 'update']);
         Route::delete('/{id}', [UsuarioController::class, 'destroy']);
     });
 });
 
 
+
+
 // Pacientes
-Route::middleware('auth:sanctum')->prefix('pacientes')->group(function () {
+Route::middleware('auth:sanctum','role:doctora,asistente')->prefix('pacientes')->group(function () {
     Route::get('/', [PacienteController::class, 'index']);
     Route::get('/{id}', [PacienteController::class, 'show']);
     Route::post('/', [PacienteController::class, 'store']);
@@ -162,27 +164,6 @@ Route::middleware('auth:sanctum')->prefix('radiografias')->group(function () {
 });
 
 
-// Insumos
-Route::middleware('auth:sanctum')->prefix('insumos')->group(function () {
-
-    Route::get('/', [InsumoController::class, 'index']);
-    Route::get('/stock-bajo', [InsumoController::class, 'stockBajo']);
-    Route::get('/{id}', [InsumoController::class, 'show']);
-    Route::post('/', [InsumoController::class, 'store']);
-    Route::put('/{id}', [InsumoController::class, 'update']);
-
-});
-
-
-// Movimientos de inventario
-Route::middleware('auth:sanctum')->prefix('movimientos-inventario')->group(function () {
-
-    Route::get('/', [MovimientoInventarioController::class, 'index']);
-    Route::get('/insumo/{insumoId}', [MovimientoInventarioController::class, 'porInsumo']);
-    Route::get('/{id}', [MovimientoInventarioController::class, 'show']);
-    Route::post('/', [MovimientoInventarioController::class, 'store']);
-
-});
 
 
 
