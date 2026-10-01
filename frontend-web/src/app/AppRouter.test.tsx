@@ -92,6 +92,24 @@ describe('AppRouter', () => {
     expect(screen.getByText('No hay pacientes para mostrar.')).toBeInTheDocument()
   })
 
+  it('presents the single assistant account as pending without management actions', () => {
+    renderRouter('authenticated', '/usuarios', undefined, authenticatedUser('doctora'))
+
+    expect(screen.getByRole('heading', { name: 'Cuenta de asistente' })).toBeInTheDocument()
+    expect(screen.getByText('La clínica utiliza una única cuenta con rol asistente.')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Integración pendiente')
+    expect(screen.queryByText('No hay usuarios para mostrar.')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /crear|activar|desactivar|contraseña/i })).not.toBeInTheDocument()
+  })
+
+  it('keeps pending modules honest and patient registration disabled', () => {
+    renderRouter('authenticated', '/pacientes', undefined, authenticatedUser('asistente'))
+
+    expect(screen.getByRole('status')).toHaveTextContent('Integración pendiente')
+    expect(screen.getByText('No hay pacientes registrados.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Registrar paciente' })).toBeDisabled()
+  })
+
   it('shows a dismissible notice after a forbidden response without blocking the current page', () => {
     renderRouter('authenticated')
 

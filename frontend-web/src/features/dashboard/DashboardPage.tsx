@@ -12,13 +12,13 @@ function DataRegion({ type, canViewPatients }: { type: 'appointments' | 'patient
     : ['Nombre', 'Última visita', 'Tratamiento', 'Estado', 'Acciones']
 
   return (
-    <section className="overflow-hidden rounded-xl border border-slate-200 bg-white">
-      <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 px-5 py-4">
+    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+      <div className="flex flex-col items-start gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
         <div className="flex items-center gap-3">
-          <span aria-hidden="true" className="text-slate-600">
+          <span aria-hidden="true" className="grid size-10 place-items-center rounded-lg bg-clinic-50 text-clinic-700">
             {appointments ? <CalendarDays size={21}/> : <UsersRound size={21}/>}
           </span>
-          <h2 className="font-semibold text-ink-950">{appointments ? 'Agenda de hoy' : 'Pacientes recientes'}</h2>
+          <h2 className="text-lg font-semibold tracking-tight text-ink-950">{appointments ? 'Agenda de hoy' : 'Pacientes recientes'}</h2>
         </div>
         {appointments || canViewPatients ? (
           <Link
@@ -29,7 +29,7 @@ function DataRegion({ type, canViewPatients }: { type: 'appointments' | 'patient
           </Link>
         ) : null}
       </div>
-      <div className={`hidden border-b border-slate-200 bg-slate-50/70 px-6 py-3 text-xs font-medium text-slate-600 md:grid ${appointments ? 'grid-cols-6' : 'grid-cols-5'}`}>
+      <div className={`hidden border-b border-slate-200 bg-slate-50/70 px-6 py-3 text-xs font-semibold text-slate-600 md:grid ${appointments ? 'grid-cols-6' : 'grid-cols-5'}`}>
         {columns.map((column) => <span key={column}>{column}</span>)}
       </div>
       <EmptyState
@@ -47,11 +47,11 @@ export function DashboardPage() {
 
   return (
     <div>
-      <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_430px]">
-        <div>
-          <h1 className="text-3xl font-bold tracking-tight text-ink-950">Bienvenido</h1>
-          <p className="mt-2 max-w-2xl leading-7 text-slate-500">Gestiona la actividad clínica y administrativa desde un solo lugar.</p>
-          <div className="mt-6 flex flex-wrap gap-3">
+      <div className="grid items-stretch gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(290px,360px)]">
+        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
+          <h1 className="text-3xl font-bold tracking-tight text-ink-950 sm:text-[2rem]">Bienvenido</h1>
+          <p className="mt-3 max-w-2xl leading-7 text-slate-600">Gestiona la actividad clínica y administrativa desde un solo lugar.</p>
+          <div className="mt-7 flex flex-wrap gap-3">
             <Link className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-clinic-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-clinic-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" to="/agenda">
               <CalendarDays aria-hidden="true" size={18}/>Ir a la agenda
             </Link>
@@ -64,7 +64,7 @@ export function DashboardPage() {
         </div>
         <IntegrationPending/>
       </div>
-      <div className="mt-8 space-y-6">
+      <div className="mt-6 grid gap-6">
         <DataRegion canViewPatients={canViewPatients} type="appointments"/>
         <DataRegion canViewPatients={canViewPatients} type="patients"/>
       </div>
