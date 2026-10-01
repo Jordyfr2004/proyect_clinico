@@ -14,7 +14,7 @@ class StorePacienteRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'nombre' => ['required', 'string', 'max:255'],
+            'nombres' => ['required', 'string', 'max:255'],
             'cedula' => ['required', 'string', 'max:20', 'unique:pacientes,cedula'],
             'telefono' => ['nullable', 'string', 'max:20'],
             'direccion' => ['nullable', 'string', 'max:255'],
@@ -25,7 +25,7 @@ class StorePacienteRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'nombre.required' => 'El nombre del paciente es obligatorio.',
+            'nombres.required' => 'Los nombres del paciente son obligatorios.',
             'cedula.required' => 'La cédula del paciente es obligatoria.',
             'cedula.unique' => 'Ya existe un paciente registrado con esta cédula.',
             'fecha_nacimiento.date' => 'La fecha de nacimiento no es válida.',

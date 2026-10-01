@@ -45,7 +45,7 @@ class PacienteController extends Controller
 
         $paciente = Paciente::create([
             'codigo_paciente' => $codigoPaciente,
-            'nombre' => $request->nombre,
+            'nombres' => $request->nombres,
             'cedula' => $request->cedula,
             'telefono' => $request->telefono,
             'direccion' => $request->direccion,
@@ -88,6 +88,5 @@ class PacienteController extends Controller
         ]);
     }
 }
-
 
 
