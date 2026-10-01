@@ -7,6 +7,8 @@ use App\Http\Requests\Paciente\StorePacienteRequest;
 use App\Models\Paciente;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Http\Request;
+
 
 class PacienteController extends Controller
 {
@@ -54,6 +56,36 @@ class PacienteController extends Controller
             'message' => 'Paciente registrado correctamente.',
             'data' => $paciente,
         ], 201);
+    }
+
+    public function miPerfil(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user->paciente_id) {
+            return response()->json([
+                'message' => 'La cuenta no está vinculada a un paciente.',
+            ], 404);
+        }
+
+        $paciente = Paciente::find($user->paciente_id);
+
+        if (!$paciente) {
+            return response()->json([
+                'message' => 'No se encontró el expediente del paciente.',
+            ], 404);
+        }
+
+        return response()->json([
+            'data' => [
+                'codigo_paciente' => $paciente->codigo_paciente,
+                'nombres' => $paciente->nombres,
+                'cedula' => $paciente->cedula,
+                'telefono' => $paciente->telefono,
+                'direccion' => $paciente->direccion,
+                'fecha_nacimiento' => $paciente->fecha_nacimiento,
+            ],
+        ]);
     }
 }
 

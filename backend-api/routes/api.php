@@ -51,13 +51,13 @@ Route::prefix('auth')->group(function () {
 });
 
 
-// Estado de la API
 
 // Usuarios
 Route::middleware('auth:sanctum', 'role:doctora')->group(function () {
 
     Route::prefix('usuarios')->group(function () {
         Route::get('/', [UsuarioController::class, 'index']);
+        Route::get('/asistente',[UsuarioController::class, 'verAsistente']);
         Route::get('/{id}', [UsuarioController::class, 'show']);
         Route::put('/{id}', [UsuarioController::class, 'update']);
         Route::delete('/{id}', [UsuarioController::class, 'destroy']);
@@ -65,8 +65,10 @@ Route::middleware('auth:sanctum', 'role:doctora')->group(function () {
         Route::post('/asistente/desactivar', [UsuarioController::class, 'desactivarAsistente']);
         Route::post('/asistente/activar', [UsuarioController::class, 'activarAsistente']);
         Route::post('asistente/password',[UsuarioController::class, 'cambiarPasswordAsistente']);
+        Route::get('/{id}', [UsuarioController::class, 'show']);
     });
 });
+
 
 
 
@@ -77,6 +79,13 @@ Route::middleware('auth:sanctum','role:doctora,asistente')->prefix('pacientes')-
     Route::get('/{id}', [PacienteController::class, 'show']);
     Route::post('/', [PacienteController::class, 'store']);
     Route::put('/{id}', [PacienteController::class, 'update']);
+});
+
+// Perfil del paciente
+Route::middleware('auth:sanctum','role:paciente')->prefix('paciente')->group(function () {
+
+    Route::get('/mi-perfil', [PacienteController::class, 'miPerfil']);
+
 });
 
 // Citas
