@@ -59,9 +59,12 @@ Route::middleware('auth:sanctum', 'role:doctora')->group(function () {
     Route::prefix('usuarios')->group(function () {
         Route::get('/', [UsuarioController::class, 'index']);
         Route::get('/{id}', [UsuarioController::class, 'show']);
-        Route::post('/asistente', [UsuarioController::class, 'crearAsistente']);
         Route::put('/{id}', [UsuarioController::class, 'update']);
         Route::delete('/{id}', [UsuarioController::class, 'destroy']);
+        Route::post('/asistente', [UsuarioController::class, 'crearAsistente']);
+        Route::post('/asistente/desactivar', [UsuarioController::class, 'desactivarAsistente']);
+        Route::post('/asistente/activar', [UsuarioController::class, 'activarAsistente']);
+        Route::post('asistente/password',[UsuarioController::class, 'cambiarPasswordAsistente']);
     });
 });
 

@@ -50,7 +50,11 @@ class UsuarioController extends Controller
     public function crearAsistente(Request $request): JsonResponse
     {
         $datos = $request->validate([
-            'name' => ['required', 'string', 'max:255'],
+            'name' => [
+                'required',
+                'string',
+                'max:255',
+            ],
             'email' => [
                 'required',
                 'email',
@@ -102,5 +106,136 @@ class UsuarioController extends Controller
                 'activo' => $asistente->activo,
             ],
         ], 201);
+    }
+
+    public function verAsistente(): JsonResponse
+    {
+        $asistente = User::where(
+            'role',
+            'asistente'
+        )->first();
+
+        if (!$asistente) {
+            return response()->json([
+                'message' => 'No existe una cuenta de asistente.',
+            ], 404);
+        }
+
+        return response()->json([
+            'data' => [
+                'id' => $asistente->id,
+                'name' => $asistente->name,
+                'email' => $asistente->email,
+                'username' => $asistente->username,
+                'role' => $asistente->role,
+                'activo' => $asistente->activo,
+            ],
+        ]);
+    }
+
+    public function desactivarAsistente(): JsonResponse
+    {
+        $asistente = User::where(
+            'role',
+            'asistente'
+        )->first();
+
+        if (!$asistente) {
+            return response()->json([
+                'message' => 'No existe una cuenta de asistente.',
+            ], 404);
+        }
+
+        if (!$asistente->activo) {
+            return response()->json([
+                'message' => 'La cuenta de asistente ya está desactivada.',
+            ], 409);
+        }
+
+        $asistente->update([
+            'activo' => false,
+        ]);
+
+        $asistente->tokens()->delete();
+
+        return response()->json([
+            'message' => 'Cuenta de asistente desactivada correctamente.',
+            'data' => [
+                'id' => $asistente->id,
+                'name' => $asistente->name,
+                'username' => $asistente->username,
+                'role' => $asistente->role,
+                'activo' => $asistente->activo,
+            ],
+        ]);
+    }
+
+    public function activarAsistente(): JsonResponse
+    {
+        $asistente = User::where(
+            'role',
+            'asistente'
+        )->first();
+
+        if (!$asistente) {
+            return response()->json([
+                'message' => 'No existe una cuenta de asistente.',
+            ], 404);
+        }
+
+        if ($asistente->activo) {
+            return response()->json([
+                'message' => 'La cuenta de asistente ya está activa.',
+            ], 409);
+        }
+
+        $asistente->update([
+            'activo' => true,
+        ]);
+
+        return response()->json([
+            'message' => 'Cuenta de asistente activada correctamente.',
+            'data' => [
+                'id' => $asistente->id,
+                'name' => $asistente->name,
+                'username' => $asistente->username,
+                'role' => $asistente->role,
+                'activo' => $asistente->activo,
+            ],
+        ]);
+    }
+
+    public function cambiarPasswordAsistente(Request $request): JsonResponse
+    {
+        $datos = $request->validate([
+            'password' => [
+                'required',
+                'string',
+                'min:8',
+                'confirmed',
+            ],
+        ]);
+
+        $asistente = User::where(
+            'role',
+            'asistente'
+        )->first();
+
+        if (!$asistente) {
+            return response()->json([
+                'message' => 'No existe una cuenta de asistente.',
+            ], 404);
+        }
+
+        $asistente->update([
+            'password' => $datos['password'],
+        ]);
+
+        // Cierra cualquier sesión activa de la asistente
+        $asistente->tokens()->delete();
+
+        return response()->json([
+            'message' => 'Contraseña de la asistente actualizada correctamente.',
+        ]);
     }
 }
