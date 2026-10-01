@@ -7,10 +7,19 @@ import { AuthContext, type AuthStatus } from '../features/auth/authContext'
 import type { LoginValues } from '../features/auth/loginSchema'
 import type { AuthUser, UserRole } from '../features/auth/authService'
 
+vi.mock('../features/assistant/assistantService', () => ({
+  getAssistant: vi.fn(() => new Promise(() => {})),
+}))
+vi.mock('../features/patients/patientService', () => ({
+  getPatients: vi.fn(() => Promise.resolve([])),
+  getPatient: vi.fn(() => new Promise(() => {})),
+  getMyProfile: vi.fn(() => new Promise(() => {})),
+}))
+
 function renderRouter(status: AuthStatus, path = '/', login: (values: LoginValues) => Promise<void> = async () => {}, user: AuthUser | null = null) {
   render(
     <MemoryRouter initialEntries={[path]}>
-      <AuthContext.Provider value={{ status, user, sessionError: null, login, logout: async () => {} }}>
+      <AuthContext.Provider value={{ status, user, sessionError: null, login, registerPatient: async () => {}, logout: async () => {} }}>
         <AppRouter/>
       </AuthContext.Provider>
     </MemoryRouter>,
@@ -33,13 +42,13 @@ describe('AppRouter', () => {
     expect(screen.queryByRole('heading', { name: 'Pacientes' })).not.toBeInTheDocument()
   })
 
-  it('links public login to pending client registration and back', () => {
+  it('links public login to the real patient registration form and back', () => {
     renderRouter('guest', '/login')
 
     fireEvent.click(screen.getByRole('link', { name: 'Crear cuenta' }))
     expect(screen.getByRole('heading', { name: 'Crear cuenta' })).toBeInTheDocument()
-    expect(screen.getByText('El registro de clientes aún no está disponible.')).toBeInTheDocument()
-    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+    expect(screen.getByRole('form', { name: 'Registro de paciente' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Cédula')).toHaveValue('')
 
     fireEvent.click(screen.getByRole('link', { name: 'Volver al inicio de sesión' }))
     expect(screen.getByRole('heading', { name: 'Bienvenido de nuevo' })).toBeInTheDocument()
@@ -55,6 +64,20 @@ describe('AppRouter', () => {
     expect(screen.queryByRole('button', { name: 'Solicitar recuperación' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('link', { name: 'Volver al inicio de sesión' }))
     expect(screen.getByRole('heading', { name: 'Bienvenido de nuevo' })).toBeInTheDocument()
+  })
+
+  it('redirects authenticated users away from password recovery', () => {
+    renderRouter('authenticated', '/recuperar-contrasena', undefined, authenticatedUser('doctora'))
+
+    expect(screen.getByRole('heading', { name: 'Bienvenido' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Recupera tu acceso' })).not.toBeInTheDocument()
+  })
+
+  it('holds password recovery while the session is loading', () => {
+    renderRouter('loading', '/recuperar-contrasena')
+
+    expect(screen.getByText('Verificando sesión…')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Recupera tu acceso' })).not.toBeInTheDocument()
   })
 
   it('sends username and password and shows a backend 422 message', async () => {
@@ -92,22 +115,19 @@ describe('AppRouter', () => {
     expect(screen.getByText('No hay pacientes para mostrar.')).toBeInTheDocument()
   })
 
-  it('presents the single assistant account as pending without management actions', () => {
+  it('starts the confirmed assistant consultation only on the authorized route', () => {
     renderRouter('authenticated', '/usuarios', undefined, authenticatedUser('doctora'))
 
-    expect(screen.getByRole('heading', { name: 'Cuenta de asistente' })).toBeInTheDocument()
-    expect(screen.getByText('La clínica utiliza una única cuenta con rol asistente.')).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('Integración pendiente')
-    expect(screen.queryByText('No hay usuarios para mostrar.')).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: /crear|activar|desactivar|contraseña/i })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Usuarios' })).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Cargando')
+    expect(screen.queryByRole('heading', { name: 'Crear cuenta de asistente' })).not.toBeInTheDocument()
   })
 
-  it('keeps pending modules honest and patient registration disabled', () => {
+  it('consults patients and offers creation after the backend contract is aligned', async () => {
     renderRouter('authenticated', '/pacientes', undefined, authenticatedUser('asistente'))
 
-    expect(screen.getByRole('status')).toHaveTextContent('Integración pendiente')
-    expect(screen.getByText('No hay pacientes registrados.')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Registrar paciente' })).toBeDisabled()
+    expect(await screen.findByText('No hay pacientes registrados.')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Registrar paciente' })).toBeEnabled()
   })
 
   it('shows a dismissible notice after a forbidden response without blocking the current page', () => {
@@ -145,6 +165,7 @@ describe('AppRouter', () => {
     const navigation = within(screen.getByRole('navigation', { name: 'Navegación principal' }))
     expect(Boolean(navigation.queryByRole('link', { name: 'Usuarios' }))).toBe(seesUsers)
     expect(Boolean(navigation.queryByRole('link', { name: 'Pacientes' }))).toBe(seesPatients)
+    expect(Boolean(navigation.queryByRole('link', { name: 'Mi perfil' }))).toBe(role === 'paciente')
     expect(screen.queryByRole('link', { name: 'Registrar paciente' })).not.toBeInTheDocument()
     expect(screen.queryAllByRole('link', { name: 'Ir a pacientes' })).toHaveLength(seesPatients ? 2 : 0)
     expect(screen.getByRole('link', { name: 'Ir a la agenda' })).toBeInTheDocument()
@@ -161,13 +182,16 @@ describe('AppRouter', () => {
     ['paciente', '/usuarios', false],
     ['paciente', '/pacientes', false],
     ['paciente', '/pacientes/patient-id/historial', false],
+    ['paciente', '/mi-perfil', true],
+    ['doctora', '/mi-perfil', false],
     ['doctora', '/pacientes/patient-id/resumen', true],
     ['asistente', '/pacientes/patient-id/historial', true],
   ] as const)('applies confirmed access for %s at %s', (role, route, permitted) => {
     renderRouter('authenticated', route, undefined, authenticatedUser(role))
 
     if (permitted) {
-      expect(screen.getByRole('heading', { name: route === '/usuarios' ? 'Usuarios' : route.startsWith('/pacientes/') ? 'Paciente sin información disponible' : 'Pacientes' })).toBeInTheDocument()
+      if (route.startsWith('/pacientes/')) expect(screen.getByRole('status')).toHaveTextContent('Cargando')
+      else expect(screen.getByRole('heading', { name: route === '/usuarios' ? 'Usuarios' : route === '/mi-perfil' ? 'Mi perfil' : 'Pacientes' })).toBeInTheDocument()
       expect(screen.queryByRole('heading', { name: 'Acceso no autorizado' })).not.toBeInTheDocument()
     } else {
       expect(screen.getByRole('heading', { name: 'Acceso no autorizado' })).toBeInTheDocument()

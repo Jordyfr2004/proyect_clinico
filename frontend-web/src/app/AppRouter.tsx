@@ -7,8 +7,11 @@ import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage'
 import { LoginPage } from '../features/auth/LoginPage'
 import { RegisterPage } from '../features/auth/RegisterPage'
 import { DashboardPage } from '../features/dashboard/DashboardPage'
+import { UsersPage } from '../features/assistant/UsersPage'
 import { ModulePage } from '../features/modules/ModulePage'
 import { PatientSection, PatientWorkspace } from '../features/patients/PatientWorkspace'
+import { PatientsPage } from '../features/patients/PatientsPage'
+import { MyProfilePage } from '../features/patients/MyProfilePage'
 import { AppLayout } from '../layouts/AppLayout'
 import { PublicLayout } from '../layouts/PublicLayout'
 
@@ -58,13 +61,13 @@ export function AppRouter() {
       <Route element={<PublicLayout/>}>
         <Route element={authStatus === 'loading' ? <LoadingSession/> : authStatus === 'authenticated' ? <Navigate replace to="/"/> : <LoginPage/>} path="/login"/>
         <Route element={authStatus === 'loading' ? <LoadingSession/> : authStatus === 'authenticated' ? <Navigate replace to="/"/> : <RegisterPage/>} path="/registro"/>
-        <Route element={<ForgotPasswordPage/>} path="/recuperar-contrasena"/>
+        <Route element={authStatus === 'loading' ? <LoadingSession/> : authStatus === 'authenticated' ? <Navigate replace to="/"/> : <ForgotPasswordPage/>} path="/recuperar-contrasena"/>
       </Route>
       <Route element={<ProtectedArea/>}>
         <Route element={<DashboardPage/>} index/>
         <Route element={<ModulePage module="agenda"/>} path="agenda"/>
         <Route element={<RestrictedRoute area="pacientes"/>}>
-          <Route element={<ModulePage module="pacientes"/>} path="pacientes"/>
+          <Route element={<PatientsPage/>} path="pacientes"/>
           <Route element={<PatientWorkspace/>} path="pacientes/:patientId">
             <Route element={<Navigate replace to="resumen"/>} index/>
             <Route element={<PatientSection title="Resumen"/>} path="resumen"/>
@@ -77,9 +80,12 @@ export function AppRouter() {
             <Route element={<PatientSection title="Planes y presupuestos"/>} path="planes"/>
           </Route>
         </Route>
+        <Route element={<RestrictedRoute area="mi-perfil"/>}>
+          <Route element={<MyProfilePage/>} path="mi-perfil"/>
+        </Route>
         <Route element={<ModulePage module="reportes"/>} path="reportes"/>
         <Route element={<RestrictedRoute area="usuarios"/>}>
-          <Route element={<ModulePage module="usuarios"/>} path="usuarios"/>
+          <Route element={<UsersPage/>} path="usuarios"/>
         </Route>
         <Route element={<ModulePage module="configuracion"/>} path="configuracion"/>
       </Route>

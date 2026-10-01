@@ -11,6 +11,7 @@ const navItems: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/agenda', label: 'Agenda', icon: CalendarDays },
   { to: '/pacientes', label: 'Pacientes', icon: UsersRound, access: 'pacientes' },
+  { to: '/mi-perfil', label: 'Mi perfil', icon: UserRound, access: 'mi-perfil' },
   { to: '/reportes', label: 'Reportes', icon: BarChart3 },
   { to: '/usuarios', label: 'Usuarios', icon: UserRound, access: 'usuarios' },
   { to: '/configuracion', label: 'Configuración', icon: Settings },

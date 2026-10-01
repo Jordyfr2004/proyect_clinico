@@ -1,6 +1,6 @@
 # Frontend web — Clínica Dental
 
-SPA administrativa para la doctora y el personal asistencial. Está construida con React, TypeScript, Vite, React Router, Axios, Tailwind CSS, React Hook Form, Zod y Lucide React.
+SPA web para la gestión clínica y administrativa. El contrato de autenticación reconoce los roles doctora, asistente y paciente; el frontend solo aplica las restricciones confirmadas por el backend. Está construida con React, TypeScript, Vite, React Router, Axios, Tailwind CSS, React Hook Form, Zod y Lucide React.
 
 ## Desarrollo
 
@@ -10,7 +10,7 @@ Copy-Item .env.example .env.local
 npm run dev
 ```
 
-Configura `VITE_API_BASE_URL` en `.env.local` cuando el backend Laravel publique su URL y sus contratos HTTP. El cliente Axios ya utiliza cookies mediante `withCredentials`, cabeceras JSON y eventos diferenciados para respuestas 401/403.
+Configura `VITE_API_BASE_URL` localmente en `.env.local` con la base de la API confirmada por backend. `.env` y `.env.local` no se versionan. La autenticación actual es real: Axios usa un token Bearer de Laravel Sanctum, restaura el usuario con `GET /user` y distingue respuestas 401/403.
 
 ## Comandos
 
@@ -28,7 +28,7 @@ npm run build
 - `src/components`: controles y estados reutilizables.
 - `src/services`: cliente HTTP y futuros servicios por recurso.
 
-El frontend no contiene datos simulados ni contratos de API inventados. Los módulos dependientes del backend muestran estados vacíos o de integración pendiente hasta disponer de endpoints verificables.
+El frontend no contiene datos simulados ni contratos de API inventados. El código integra login, registro público de pacientes, sesión, gestión de la única cuenta de asistente, listado, detalle y registro administrativo de pacientes para doctora/asistente, y consulta del perfil propio para paciente. `POST /pacientes` usa el contrato `nombres` alineado en Request, Controller y Model de `origin/backend`; tras un 201 vuelve a consultar el listado. Los contratos se inspeccionaron en backend y tienen pruebas automatizadas; la prueba extremo a extremo autenticada sigue pendiente de una sesión real. La edición de pacientes, recuperación de contraseña, datos clínicos, agenda y reportes continúan pendientes.
 
 ## Contexto para desarrollo
 

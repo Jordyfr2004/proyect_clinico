@@ -1,10 +1,11 @@
 import { isAxiosError } from 'axios'
 import { useEffect, useState, type ReactNode } from 'react'
 import { AUTH_UNAUTHORIZED_EVENT } from '../../services/apiClient'
-import { getCurrentUser, login as requestLogin, logout as requestLogout } from './authService'
+import { getCurrentUser, login as requestLogin, logout as requestLogout, registerPatient as requestRegisterPatient } from './authService'
 import { clearAccessToken, getAccessToken, setAccessToken } from './authStorage'
 import { AuthContext, type AuthStatus } from './authContext'
 import type { LoginValues } from './loginSchema'
+import type { RegisterPatientValues } from './registerPatientSchema'
 import type { AuthUser } from './authService'
 
 export function AuthProvider({ children }: { children: ReactNode }) {
@@ -47,10 +48,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = async (values: LoginValues) => {
     const response = await requestLogin(values)
+    acceptSession(response)
+  }
+
+  const acceptSession = (response: { access_token: string; user: AuthUser }) => {
     setAccessToken(response.access_token)
     setUser(response.user)
     setSessionError(null)
     setStatus('authenticated')
+  }
+
+  const registerPatient = async (values: RegisterPatientValues) => {
+    const response = await requestRegisterPatient(values)
+    acceptSession(response)
   }
 
   const logout = async () => {
@@ -66,5 +76,5 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  return <AuthContext.Provider value={{ status, user, sessionError, login, logout }}>{children}</AuthContext.Provider>
+  return <AuthContext.Provider value={{ status, user, sessionError, login, registerPatient, logout }}>{children}</AuthContext.Provider>
 }
