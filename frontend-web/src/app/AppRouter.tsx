@@ -23,7 +23,7 @@ function RestrictedRoute({ area }: { area: RestrictedArea }) {
   return <section aria-labelledby="access-denied-title" className="rounded-xl border border-slate-200 bg-white p-6">
     <h1 className="text-2xl font-semibold text-ink-950" id="access-denied-title">Acceso no autorizado</h1>
     <p className="mt-2 text-slate-600">No tienes permiso para acceder a esta sección.</p>
-    <Link className="mt-4 inline-flex rounded-lg text-sm font-semibold text-clinic-700 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" to="/">Volver al Dashboard</Link>
+    <Link className="mt-4 inline-flex min-h-11 items-center rounded-lg text-sm font-semibold text-clinic-700 underline-offset-4 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" to="/">Volver al Dashboard</Link>
   </section>
 }
 
@@ -38,7 +38,16 @@ function ProtectedArea() {
   }, [authStatus])
   if (authStatus === 'loading') return <LoadingSession/>
   if (authStatus !== 'authenticated') return <Navigate replace to="/login"/>
-  return <>{forbidden ? <div role="alert" className="border-b border-amber-300 bg-amber-50 px-4 py-3 text-amber-950"><h2 className="font-semibold">Acceso no autorizado</h2><p>No tienes permiso para completar esta operación.</p><button className="mt-2 rounded border border-amber-700 px-3 py-1" onClick={() => setForbidden(false)} type="button">Cerrar aviso</button></div> : null}<AppLayout/></>
+  return <>
+    {forbidden ? (
+      <div className="border-b border-amber-300 bg-amber-50 px-4 py-3 text-amber-950" role="alert">
+        <h2 className="font-semibold">Acceso no autorizado</h2>
+        <p className="mt-1 text-sm leading-6">No tienes permiso para completar esta operación.</p>
+        <button className="mt-2 min-h-11 rounded-lg border border-amber-700 px-3 text-sm font-semibold hover:bg-amber-100 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-800" onClick={() => setForbidden(false)} type="button">Cerrar aviso</button>
+      </div>
+    ) : null}
+    <AppLayout/>
+  </>
 }
 
 export function AppRouter() {

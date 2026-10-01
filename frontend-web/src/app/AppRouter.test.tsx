@@ -45,6 +45,18 @@ describe('AppRouter', () => {
     expect(screen.getByRole('heading', { name: 'Bienvenido de nuevo' })).toBeInTheDocument()
   })
 
+  it('explains pending password recovery without presenting a working form', () => {
+    renderRouter('guest', '/recuperar-contrasena')
+
+    expect(screen.getByRole('heading', { name: 'Recupera tu acceso' })).toBeInTheDocument()
+    expect(screen.getByText('La recuperación de contraseña todavía no está disponible.')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent('Integración pendiente')
+    expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Solicitar recuperación' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('link', { name: 'Volver al inicio de sesión' }))
+    expect(screen.getByRole('heading', { name: 'Bienvenido de nuevo' })).toBeInTheDocument()
+  })
+
   it('sends username and password and shows a backend 422 message', async () => {
     const login = vi.fn().mockRejectedValue({ isAxiosError: true, response: { status: 422, data: { message: 'Credenciales incorrectas.' } } })
     renderRouter('guest', '/login', login)
@@ -98,10 +110,11 @@ describe('AppRouter', () => {
 
     fireEvent.click(trigger)
     expect(trigger).toHaveAttribute('aria-expanded', 'true')
-    expect(screen.getByRole('button', { name: 'Cerrar menú' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Cerrar menú' })).toHaveFocus()
 
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    expect(trigger).toHaveFocus()
   })
 
   it.each([
@@ -114,9 +127,10 @@ describe('AppRouter', () => {
     const navigation = within(screen.getByRole('navigation', { name: 'Navegación principal' }))
     expect(Boolean(navigation.queryByRole('link', { name: 'Usuarios' }))).toBe(seesUsers)
     expect(Boolean(navigation.queryByRole('link', { name: 'Pacientes' }))).toBe(seesPatients)
-    expect(Boolean(screen.queryByRole('link', { name: 'Registrar paciente' }))).toBe(seesPatients)
-    expect(Boolean(screen.queryByRole('link', { name: 'Ir a pacientes' }))).toBe(seesPatients)
+    expect(screen.queryByRole('link', { name: 'Registrar paciente' })).not.toBeInTheDocument()
+    expect(screen.queryAllByRole('link', { name: 'Ir a pacientes' })).toHaveLength(seesPatients ? 2 : 0)
     expect(screen.getByRole('link', { name: 'Ir a la agenda' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Ayuda' })).not.toBeInTheDocument()
     expect(screen.getByText('Nombre de sesión')).toBeInTheDocument()
     expect(within(screen.getByRole('banner')).getByText(label)).toBeInTheDocument()
   })
