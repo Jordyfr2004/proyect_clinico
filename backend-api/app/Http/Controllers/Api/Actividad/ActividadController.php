@@ -20,6 +20,15 @@ class ActividadController extends Controller
             $query->whereDate('fecha', $request->fecha);
         }
 
+        if ($request->filled('semana')) {
+            $fecha = Carbon::parse($request->semana);
+
+            $query->whereBetween('fecha', [
+                $fecha->copy()->startOfWeek(),
+                $fecha->copy()->endOfWeek(),
+            ]);
+        }
+
         if ($request->filled('mes') && $request->filled('anio')) {
             $query->whereMonth('fecha', $request->mes)
                 ->whereYear('fecha', $request->anio);

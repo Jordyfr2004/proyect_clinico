@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Paciente;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Paciente\StorePacienteRequest;
+use App\Http\Requests\Paciente\UpdatePacienteRequest;
 use App\Models\Paciente;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Support\Facades\DB;
@@ -58,6 +59,17 @@ class PacienteController extends Controller
         ], 201);
     }
 
+    public function update(UpdatePacienteRequest $request, string $id): JsonResponse
+    {
+        $paciente = Paciente::findOrFail($id);
+        $paciente->update($request->validated());
+
+        return response()->json([
+            'message' => 'Paciente actualizado correctamente.',
+            'data' => $paciente->fresh(),
+        ]);
+    }
+
     public function miPerfil(Request $request): JsonResponse
     {
         $user = $request->user();
@@ -88,5 +100,4 @@ class PacienteController extends Controller
         ]);
     }
 }
-
 

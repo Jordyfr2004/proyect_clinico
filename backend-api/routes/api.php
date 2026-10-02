@@ -11,10 +11,6 @@ use App\Http\Controllers\Api\Usuario\RolController;
 
 use App\Http\Controllers\Api\Paciente\PacienteController;
 
-use App\Http\Controllers\Api\Cita\CitaController;
-use App\Http\Controllers\Api\Cita\HorarioController;
-use App\Http\Controllers\Api\Cita\ListaEsperaController;
-
 use App\Http\Controllers\Api\Clinica\HistorialClinicoController;
 use App\Http\Controllers\Api\Clinica\DiagnosticoController;
 use App\Http\Controllers\Api\Clinica\TratamientoController;
@@ -28,6 +24,8 @@ use App\Http\Controllers\Api\Reporte\ReporteController;
 use App\Http\Controllers\Api\Notificacion\NotificacionController;
 
 use App\Http\Controllers\Api\Actividad\ActividadController;
+
+use App\Http\Controllers\Api\Agenda\AgendaController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -100,35 +98,6 @@ Route::middleware('auth:sanctum','role:paciente')->prefix('paciente')->group(fun
 
 });
 
-// Citas
-Route::middleware('auth:sanctum')->prefix('citas')->group(function () {
-
-    Route::get('/', [CitaController::class, 'index']);
-    Route::get('/{id}', [CitaController::class, 'show']);
-    Route::post('/', [CitaController::class, 'store']);
-
-    Route::put('/{id}/reprogramar', [CitaController::class, 'reprogramar']);
-    Route::put('/{id}/cancelar', [CitaController::class, 'cancelar']);
-    Route::put('/{id}/confirmar', [CitaController::class, 'confirmar']);
-});
-
-// Horarios y disponibilidad
-Route::middleware('auth:sanctum')->prefix('horarios')->group(function () {
-
-    Route::get('/', [HorarioController::class, 'index']);
-    Route::get('/disponibilidad', [HorarioController::class, 'disponibilidad']);
-
-});
-
-
-// Lista de espera
-Route::middleware('auth:sanctum')->prefix('lista-espera')->group(function () {
-
-    Route::get('/', [ListaEsperaController::class, 'index']);
-    Route::post('/', [ListaEsperaController::class, 'store']);
-    Route::delete('/{id}', [ListaEsperaController::class, 'destroy']);
-
-});
 
 // Historial clínico - doctora y asistente pueden consultar
 Route::middleware('auth:sanctum','role:doctora,asistente')->prefix('historiales-clinicos')->group(function () { 
@@ -219,27 +188,69 @@ Route::middleware('auth:sanctum')->prefix('reportes')->group(function () {
 
 
 
-// Actividades - doctora y asistente pueden consultar
-Route::middleware('auth:sanctum','role:doctora,asistente')->prefix('actividades')->group(function () { 
+Route::prefix('actividades')->group(function () {
 
-    Route::get('/', [ActividadController::class, 'index']); 
+    // Doctora y asistente pueden consultar
+    Route::middleware('auth:sanctum', 'role:doctora,asistente')->group(function () {
 
-    Route::get('/paciente/codigo/{codigo}', [ActividadController::class, 'buscarPacientePorCodigo']); 
+        Route::get('/', [ActividadController::class, 'index']);
 
-    Route::get('/resumen', [ActividadController::class, 'resumen']); 
+        Route::get('/paciente/codigo/{codigo}', [ActividadController::class, 'buscarPacientePorCodigo']);
 
-    Route::get('/{id}', [ActividadController::class, 'show']); 
+        Route::get('/resumen', [ActividadController::class, 'resumen']);
 
-}); 
+        Route::get('/{id}', [ActividadController::class, 'show']);
+
+    });
+
+    // Solo doctora puede crear, editar y eliminar
+    Route::middleware('auth:sanctum', 'role:doctora')->group(function () {
+
+        Route::post('/', [ActividadController::class, 'store']);
+
+        Route::put('/{id}', [ActividadController::class, 'update']);
+
+        Route::delete('/{id}', [ActividadController::class, 'destroy']);
+
+    });
+
+});
 
 
-// Actividades - solo doctora puede crear, editar y eliminar
-Route::middleware('auth:sanctum','role:doctora')->prefix('actividades')->group(function () { 
 
-    Route::post('/', [ActividadController::class, 'store']); 
 
-    Route::put('/{id}', [ActividadController::class, 'update']); 
+// Agenda
+Route::prefix('agenda')->group(function () {
 
-    Route::delete('/{id}', [ActividadController::class, 'destroy']); 
+    // Doctora
+    Route::middleware('auth:sanctum', 'role:doctora')->group(function () {
 
-}); 
+        Route::get('/', [AgendaController::class, 'index']);
+
+        Route::get('/{id}', [AgendaController::class, 'show']);
+
+        Route::post('/personal', [AgendaController::class, 'crearPersonal']);
+
+        Route::post('/cita-medica', [AgendaController::class, 'crearCitaMedica']);
+
+        Route::put('/solicitud/{id}/programar', [AgendaController::class, 'programarSolicitud']);
+
+        Route::put('/{id}', [AgendaController::class, 'update']);
+
+        Route::put('/{id}/cancelar', [AgendaController::class, 'cancelarCita']);
+
+        Route::put('/{id}/completar', [AgendaController::class, 'completarCita']);
+
+        Route::delete('/{id}', [AgendaController::class, 'destroy']);
+
+    });
+
+
+    // Paciente
+    Route::middleware('auth:sanctum', 'role:paciente')->group(function () {
+
+        Route::post('/solicitar-cita', [AgendaController::class, 'solicitarCita']);
+
+    });
+
+});
