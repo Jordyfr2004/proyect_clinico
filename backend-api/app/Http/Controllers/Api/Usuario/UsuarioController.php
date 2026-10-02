@@ -238,4 +238,28 @@ class UsuarioController extends Controller
             'message' => 'Contraseña de la asistente actualizada correctamente.',
         ]);
     }
+
+    public function eliminarAsistente(): JsonResponse
+    {
+        $asistente = User::where(
+            'role',
+            'asistente'
+        )->first();
+
+        if (!$asistente) {
+            return response()->json([
+                'message' => 'No existe una cuenta de asistente.',
+            ], 404);
+        }
+
+        // Elimina todos sus tokens/sesiones
+        $asistente->tokens()->delete();
+
+        // Elimina la cuenta
+        $asistente->delete();
+
+        return response()->json([
+            'message' => 'Cuenta de asistente eliminada correctamente.',
+        ]);
+    }
 }

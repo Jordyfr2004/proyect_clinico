@@ -60,6 +60,7 @@ Route::middleware('auth:sanctum', 'role:doctora')->group(function () {
         Route::get('/asistente',[UsuarioController::class, 'verAsistente']);
         Route::get('/{id}', [UsuarioController::class, 'show']);
         Route::put('/{id}', [UsuarioController::class, 'update']);
+        Route::delete('/asistente', [UsuarioController::class, 'eliminarAsistente']);
         Route::delete('/{id}', [UsuarioController::class, 'destroy']);
         Route::post('/asistente', [UsuarioController::class, 'crearAsistente']);
         Route::post('/asistente/desactivar', [UsuarioController::class, 'desactivarAsistente']);
@@ -118,16 +119,31 @@ Route::middleware('auth:sanctum')->prefix('lista-espera')->group(function () {
 
 });
 
-// Historial clínico
-Route::middleware('auth:sanctum')->prefix('historiales-clinicos')->group(function () {
+// Historial clínico - doctora y asistente pueden consultar
+Route::middleware('auth:sanctum','role:doctora,asistente')->prefix('historiales-clinicos')->group(function () { 
+ 
+    Route::get('/', [HistorialClinicoController::class, 'index']); 
+    Route::get('/paciente/{pacienteId}', [HistorialClinicoController::class, 'porPaciente']); 
+    Route::get('/{id}', [HistorialClinicoController::class, 'show']); 
+ 
+}); 
 
-    Route::get('/', [HistorialClinicoController::class, 'index']);
-    Route::get('/paciente/{pacienteId}', [HistorialClinicoController::class, 'porPaciente']);
-    Route::get('/{id}', [HistorialClinicoController::class, 'show']);
-    Route::post('/', [HistorialClinicoController::class, 'store']);
-    Route::put('/{id}', [HistorialClinicoController::class, 'update']);
 
-});
+// Historial clínico - solo doctora puede crear y actualizar
+Route::middleware('auth:sanctum','role:doctora')->prefix('historiales-clinicos')->group(function () { 
+ 
+    Route::post('/', [HistorialClinicoController::class, 'store']); 
+    Route::put('/{id}', [HistorialClinicoController::class, 'update']); 
+ 
+}); 
+
+
+// Historial clínico propio del paciente
+Route::middleware('auth:sanctum','role:paciente')->prefix('paciente')->group(function () { 
+ 
+    Route::get('/mi-historial', [HistorialClinicoController::class, 'miHistorial']); 
+ 
+}); 
 
 // Diagnósticos
 Route::middleware('auth:sanctum')->prefix('diagnosticos')->group(function () {
