@@ -1,4 +1,5 @@
 import { isAxiosError } from 'axios'
+import { ArrowLeft, FileText } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { Link, Navigate, NavLink, Outlet, useOutletContext, useParams } from 'react-router-dom'
 import { ErrorState } from '../../components/states/ErrorState'
@@ -32,18 +33,28 @@ function PatientDetail({ patientId }: { patientId: string }) {
 
   if (state.kind === 'loading') return <LoadingState/>
   if (state.kind === 'error') return <ErrorState description={state.message} onRetry={load}/>
-  if (state.kind === 'missing') return <section className="rounded-xl border border-slate-200 bg-white p-6" role="alert"><h1 className="text-xl font-semibold text-ink-950">Paciente no encontrado</h1><Link className="mt-4 inline-flex min-h-11 items-center text-clinic-700 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" to="/pacientes">Volver a Pacientes</Link></section>
+  if (state.kind === 'missing') return <section className="admin-surface rounded-xl p-6" role="alert"><h1 className="text-xl font-semibold text-ink-950">Paciente no encontrado</h1><Link className="mt-4 inline-flex min-h-11 items-center text-clinic-700 underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" to="/pacientes">Volver a Pacientes</Link></section>
 
   return (
-    <div>
-      <div className="border-b border-slate-200 pb-5">
-        <p className="text-sm font-medium text-clinic-700">Paciente {state.patient.codigo_paciente}</p>
-        <h1 className="mt-2 break-words text-2xl font-bold text-ink-950">{state.patient.nombres}</h1>
-        <p className="mt-2 text-sm text-slate-600">Cédula: {state.patient.cedula}</p>
+    <div className="admin-reveal min-w-0 max-w-[1330px]">
+      <Link className="mb-5 inline-flex min-h-9 items-center gap-2 text-sm font-semibold text-clinic-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2" to="/pacientes"><ArrowLeft aria-hidden="true" size={16}/>Pacientes</Link>
+      <div className="admin-surface-raised overflow-hidden rounded-[22px]">
+        <div className="admin-record-hero p-6 sm:p-8">
+          <div className="flex flex-wrap items-center gap-4 sm:gap-5">
+            <span aria-hidden="true" className="admin-record-avatar grid size-14 shrink-0 place-items-center rounded-[16px] text-xl font-bold sm:size-[74px] sm:rounded-[18px] sm:text-2xl">{state.patient.nombres.trim().charAt(0).toLocaleUpperCase('es')}</span>
+            <div className="min-w-[170px] flex-1"><p className="admin-kicker">Expediente clínico</p><h1 className="mt-1 break-words text-[22px] font-bold tracking-tight text-white sm:text-[32px]">{state.patient.nombres}</h1><p className="mt-2 break-words text-sm text-sky-100/80">Código {state.patient.codigo_paciente}</p></div>
+            <span className="admin-record-badge self-start rounded-full px-3 py-1.5 text-xs font-semibold sm:self-center"><FileText aria-hidden="true" className="mr-1 inline" size={14}/>Expediente</span>
+          </div>
+          <dl className="mt-6 grid grid-cols-2 gap-4 border-t border-sky-200/20 pt-5 lg:grid-cols-3">
+            <div><dt className="text-[11px] font-bold uppercase tracking-wider text-sky-200/75">Cédula</dt><dd className="mt-1 break-words text-sm font-semibold text-white">{state.patient.cedula}</dd></div>
+            <div><dt className="text-[11px] font-bold uppercase tracking-wider text-sky-200/75">Teléfono</dt><dd className="mt-1 break-words text-sm font-semibold text-white">{state.patient.telefono ?? 'No registrado'}</dd></div>
+            <div><dt className="text-[11px] font-bold uppercase tracking-wider text-sky-200/75">Dirección</dt><dd className="mt-1 break-words text-sm font-semibold text-white">{state.patient.direccion ?? 'No registrada'}</dd></div>
+          </dl>
+        </div>
+        <nav aria-label="Secciones del expediente" className="flex min-w-0 gap-1 overflow-x-auto bg-white px-3 sm:px-6">
+          {sections.map(([path, label]) => <NavLink className="admin-tab shrink-0 px-3 py-4 text-[13px] font-semibold focus-visible:outline-2 focus-visible:outline-offset-[-3px]" key={path} to={path}>{label}</NavLink>)}
+        </nav>
       </div>
-      <nav aria-label="Secciones del expediente" className="mt-5 flex gap-1 overflow-x-auto border-b border-slate-200">
-        {sections.map(([path, label]) => <NavLink className={({ isActive }) => `shrink-0 border-b-2 px-3 py-3 text-sm font-medium ${isActive ? 'border-clinic-600 text-clinic-700' : 'border-transparent text-slate-500 hover:text-slate-900'}`} key={path} to={path}>{label}</NavLink>)}
-      </nav>
       <div className="mt-6"><Outlet context={state.patient}/></div>
     </div>
   )
@@ -57,6 +68,6 @@ export function PatientWorkspace() {
 
 export function PatientSection({ title }: { title: string }) {
   const patient = useOutletContext<Patient>()
-  if (title === 'Resumen') return <section className="rounded-xl border border-slate-200 bg-white p-6"><h2 className="text-lg font-semibold text-ink-950">Datos del paciente</h2><div className="mt-5"><PatientFacts patient={patient}/></div></section>
-  return <section className="rounded-xl border border-slate-200 bg-white p-6"><h2 className="text-lg font-semibold text-ink-950">{title}</h2><div className="mt-5"><IntegrationPending detail={title === 'Odontograma' ? 'El odontograma se habilitará cuando pueda verificarse la numeración y estructura clínica definida por la base de datos.' : `La información de ${title.toLowerCase()} se cargará desde los servicios reales del backend.`}/></div></section>
+  if (title === 'Resumen') return <section className="admin-surface rounded-[20px] p-6 sm:p-8"><p className="admin-kicker">Información registrada</p><h2 className="mt-2 text-xl font-semibold text-ink-950">Datos del paciente</h2><div className="mt-5"><PatientFacts patient={patient}/></div></section>
+  return <section className="admin-surface rounded-[20px] p-6 sm:p-8"><span className="admin-pill admin-pill-pending">En preparación</span><h2 className="mt-4 text-xl font-semibold text-ink-950">{title}</h2><div className="mt-5"><IntegrationPending detail={title === 'Odontograma' ? 'El odontograma se habilitará cuando pueda verificarse la numeración y estructura clínica definida por la base de datos.' : `La información de ${title.toLowerCase()} se cargará desde los servicios reales del backend.`}/></div></section>
 }

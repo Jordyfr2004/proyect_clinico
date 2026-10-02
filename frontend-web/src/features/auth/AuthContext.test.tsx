@@ -9,7 +9,7 @@ import * as authService from './authService'
 import { getAccessToken, setAccessToken } from './authStorage'
 import type { AuthUser } from './authService'
 
-vi.mock('./authService', () => ({ login: vi.fn(), registerPatient: vi.fn(), getCurrentUser: vi.fn(), logout: vi.fn() }))
+vi.mock('./authService', () => ({ login: vi.fn(), getCurrentUser: vi.fn(), logout: vi.fn() }))
 
 const confirmedUser: AuthUser = { id: 'user-id', name: 'Doctora', username: 'doctora', role: 'doctora', paciente_id: null, activo: true }
 
@@ -30,6 +30,18 @@ beforeEach(() => {
 })
 
 describe('AuthProvider', () => {
+  it('restores a patient without exposing the administrative shell and allows real logout', async () => {
+    setAccessToken('token-existente')
+    vi.mocked(authService.getCurrentUser).mockResolvedValue({ ...confirmedUser, role: 'paciente', paciente_id: 'patient-id' })
+    vi.mocked(authService.logout).mockResolvedValue()
+    render(<MemoryRouter initialEntries={['/agenda']}><AuthProvider><AppRouter/></AuthProvider></MemoryRouter>)
+    expect(await screen.findByRole('heading', { name: 'Este portal está disponible para el personal de la clínica.' })).toBeInTheDocument()
+    expect(screen.queryByRole('navigation')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Cerrar sesión' }))
+    expect(await screen.findByRole('heading', { name: 'Bienvenido de nuevo' })).toBeInTheDocument()
+    expect(authService.logout).toHaveBeenCalledOnce()
+    expect(getAccessToken()).toBeNull()
+  })
   it('moves from login to the protected area after a successful response', async () => {
     vi.mocked(authService.login).mockResolvedValue({ message: 'Inicio de sesión correcto.', token_type: 'Bearer', access_token: 'token-confirmado', user: confirmedUser })
     render(<MemoryRouter initialEntries={['/login']}><AuthProvider><AppRouter/></AuthProvider></MemoryRouter>)
@@ -55,26 +67,6 @@ describe('AuthProvider', () => {
     expect(screen.getByTestId('auth-user')).toHaveTextContent('doctora:null:true')
     expect([...Array(sessionStorage.length)].map((_, index) => sessionStorage.key(index))).toEqual(['clinic.access_token'])
     expect(vi.mocked(authService.login)).toHaveBeenCalledWith({ username: '1234567890', password: 'valid-password-123' })
-  })
-
-  it('stores the confirmed registration token and enters as a patient', async () => {
-    const patientUser: AuthUser = { id: 'user-id', name: 'Nombre recibido', username: '0912345678', role: 'paciente', paciente_id: 'patient-id', activo: true }
-    vi.mocked(authService.registerPatient).mockResolvedValue({ message: 'Cuenta de paciente creada correctamente.', token_type: 'Bearer', access_token: 'token-registro', user: patientUser })
-    render(<MemoryRouter initialEntries={['/registro']}><AuthProvider><AppRouter/></AuthProvider></MemoryRouter>)
-
-    fireEvent.change(screen.getByLabelText('Nombres'), { target: { value: 'Nombre recibido' } })
-    fireEvent.change(screen.getByLabelText('Cédula'), { target: { value: '0912345678' } })
-    fireEvent.change(screen.getByLabelText('Teléfono'), { target: { value: '0991234567' } })
-    fireEvent.change(screen.getByLabelText('Dirección'), { target: { value: 'Dirección recibida' } })
-    fireEvent.change(screen.getByLabelText('Fecha de nacimiento'), { target: { value: '1990-01-01' } })
-    fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'clave-confirmada' } })
-    fireEvent.change(screen.getByLabelText('Confirmar contraseña'), { target: { value: 'clave-confirmada' } })
-    fireEvent.click(screen.getByRole('button', { name: 'Crear cuenta' }))
-
-    expect(await screen.findByRole('heading', { name: 'Bienvenido' })).toBeInTheDocument()
-    expect(getAccessToken()).toBe('token-registro')
-    expect(screen.queryByRole('link', { name: 'Usuarios' })).not.toBeInTheDocument()
-    expect(screen.getByRole('link', { name: 'Mi perfil' })).toBeInTheDocument()
   })
 
   it('restores an existing session through GET /user without exposing protected content while loading', async () => {

@@ -1,73 +1,69 @@
-import { ArrowRight, CalendarDays, ClipboardList, UsersRound } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, CalendarDays, ClipboardList, FileClock, FileText, Settings, ShieldCheck, Stethoscope, UsersRound } from 'lucide-react'
 import { Link } from 'react-router-dom'
-import { EmptyState } from '../../components/states/EmptyState'
-import { IntegrationPending } from '../../components/states/IntegrationPending'
 import { useAuth } from '../auth/authContext'
 import { canAccessArea } from '../auth/roleAccess'
 
-function DataRegion({ type, canViewPatients }: { type: 'appointments' | 'patients'; canViewPatients: boolean }) {
-  const appointments = type === 'appointments'
-  const columns = appointments
-    ? ['Hora', 'Paciente', 'Tratamiento', 'Estado', 'Consultorio', 'Acciones']
-    : ['Nombre', 'Última visita', 'Tratamiento', 'Estado', 'Acciones']
-
-  return (
-    <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-      <div className="flex flex-col items-start gap-3 border-b border-slate-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between sm:px-6">
-        <div className="flex items-center gap-3">
-          <span aria-hidden="true" className="grid size-10 place-items-center rounded-lg bg-clinic-50 text-clinic-700">
-            {appointments ? <CalendarDays size={21}/> : <UsersRound size={21}/>}
-          </span>
-          <h2 className="text-lg font-semibold tracking-tight text-ink-950">{appointments ? 'Agenda de hoy' : 'Pacientes recientes'}</h2>
-        </div>
-        {appointments || canViewPatients ? (
-          <Link
-            className="inline-flex min-h-11 items-center gap-1 rounded-lg text-sm font-semibold text-clinic-700 hover:text-clinic-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600"
-            to={appointments ? '/agenda' : '/pacientes'}
-          >
-            {appointments ? 'Ver agenda completa' : 'Ir a pacientes'}<ArrowRight aria-hidden="true" size={15}/>
-          </Link>
-        ) : null}
-      </div>
-      <div className={`hidden border-b border-slate-200 bg-slate-50/70 px-6 py-3 text-xs font-semibold text-slate-600 md:grid ${appointments ? 'grid-cols-6' : 'grid-cols-5'}`}>
-        {columns.map((column) => <span key={column}>{column}</span>)}
-      </div>
-      <EmptyState
-        description={appointments ? 'Las citas aparecerán aquí cuando exista una integración disponible.' : 'La información clínica aparecerá aquí cuando exista una integración disponible.'}
-        icon={appointments ? CalendarDays : ClipboardList}
-        title={appointments ? 'No hay citas para mostrar.' : 'No hay pacientes para mostrar.'}
-      />
-    </section>
-  )
-}
+const upcoming = [
+  { name: 'Agenda', icon: CalendarDays, to: '/agenda' },
+  { name: 'Diagnósticos', icon: ClipboardList },
+  { name: 'Tratamientos', icon: Stethoscope },
+  { name: 'Odontograma', icon: FileClock },
+  { name: 'Radiografías', icon: FileText },
+  { name: 'Reportes', icon: FileText, to: '/reportes' },
+  { name: 'Configuración', icon: Settings, to: '/configuracion' },
+] as const
 
 export function DashboardPage() {
   const { user } = useAuth()
   const canViewPatients = canAccessArea(user?.role, 'pacientes')
+  const canManageUsers = canAccessArea(user?.role, 'usuarios')
 
   return (
-    <div>
-      <div className="grid items-stretch gap-5 xl:grid-cols-[minmax(0,1fr)_minmax(290px,360px)]">
-        <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-          <h1 className="text-3xl font-bold tracking-tight text-ink-950 sm:text-[2rem]">Bienvenido</h1>
-          <p className="mt-3 max-w-2xl leading-7 text-slate-600">Gestiona la actividad clínica y administrativa desde un solo lugar.</p>
-          <div className="mt-7 flex flex-wrap gap-3">
-            <Link className="inline-flex min-h-11 items-center gap-2 rounded-lg bg-clinic-600 px-4 text-sm font-semibold text-white shadow-sm hover:bg-clinic-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" to="/agenda">
-              <CalendarDays aria-hidden="true" size={18}/>Ir a la agenda
-            </Link>
-            {canViewPatients ? (
-              <Link className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 bg-white px-4 text-sm font-semibold text-slate-700 hover:border-clinic-500 hover:text-clinic-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" to="/pacientes">
-                <UsersRound aria-hidden="true" size={18}/>Ir a pacientes
-              </Link>
-            ) : null}
+    <div className="admin-reveal max-w-[1390px] space-y-8 lg:space-y-10">
+      <section className="dashboard-hero rounded-[24px] p-6 sm:p-9 lg:p-11">
+        <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_290px] lg:items-end">
+          <div className="min-w-0">
+            <p className="dashboard-hero-kicker text-[11px] font-bold uppercase">Portal clínico · Clínica Dental</p>
+            <h1 className="mt-5 text-[clamp(2.1rem,4vw,3.3rem)] font-extrabold leading-[1.08] tracking-[-0.05em]">Bienvenido</h1>
+            <p className="mt-3 text-lg font-medium text-white">{user?.name ?? 'Equipo clínico'}</p>
+            <p className="dashboard-hero-copy mt-4 max-w-xl text-[15px] leading-7">Gestiona pacientes, consulta historiales y administra el acceso asistencial desde las funciones disponibles.</p>
+            <div className="mt-8 flex flex-wrap gap-3">
+              {canViewPatients ? <Link className="admin-primary admin-interactive inline-flex min-h-11 items-center gap-2 rounded-[11px] px-5 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2" to="/pacientes">Abrir pacientes <ArrowUpRight aria-hidden="true" size={17}/></Link> : null}
+              {canManageUsers ? <Link className="admin-interactive inline-flex min-h-11 items-center rounded-[11px] border border-sky-200/45 bg-white/10 px-5 text-sm font-semibold text-white hover:bg-white/20 focus-visible:outline-2 focus-visible:outline-offset-2" to="/usuarios">Gestionar asistente</Link> : null}
+            </div>
+          </div>
+          <div className="dashboard-signal hidden rounded-[18px] p-6 sm:block">
+            <span aria-hidden="true" className="grid size-12 place-items-center rounded-xl border border-cyan-200/35 bg-cyan-100/10 text-cyan-100"><Stethoscope size={25} strokeWidth={1.6}/></span>
+            <p className="mt-8 text-[11px] font-bold uppercase tracking-[0.16em] text-cyan-200">Espacio de trabajo</p>
+            <p className="mt-2 text-lg font-semibold leading-snug text-white">Información clínica organizada para cada consulta.</p>
+            <div aria-hidden="true" className="mt-6 flex items-center gap-2"><span className="h-px w-10 bg-cyan-200/70"/><span className="size-1.5 rounded-full bg-cyan-200"/><span className="h-px flex-1 bg-cyan-200/20"/></div>
           </div>
         </div>
-        <IntegrationPending/>
-      </div>
-      <div className="mt-6 grid gap-6">
-        <DataRegion canViewPatients={canViewPatients} type="appointments"/>
-        <DataRegion canViewPatients={canViewPatients} type="patients"/>
-      </div>
+      </section>
+
+      <section aria-labelledby="dashboard-modules-title">
+        <div className="mb-5 flex flex-wrap items-end justify-between gap-3">
+          <div><p className="admin-kicker">Herramientas del portal</p><h2 className="admin-page-title mt-1" id="dashboard-modules-title">Módulos</h2></div>
+          <p className="admin-muted text-sm">Disponibilidad según la integración actual</p>
+        </div>
+        <div className="grid gap-5 lg:grid-cols-[minmax(0,1.55fr)_minmax(290px,.85fr)]">
+          <div>
+            <div className="mb-3 flex items-center justify-between gap-3"><h3 className="text-lg font-bold text-ink-950">Disponibles ahora</h3><span className="admin-pill admin-pill-ready">Disponible</span></div>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {canViewPatients ? <Link className="dashboard-module-card admin-reveal flex flex-col justify-between overflow-hidden rounded-[19px] p-5 focus-visible:outline-2 focus-visible:outline-offset-2 sm:p-6" to="/pacientes"><span className="flex items-start justify-between"><UsersRound aria-hidden="true" className="text-[#1269dd]" size={27} strokeWidth={1.6}/><ArrowUpRight aria-hidden="true" className="text-[#2776cc]" size={18}/></span><span className="mt-7"><span className="block text-lg font-bold text-ink-950">Pacientes</span><span className="admin-muted mt-1 block text-sm leading-6">Listado, búsqueda, registro y expediente.</span></span></Link> : null}
+              {canViewPatients ? <Link className="dashboard-module-card admin-reveal flex flex-col justify-between overflow-hidden rounded-[19px] p-5 focus-visible:outline-2 focus-visible:outline-offset-2 sm:p-6" to="/pacientes"><span className="flex items-start justify-between"><FileClock aria-hidden="true" className="text-[#1269dd]" size={27} strokeWidth={1.6}/><ArrowUpRight aria-hidden="true" className="text-[#2776cc]" size={18}/></span><span className="mt-7"><span className="block text-lg font-bold text-ink-950">Historial clínico</span><span className="admin-muted mt-1 block text-sm leading-6">Accede desde el expediente de un paciente.</span></span></Link> : null}
+              {canManageUsers ? <Link className="dashboard-module-card admin-reveal flex flex-col justify-between overflow-hidden rounded-[19px] p-5 focus-visible:outline-2 focus-visible:outline-offset-2 sm:col-span-2 sm:p-6" to="/usuarios"><span className="flex items-start justify-between"><ShieldCheck aria-hidden="true" className="text-[#1269dd]" size={27} strokeWidth={1.6}/><ArrowUpRight aria-hidden="true" className="text-[#2776cc]" size={18}/></span><span className="mt-7"><span className="block text-lg font-bold text-ink-950">Usuarios</span><span className="admin-muted mt-1 block text-sm leading-6">Administración de la cuenta de asistente.</span></span></Link> : null}
+            </div>
+          </div>
+          <div className="dashboard-pending rounded-[20px] p-5 sm:p-6">
+            <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="admin-kicker">Próximamente</p><h3 className="mt-1 text-lg font-bold text-ink-950">En preparación</h3></div><span className="admin-pill admin-pill-pending">Pendiente</span></div>
+            <p className="admin-muted mt-2 text-sm">Integración pendiente de backend.</p>
+            <ul className="mt-6 grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
+              {upcoming.map(({ name, icon: Icon, ...item }) => <li className="dashboard-pending-item flex min-h-11 items-center gap-3 rounded-[10px] px-3 text-sm text-[#496483]" key={name}><Icon aria-hidden="true" className="shrink-0 text-[#7094bb]" size={17}/><span className="flex-1">{name}</span>{'to' in item ? <Link aria-label={`Ver estado de ${name}`} className="grid size-8 place-items-center rounded-md text-[#1269dd] hover:bg-sky-100 focus-visible:outline-2 focus-visible:outline-offset-2" to={item.to}><ArrowRight aria-hidden="true" size={16}/></Link> : null}</li>)}
+            </ul>
+          </div>
+        </div>
+      </section>
     </div>
   )
 }

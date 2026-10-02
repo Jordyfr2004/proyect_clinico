@@ -87,7 +87,6 @@ export function LoginPage() {
           </button>
         </form>
         {loginError || sessionError ? <p className="login-error mt-5" role="alert">{loginError ?? sessionError}</p> : null}
-        <p className="login-create-account">¿No tienes una cuenta? <Link className="login-text-link" to="/registro">Crear cuenta</Link></p>
       </div>
     </div>
   )

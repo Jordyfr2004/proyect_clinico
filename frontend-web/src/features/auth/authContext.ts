@@ -1,6 +1,5 @@
 import { createContext, useContext } from 'react'
 import type { LoginValues } from './loginSchema'
-import type { RegisterPatientValues } from './registerPatientSchema'
 import type { AuthUser } from './authService'
 
 export type AuthStatus = 'loading' | 'authenticated' | 'guest'
@@ -10,7 +9,6 @@ type AuthContextValue = {
   user: AuthUser | null
   sessionError: string | null
   login: (values: LoginValues) => Promise<void>
-  registerPatient: (values: RegisterPatientValues) => Promise<void>
   logout: () => Promise<void>
 }
 

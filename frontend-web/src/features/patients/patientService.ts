@@ -44,9 +44,3 @@ export async function createPatient(values: CreatePatientPayload): Promise<Creat
   const parsed = z.object({ message: z.string(), data: patientSchema }).parse(data)
   return { message: parsed.message, patient: parsed.data }
 }
-
-export async function getMyProfile(): Promise<PatientProfile> {
-  requireApiBaseUrl()
-  const { data } = await apiClient.get<unknown>('/paciente/mi-perfil')
-  return z.object({ data: patientProfileSchema }).parse(data).data
-}

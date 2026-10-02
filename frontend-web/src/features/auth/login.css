@@ -194,7 +194,7 @@
 .login-password-toggle { position: absolute; top: 50%; right: 7px; display: grid; place-items: center; width: 40px; height: 40px; transform: translateY(-50%); border-radius: 6px; color: #64738f; cursor: pointer; }
 .login-password-toggle svg { width: 23px; height: 23px; stroke-width: 1.7; }
 .login-password-toggle:hover { background: #eef5fc; color: var(--login-accent-dark); }
-.login-password-toggle:focus-visible, .login-recovery a:focus-visible, .login-text-link:focus-visible { outline: 3px solid rgb(17 104 219 / .4); outline-offset: 3px; }
+.login-password-toggle:focus-visible, .login-recovery a:focus-visible { outline: 3px solid rgb(17 104 219 / .4); outline-offset: 3px; }
 .login-recovery { display: flex; justify-content: flex-end; margin-top: 16px; }
 .login-recovery a { color: var(--login-accent); font-size: 17px; line-height: 1.5; text-decoration: underline; text-underline-offset: 3px; border-radius: 2px; }
 .login-recovery a:hover { color: var(--login-accent-dark); text-decoration-thickness: 2px; }
@@ -204,11 +204,6 @@
 .login-submit:hover:not(:disabled) { background: linear-gradient(180deg, #146ddb, #084eae); box-shadow: 0 12px 24px rgb(25 114 222 / .3); }
 .login-submit:focus-visible { outline: 3px solid var(--login-accent-dark); outline-offset: 4px; }
 .login-submit:disabled { background: #8b99ad; border-color: #8b99ad; box-shadow: none; cursor: not-allowed; }
-.login-create-account { margin: 28px 0 0; color: #4b5b72; font-size: 16px; font-weight: 500; line-height: 1.5; text-align: center; }
-.login-text-link { border-radius: 2px; color: var(--login-accent); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
-.login-text-link:hover { color: var(--login-accent-dark); text-decoration-thickness: 2px; }
-.login-create-account .login-text-link { color: var(--login-accent-dark); text-decoration-thickness: 1.5px; }
-.registration-back { display: inline-flex; align-items: center; gap: 8px; margin-top: 32px; font-size: 16px; line-height: 1.5; }
 
 @media (min-width: 1024px) and (max-width: 1439px) {
   .login-layout { --login-card-padding: 32px; }
@@ -265,5 +260,4 @@
   .login-input-icon { left: 15px; width: 21px; height: 21px; }
   .login-submit { margin-top: 26px; font-size: 17px; }
   .login-recovery a { font-size: 15px; }
-  .login-create-account { margin-top: 22px; font-size: 15px; }
 }

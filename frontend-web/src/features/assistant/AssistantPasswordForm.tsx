@@ -11,7 +11,7 @@ const schema = z.object({
   message: 'Las contraseñas deben coincidir.',
 })
 
-export function AssistantPasswordForm({ onChangePassword, error }: { onChangePassword: (values: ChangeAssistantPasswordValues) => Promise<boolean>; error: string | null }) {
+export function AssistantPasswordForm({ onChangePassword, error, disabled = false }: { onChangePassword: (values: ChangeAssistantPasswordValues) => Promise<boolean>; error: string | null; disabled?: boolean }) {
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<ChangeAssistantPasswordValues>({
     resolver: zodResolver(schema),
     defaultValues: { password: '', password_confirmation: '' },
@@ -19,11 +19,11 @@ export function AssistantPasswordForm({ onChangePassword, error }: { onChangePas
   const submit = async (values: ChangeAssistantPasswordValues) => {
     if (await onChangePassword(values)) reset()
   }
-  const inputClassName = 'mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-ink-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600'
+  const inputClassName = 'admin-input mt-2 w-full focus-visible:outline-2 focus-visible:outline-offset-2'
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-      <h2 className="text-xl font-semibold tracking-tight text-ink-950">Cambiar contraseña de asistente</h2>
+    <section className="admin-surface rounded-[20px] p-6 sm:p-8">
+      <p className="admin-kicker">Seguridad</p><h2 className="mt-1 text-xl font-semibold tracking-tight text-ink-950">Cambiar contraseña de asistente</h2>
       <form aria-label="Cambiar contraseña de asistente" className="mt-6" noValidate onSubmit={handleSubmit(submit)}>
         <div className="grid gap-5 sm:grid-cols-2">
           <div>
@@ -38,7 +38,7 @@ export function AssistantPasswordForm({ onChangePassword, error }: { onChangePas
           </div>
         </div>
         {error ? <p className="mt-5 text-sm text-red-700" role="alert">{error}</p> : null}
-        <button className="mt-7 min-h-11 rounded-lg bg-clinic-700 px-5 text-sm font-semibold text-white hover:bg-clinic-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600 disabled:cursor-not-allowed disabled:opacity-60" disabled={isSubmitting} type="submit">{isSubmitting ? 'Guardando…' : 'Cambiar contraseña'}</button>
+        <button className="admin-primary mt-7 min-h-11 rounded-[10px] px-5 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-60" disabled={disabled || isSubmitting} type="submit">{isSubmitting ? 'Guardando…' : 'Cambiar contraseña'}</button>
       </form>
     </section>
   )

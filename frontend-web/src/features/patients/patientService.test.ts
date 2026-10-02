@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { apiClient } from '../../services/apiClient'
-import { createPatient, getMyProfile, getPatient, getPatients } from './patientService'
+import { createPatient, getPatient, getPatients } from './patientService'
 
 const originalBaseURL = apiClient.defaults.baseURL
 const patient = { id: 'patient-id', codigo_paciente: '001', nombres: 'Nombre recibido', cedula: '0912345678', telefono: null, direccion: null, fecha_nacimiento: '1990-01-01T00:00:00.000000Z' }
@@ -27,17 +27,10 @@ describe('patientService', () => {
     await expect(getPatients()).rejects.toThrow()
   })
 
-  it('loads the confirmed patient profile and validates its fields', async () => {
-    apiClient.defaults.baseURL = 'https://api.clinica.test/api'
-    const get = vi.spyOn(apiClient, 'get').mockResolvedValue({ data: { data: patient } })
-    expect(await getMyProfile()).toEqual({ codigo_paciente: '001', nombres: 'Nombre recibido', cedula: '0912345678', telefono: null, direccion: null, fecha_nacimiento: '1990-01-01T00:00:00.000000Z' })
-    expect(get).toHaveBeenCalledWith('/paciente/mi-perfil')
-  })
-
-  it('rejects an invalid profile and does not request without an API base', async () => {
+  it('rejects an invalid patient and does not request without an API base', async () => {
     apiClient.defaults.baseURL = 'https://api.clinica.test/api'
     vi.spyOn(apiClient, 'get').mockResolvedValue({ data: { data: { ...patient, cedula: undefined } } })
-    await expect(getMyProfile()).rejects.toThrow()
+    await expect(getPatient('patient-id')).rejects.toThrow()
     apiClient.defaults.baseURL = undefined
     await expect(getPatients()).rejects.toThrow('VITE_API_BASE_URL')
   })

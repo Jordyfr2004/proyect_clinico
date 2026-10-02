@@ -3,7 +3,7 @@ import { useForm } from 'react-hook-form'
 import { createPatientSchema, type CreatePatientFormValues } from './createPatientSchema'
 import type { CreatePatientPayload } from './patientService'
 
-const inputClassName = 'mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-ink-950 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600'
+const inputClassName = 'admin-input mt-2 w-full focus-visible:outline-2 focus-visible:outline-offset-2'
 
 export function PatientCreateForm({ onCreate, onCancel, error }: { onCreate: (values: CreatePatientPayload) => Promise<boolean>; onCancel: () => void; error: string | null }) {
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<CreatePatientFormValues>({
@@ -24,15 +24,14 @@ export function PatientCreateForm({ onCreate, onCancel, error }: { onCreate: (va
   const field = (name: keyof CreatePatientFormValues, label: string, type: string, required: boolean) => (
     <div key={name}>
       <label className="text-sm font-medium text-ink-950" htmlFor={`new-patient-${name}`}>{label}{required ? ' *' : ''}</label>
-      <input aria-describedby={errors[name] ? `new-patient-${name}-error` : undefined} aria-invalid={Boolean(errors[name])} autoFocus={name === 'nombres'} className={inputClassName} id={`new-patient-${name}`} type={type} {...register(name)}/>
+      <input aria-describedby={errors[name] ? `new-patient-${name}-error` : undefined} aria-invalid={Boolean(errors[name])} data-dialog-initial={name === 'nombres' ? '' : undefined} className={inputClassName} id={`new-patient-${name}`} type={type} {...register(name)}/>
       {errors[name] ? <p className="mt-1 text-sm text-red-700" id={`new-patient-${name}-error`}>{errors[name]?.message}</p> : null}
     </div>
   )
 
   return (
-    <section className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8" aria-labelledby="create-patient-title" id="patient-create-panel">
-      <h2 className="text-xl font-semibold text-ink-950" id="create-patient-title">Registrar paciente</h2>
-      <p className="mt-2 text-sm text-slate-600">Los campos marcados con * son obligatorios.</p>
+    <div id="patient-create-panel">
+      <p className="admin-muted text-sm">Los campos marcados con * son obligatorios.</p>
       <form aria-label="Datos del nuevo paciente" className="mt-6" noValidate onSubmit={handleSubmit(submit)}>
         <div className="grid gap-5 sm:grid-cols-2">
           {field('nombres', 'Nombres', 'text', true)}
@@ -43,10 +42,10 @@ export function PatientCreateForm({ onCreate, onCancel, error }: { onCreate: (va
         </div>
         {error ? <p className="mt-5 text-sm text-red-700" role="alert">{error}</p> : null}
         <div className="mt-7 flex flex-wrap gap-3">
-          <button className="min-h-11 rounded-lg bg-clinic-700 px-5 text-sm font-semibold text-white hover:bg-clinic-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600 disabled:cursor-not-allowed disabled:opacity-60" disabled={isSubmitting} type="submit">{isSubmitting ? 'Registrando…' : 'Guardar paciente'}</button>
-          <button className="min-h-11 rounded-lg border border-slate-300 px-5 text-sm font-semibold text-slate-700 hover:bg-slate-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600 disabled:cursor-not-allowed disabled:opacity-60" disabled={isSubmitting} onClick={onCancel} type="button">Cancelar</button>
+          <button className="admin-primary min-h-11 rounded-[10px] px-5 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-60" disabled={isSubmitting} type="submit">{isSubmitting ? 'Registrando…' : 'Guardar paciente'}</button>
+          <button className="admin-secondary min-h-11 rounded-[10px] px-5 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-60" disabled={isSubmitting} onClick={onCancel} type="button">Cancelar</button>
         </div>
       </form>
-    </section>
+    </div>
   )
 }

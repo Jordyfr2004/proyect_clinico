@@ -10,9 +10,9 @@ const schema = z.object({
   password: z.string().min(8, 'La contraseña debe tener al menos 8 caracteres.'),
 })
 
-const inputClassName = 'mt-2 min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 text-ink-950 placeholder:text-slate-400 focus-visible:border-clinic-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600'
+const inputClassName = 'admin-input mt-2 w-full focus-visible:outline-2 focus-visible:outline-offset-2'
 
-export function AssistantCreateForm({ onCreate, error }: { onCreate: (values: CreateAssistantValues) => Promise<boolean>; error: string | null }) {
+export function AssistantCreateForm({ onCreate, onCancel, error }: { onCreate: (values: CreateAssistantValues) => Promise<boolean>; onCancel?: () => void; error: string | null }) {
   const { register, handleSubmit, reset, formState: { errors, isSubmitting } } = useForm<CreateAssistantValues>({
     resolver: zodResolver(schema),
     defaultValues: { name: '', email: '', username: '', password: '' },
@@ -23,13 +23,13 @@ export function AssistantCreateForm({ onCreate, error }: { onCreate: (values: Cr
   }
 
   return (
-    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm sm:p-8">
-      <h2 className="text-xl font-semibold tracking-tight text-ink-950">Crear cuenta de asistente</h2>
+    <div>
+      <p className="admin-muted text-sm leading-6">Completa los datos de la única cuenta de asistente de la clínica.</p>
       <form aria-label="Datos para crear cuenta de asistente" className="mt-7" noValidate onSubmit={handleSubmit(submit)}>
         <div className="grid gap-x-5 gap-y-5 sm:grid-cols-2">
           <div>
             <label className="text-sm font-medium text-ink-950" htmlFor="assistant-name">Nombre</label>
-            <input aria-invalid={Boolean(errors.name)} aria-describedby={errors.name ? 'assistant-name-error' : undefined} autoComplete="name" className={inputClassName} id="assistant-name" type="text" {...register('name')}/>
+            <input aria-invalid={Boolean(errors.name)} aria-describedby={errors.name ? 'assistant-name-error' : undefined} autoComplete="name" className={inputClassName} data-dialog-initial id="assistant-name" type="text" {...register('name')}/>
             {errors.name ? <p className="mt-1 text-sm text-red-700" id="assistant-name-error">{errors.name.message}</p> : null}
           </div>
           <div>
@@ -49,8 +49,8 @@ export function AssistantCreateForm({ onCreate, error }: { onCreate: (values: Cr
           </div>
         </div>
         {error ? <p className="mt-5 text-sm text-red-700" role="alert">{error}</p> : null}
-        <button className="mt-7 min-h-11 rounded-lg bg-clinic-700 px-5 text-sm font-semibold text-white hover:bg-clinic-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600 disabled:cursor-not-allowed disabled:opacity-60" disabled={isSubmitting} type="submit">{isSubmitting ? 'Creando cuenta…' : 'Crear cuenta de asistente'}</button>
+        <div className="mt-7 flex flex-wrap gap-3"><button className="admin-primary min-h-11 rounded-[10px] px-5 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-60" disabled={isSubmitting} type="submit">{isSubmitting ? 'Creando cuenta…' : 'Crear cuenta de asistente'}</button>{onCancel ? <button className="admin-secondary min-h-11 rounded-[10px] px-5 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2 disabled:cursor-not-allowed disabled:opacity-60" disabled={isSubmitting} onClick={onCancel} type="button">Cancelar</button> : null}</div>
       </form>
-    </section>
+    </div>
   )
 }

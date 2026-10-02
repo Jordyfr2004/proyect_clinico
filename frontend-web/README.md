@@ -1,6 +1,6 @@
 # Frontend web — Clínica Dental
 
-SPA web para la gestión clínica y administrativa. El contrato de autenticación reconoce los roles doctora, asistente y paciente; el frontend solo aplica las restricciones confirmadas por el backend. Está construida con React, TypeScript, Vite, React Router, Axios, Tailwind CSS, React Hook Form, Zod y Lucide React.
+SPA web para la gestión clínica y administrativa. El portal web es administrativo para doctora y asistente. El rol paciente se reconoce en autenticación, pero no entra al shell administrativo; su cuenta, identidad y perfil pertenecen al flujo móvil. Está construida con React, TypeScript, Vite, React Router, Axios, Tailwind CSS, React Hook Form, Zod y Lucide React.
 
 ## Desarrollo
 
@@ -28,7 +28,11 @@ npm run build
 - `src/components`: controles y estados reutilizables.
 - `src/services`: cliente HTTP y futuros servicios por recurso.
 
-El frontend no contiene datos simulados ni contratos de API inventados. El código integra login, registro público de pacientes, sesión, gestión de la única cuenta de asistente, listado, detalle y registro administrativo de pacientes para doctora/asistente, y consulta del perfil propio para paciente. `POST /pacientes` usa el contrato `nombres` alineado en Request, Controller y Model de `origin/backend`; tras un 201 vuelve a consultar el listado. Los contratos se inspeccionaron en backend y tienen pruebas automatizadas; la prueba extremo a extremo autenticada sigue pendiente de una sesión real. La edición de pacientes, recuperación de contraseña, datos clínicos, agenda y reportes continúan pendientes.
+El frontend no contiene datos simulados en runtime ni contratos de API inventados. Integra login/sesión reales, la cuenta única de asistente (consulta, creación, activación, desactivación, cambio de contraseña y eliminación con confirmación) y pacientes administrativos para doctora/asistente (GET listado, GET detalle y POST). La búsqueda filtra únicamente el listado recibido por nombre, cédula o código; el resumen muestra los seis campos confirmados. `POST /pacientes` usa `nombres`, `cedula`, `telefono`, `direccion` y `fecha_nacimiento`; tras un 201 vuelve a consultar el listado. PUT paciente continúa pendiente porque el controlador no implementa `update()`.
+
+Historial clínico está integrado en el expediente web: doctora/asistente consultan por paciente y solo doctora registra y actualiza los cinco campos confirmados. El historial propio del paciente pertenece al móvil. Recuperación de contraseña, agenda/citas, horarios, lista de espera, diagnósticos, tratamientos, odontograma, radiografías y reportes/dashboard continúan pendientes de backend; Dashboard no afirma que no existan registros en secciones sin integración. El web no expone registro ni perfil de paciente.
+
+Las pruebas automatizadas y el QA de navegador con respuestas aisladas de prueba no equivalen a E2E contra Laravel. No hay una prueba E2E autenticada documentada para estas integraciones; la eliminación real de asistente y los cambios reales del historial requieren prueba manual autorizada. Antes de integrar, volver a inspeccionar `origin/backend` actualizado; no asumir que un SHA histórico representa el contrato actual.
 
 ## Contexto para desarrollo
 

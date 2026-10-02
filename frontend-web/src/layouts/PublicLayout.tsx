@@ -4,7 +4,7 @@ import { LoginVisual } from '../features/auth/LoginVisual'
 import '../features/auth/login.css'
 
 export function PublicLayout() {
-  const usesLoginLayout = ['/login', '/registro'].includes(useLocation().pathname)
+  const usesLoginLayout = useLocation().pathname === '/login'
 
   return (
     <main className={usesLoginLayout ? 'login-layout' : 'grid min-h-screen bg-white lg:grid-cols-[46%_54%]'}>

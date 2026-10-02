@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { apiClient } from '../../services/apiClient'
-import { activateAssistant, changeAssistantPassword, createAssistant, deactivateAssistant, getAssistant } from './assistantService'
+import { activateAssistant, changeAssistantPassword, createAssistant, deactivateAssistant, deleteAssistant, getAssistant } from './assistantService'
 
 const originalBaseURL = apiClient.defaults.baseURL
 const assistant = { id: 'assistant-id', name: 'Cuenta recibida', email: 'recibido@backend.test', username: 'recibido', role: 'asistente' as const, activo: true }
@@ -27,6 +27,12 @@ describe('assistantService', () => {
       .mockResolvedValueOnce({ data: { data: { ...assistant, activo: 'true' } } })
 
     await expect(getAssistant()).rejects.toThrow()
+    await expect(getAssistant()).rejects.toThrow()
+  })
+
+  it('rejects a malformed email returned by the backend', async () => {
+    apiClient.defaults.baseURL = 'https://api.clinica.test/api'
+    vi.spyOn(apiClient, 'get').mockResolvedValue({ data: { data: { ...assistant, email: 'invalid-email' } } })
     await expect(getAssistant()).rejects.toThrow()
   })
 
@@ -57,6 +63,13 @@ describe('assistantService', () => {
 
     await changeAssistantPassword(values)
     expect(post).toHaveBeenCalledWith('/usuarios/asistente/password', values)
+  })
+
+  it('deletes the assistant through the confirmed DELETE path without a body', async () => {
+    apiClient.defaults.baseURL = 'https://api.clinica.test/api'
+    const request = vi.spyOn(apiClient, 'delete').mockResolvedValue({ data: { message: 'Cuenta de asistente eliminada correctamente.' } })
+    await deleteAssistant()
+    expect(request).toHaveBeenCalledExactlyOnceWith('/usuarios/asistente')
   })
 
   it('does not send assistant requests without an API base', async () => {

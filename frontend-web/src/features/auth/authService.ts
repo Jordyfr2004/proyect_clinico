@@ -1,7 +1,6 @@
 import { z } from 'zod'
 import { apiClient } from '../../services/apiClient'
 import type { LoginValues } from './loginSchema'
-import type { RegisterPatientValues } from './registerPatientSchema'
 
 const authUserSchema = z.object({
   id: z.string(),
@@ -37,12 +36,6 @@ function parseAuthResponse(data: LoginResponse): LoginResponse {
     throw new Error('Invalid login response')
   }
   return { ...data, user: authUserSchema.parse(data.user) }
-}
-
-export async function registerPatient(values: RegisterPatientValues): Promise<LoginResponse> {
-  requireApiBaseUrl()
-  const { data } = await apiClient.post<LoginResponse>('/auth/register-paciente', values)
-  return parseAuthResponse(data)
 }
 
 export async function getCurrentUser(): Promise<AuthUser> {

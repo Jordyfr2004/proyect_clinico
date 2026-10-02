@@ -1,38 +1,33 @@
-import type { LucideIcon } from 'lucide-react'
-import { CalendarDays, FileBarChart, Settings } from 'lucide-react'
-import { EmptyState } from '../../components/states/EmptyState'
-import { IntegrationPending } from '../../components/states/IntegrationPending'
+import { CalendarDays, ChartNoAxesCombined, Settings2 } from 'lucide-react'
 
 type ModuleKey = 'agenda' | 'reportes' | 'configuracion'
 
-const modules: Record<ModuleKey, { title: string; description: string }> = {
-  agenda: { title: 'Agenda', description: 'Organiza citas, disponibilidad y lista de espera.' },
-  reportes: { title: 'Reportes', description: 'Consulta información clínica, operativa y financiera.' },
-  configuracion: { title: 'Configuración', description: 'Define horarios, disponibilidad y parámetros de la clínica.' },
-}
-
-const emptyStates: Record<ModuleKey, { title: string; description: string; icon: LucideIcon }> = {
-  agenda: { title: 'No hay citas para mostrar.', description: 'Las citas se mostrarán cuando el servicio de agenda esté disponible.', icon: CalendarDays },
-  reportes: { title: 'No hay reportes disponibles.', description: 'Los reportes requieren fuentes de datos reales del backend.', icon: FileBarChart },
-  configuracion: { title: 'Configuración no disponible.', description: 'Los horarios y parámetros se habilitarán con su contrato de backend.', icon: Settings },
-}
+const modules = {
+  agenda: { title: 'Agenda', description: 'Citas, disponibilidad y lista de espera.', icon: CalendarDays, capabilities: ['Citas', 'Disponibilidad', 'Lista de espera'] },
+  reportes: { title: 'Reportes', description: 'Información clínica, operativa y financiera.', icon: ChartNoAxesCombined, capabilities: ['Estadísticas', 'Reportes clínicos', 'Reportes administrativos'] },
+  configuracion: { title: 'Configuración', description: 'Horarios, disponibilidad y parámetros de la clínica.', icon: Settings2, capabilities: ['Horarios', 'Disponibilidad', 'Parámetros'] },
+} as const
 
 export function ModulePage({ module }: { module: ModuleKey }) {
   const current = modules[module]
+  const Icon = current.icon
 
   return (
-    <div className="max-w-6xl">
-      <div className="border-b border-slate-200 pb-7">
-        <div className="min-w-0">
-          <h1 className="text-3xl font-bold tracking-tight text-ink-950 sm:text-[2rem]">{current.title}</h1>
-          <p className="mt-2 max-w-2xl leading-7 text-slate-600">{current.description}</p>
+    <div className="admin-reveal max-w-5xl">
+      <div className="mb-8"><p className="admin-kicker">Módulo clínico</p><h1 className="admin-page-title mt-2">{current.title}</h1><p className="admin-body mt-3 max-w-2xl">{current.description}</p></div>
+      <section aria-labelledby="module-status-title" className="admin-surface-raised overflow-hidden rounded-[22px]">
+        <div className="grid md:grid-cols-[minmax(0,1fr)_240px]">
+          <div className="admin-pending-hero px-6 py-9 sm:px-10 sm:py-12">
+            <span aria-hidden="true" className="mb-7 grid size-14 place-items-center rounded-[16px] border border-sky-200/30 bg-sky-100/10 text-sky-100"><Icon size={26} strokeWidth={1.6}/></span>
+            <span className="inline-flex rounded-full border border-cyan-200/30 bg-cyan-100/10 px-3 py-1.5 text-xs font-bold text-cyan-100">En preparación</span>
+            <h2 className="mt-5 text-2xl font-bold tracking-tight text-white" id="module-status-title">Módulo en preparación</h2>
+            <p className="mt-3 max-w-xl text-[15px] leading-7 text-sky-100/85">La integración de {current.title.toLowerCase()} está pendiente de un contrato de backend confirmado. Sus datos aparecerán aquí cuando el servicio real esté disponible.</p>
+          </div>
+          <div className="border-t border-[#dbe6f2] bg-[#f1f7fd] px-6 py-8 sm:px-8 md:border-l md:border-t-0">
+            <p className="admin-kicker">Alcance previsto</p>
+            <ul className="mt-5 space-y-3">{current.capabilities.map((capability) => <li className="flex items-center gap-3 text-sm text-[#355878]" key={capability}><span aria-hidden="true" className="size-1.5 rounded-full bg-[#1685e6]"/>{capability}</li>)}</ul>
+          </div>
         </div>
-      </div>
-
-      <div className="mt-6"><IntegrationPending compact/></div>
-
-      <section className="mt-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-        <EmptyState description={emptyStates[module].description} icon={emptyStates[module].icon} title={emptyStates[module].title}/>
       </section>
     </div>
   )

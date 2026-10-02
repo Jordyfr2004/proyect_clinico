@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { apiClient } from '../../services/apiClient'
-import { getCurrentUser, login, logout, registerPatient } from './authService'
+import { getCurrentUser, login, logout } from './authService'
 
 const originalBaseURL = apiClient.defaults.baseURL
 
@@ -56,20 +56,4 @@ describe('authService', () => {
     expect(post).not.toHaveBeenCalled()
   })
 
-  it('registers a patient with the confirmed payload and parses the 201 session', async () => {
-    apiClient.defaults.baseURL = 'https://api.clinica.test/api'
-    const values = { nombres: 'Nombre recibido', cedula: '0912345678', telefono: '0991234567', direccion: 'Dirección recibida', fecha_nacimiento: '1990-01-01', password: 'clave-confirmada', password_confirmation: 'clave-confirmada' }
-    const user = { id: 'user-id', name: 'Nombre recibido', username: '0912345678', role: 'paciente', paciente_id: 'patient-id', activo: true }
-    const post = vi.spyOn(apiClient, 'post').mockResolvedValue({ data: { message: 'Cuenta de paciente creada correctamente.', token_type: 'Bearer', access_token: 'token-confirmado', user: { ...user, codigo_paciente: '001' } } })
-
-    expect(apiClient.getUri({ url: '/auth/register-paciente' })).toBe('https://api.clinica.test/api/auth/register-paciente')
-    expect(await registerPatient(values)).toEqual({ message: 'Cuenta de paciente creada correctamente.', token_type: 'Bearer', access_token: 'token-confirmado', user })
-    expect(post).toHaveBeenCalledWith('/auth/register-paciente', values)
-  })
-
-  it('rejects an invalid registration session instead of storing it', async () => {
-    apiClient.defaults.baseURL = 'https://api.clinica.test/api'
-    vi.spyOn(apiClient, 'post').mockResolvedValue({ data: { token_type: 'Bearer', access_token: 'token-confirmado', user: { role: 'otro' } } })
-    await expect(registerPatient({ nombres: 'Nombre', cedula: '1', telefono: '1', direccion: 'Dirección', fecha_nacimiento: '1990-01-01', password: 'clave-confirmada', password_confirmation: 'clave-confirmada' })).rejects.toThrow()
-  })
 })

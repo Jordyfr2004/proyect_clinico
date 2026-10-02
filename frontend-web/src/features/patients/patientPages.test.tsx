@@ -1,12 +1,11 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import { MyProfilePage } from './MyProfilePage'
 import { PatientsPage } from './PatientsPage'
 import { PatientSection, PatientWorkspace } from './PatientWorkspace'
-import { createPatient, getMyProfile, getPatient, getPatients } from './patientService'
+import { createPatient, getPatient, getPatients } from './patientService'
 
-vi.mock('./patientService', () => ({ getPatients: vi.fn(), getPatient: vi.fn(), getMyProfile: vi.fn(), createPatient: vi.fn() }))
+vi.mock('./patientService', () => ({ getPatients: vi.fn(), getPatient: vi.fn(), createPatient: vi.fn() }))
 
 const patient = { id: 'patient-id', codigo_paciente: '001', nombres: 'Nombre recibido', cedula: '0912345678', telefono: null, direccion: null, fecha_nacimiento: '1990-01-01' }
 const httpError = (status: number, message: string) => ({ isAxiosError: true, response: { status, data: { message } } })
@@ -23,6 +22,7 @@ describe('patient views', () => {
     vi.mocked(getPatients).mockReturnValue(new Promise((done) => { resolve = done }))
     render(<MemoryRouter><PatientsPage/></MemoryRouter>)
     expect(screen.getByRole('status')).toHaveTextContent('Cargando información')
+    expect(screen.queryByRole('searchbox', { name: 'Buscar pacientes' })).not.toBeInTheDocument()
     resolve([patient])
     expect(await screen.findByRole('link', { name: /Nombre recibido/ })).toHaveAttribute('href', '/pacientes/patient-id/resumen')
     expect(screen.getByText('Cédula: 0912345678')).toBeInTheDocument()
@@ -52,6 +52,17 @@ describe('patient views', () => {
     fireEvent.click(within(form).getByRole('button', { name: 'Cancelar' }))
     expect(trigger).toHaveFocus()
     expect(screen.queryByRole('form', { name: 'Datos del nuevo paciente' })).not.toBeInTheDocument()
+  })
+
+  it('closes the patient dialog with Escape and restores focus to its trigger', async () => {
+    vi.mocked(getPatients).mockResolvedValue([])
+    render(<MemoryRouter><PatientsPage/></MemoryRouter>)
+    const trigger = screen.getByRole('button', { name: 'Registrar paciente' })
+    fireEvent.click(trigger)
+    expect(screen.getByRole('dialog', { name: 'Registrar paciente' })).toBeInTheDocument()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog', { name: 'Registrar paciente' })).not.toBeInTheDocument()
+    expect(trigger).toHaveFocus()
   })
 
   it('sends exact fields with empty optionals as null, then refreshes GET after 201', async () => {
@@ -126,6 +137,34 @@ describe('patient views', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos cargar la información.')
     fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
     expect(await screen.findByText('No hay pacientes registrados.')).toBeInTheDocument()
+    expect(screen.queryByRole('searchbox', { name: 'Buscar pacientes' })).not.toBeInTheDocument()
+  })
+
+  it.each([
+    ['nombre sin distinguir mayúsculas', 'mArÍa', 'patient-name'],
+    ['cédula', '0912345678', 'patient-name'],
+    ['código', 'COD-002', 'patient-code'],
+  ])('filters the received patients by %s without requesting again', async (_kind, query, expectedId) => {
+    vi.mocked(getPatients).mockResolvedValue([
+      { ...patient, id: 'patient-name', codigo_paciente: 'COD-001', nombres: 'María López' },
+      { ...patient, id: 'patient-code', codigo_paciente: 'COD-002', nombres: 'Ana Ruiz', cedula: '0987654321' },
+    ])
+    render(<MemoryRouter><PatientsPage/></MemoryRouter>)
+    expect(await screen.findByRole('link', { name: /María López/ })).toBeInTheDocument()
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar pacientes' }), { target: { value: query } })
+    expect(screen.getAllByRole('link', { name: /Cédula:/ })).toHaveLength(1)
+    expect(screen.getByRole('link', { name: /Cédula:/ })).toHaveAttribute('href', `/pacientes/${expectedId}/resumen`)
+    expect(getPatients).toHaveBeenCalledTimes(1)
+  })
+
+  it('distinguishes a search with no matches from a genuinely empty GET response', async () => {
+    vi.mocked(getPatients).mockResolvedValue([patient])
+    render(<MemoryRouter><PatientsPage/></MemoryRouter>)
+    expect(await screen.findByRole('link', { name: /Nombre recibido/ })).toBeInTheDocument()
+    fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar pacientes' }), { target: { value: 'sin coincidencia' } })
+    expect(screen.getByText('Ningún paciente coincide con la búsqueda.')).toBeInTheDocument()
+    expect(screen.queryByText('No hay pacientes registrados.')).not.toBeInTheDocument()
+    expect(getPatients).toHaveBeenCalledTimes(1)
   })
 
   it('loads a real patient detail and leaves clinical tabs pending', async () => {
@@ -142,7 +181,32 @@ describe('patient views', () => {
     renderDetail()
     expect(await screen.findByRole('heading', { name: 'Datos del paciente' })).toBeInTheDocument()
     expect(screen.getByText('001')).toBeInTheDocument()
-    expect(screen.getByText('No registrado')).toBeInTheDocument()
+    expect(screen.getAllByText('No registrado').length).toBeGreaterThan(0)
+  })
+
+  it('shows only the six real summary fields and formats the received birth date', async () => {
+    vi.mocked(getPatient).mockResolvedValue({ ...patient, telefono: '0991234567', direccion: 'Dirección recibida' })
+    renderDetail()
+    const summary = await screen.findByRole('heading', { name: 'Datos del paciente' })
+    const facts = summary.parentElement?.querySelector('dl')
+    expect(facts?.querySelectorAll('dt')).toHaveLength(6)
+    expect(facts).toHaveTextContent('001')
+    expect(facts).toHaveTextContent('Nombre recibido')
+    expect(facts).toHaveTextContent('0912345678')
+    expect(facts).toHaveTextContent('0991234567')
+    expect(facts).toHaveTextContent('Dirección recibida')
+    expect(facts).toHaveTextContent('1 de enero de 1990')
+  })
+
+  it('represents nullable summary fields without inventing values', async () => {
+    vi.mocked(getPatient).mockResolvedValue({ ...patient, fecha_nacimiento: null })
+    renderDetail()
+    const summary = await screen.findByRole('heading', { name: 'Datos del paciente' })
+    const facts = summary.parentElement?.querySelector('dl')
+    expect(facts?.querySelectorAll('dt')).toHaveLength(6)
+    expect(facts).toHaveTextContent('TeléfonoNo registrado')
+    expect(facts).toHaveTextContent('DirecciónNo registrada')
+    expect(facts).toHaveTextContent('Fecha de nacimientoNo registrada')
   })
 
   it('distinguishes a missing patient from a retryable detail error', async () => {
@@ -151,25 +215,4 @@ describe('patient views', () => {
     expect(await screen.findByRole('heading', { name: 'Paciente no encontrado' })).toBeInTheDocument()
   })
 
-  it('shows the real patient profile returned by GET /paciente/mi-perfil', async () => {
-    vi.mocked(getMyProfile).mockResolvedValue(patient)
-    render(<MyProfilePage/>)
-    expect(screen.getByRole('status')).toHaveTextContent('Cargando información')
-    expect(await screen.findByText('Nombre recibido')).toBeInTheDocument()
-    expect(getMyProfile).toHaveBeenCalledOnce()
-  })
-
-  it('shows the backend 404 message when the account is not linked', async () => {
-    vi.mocked(getMyProfile).mockRejectedValue(httpError(404, 'La cuenta no está vinculada a un paciente.'))
-    render(<MyProfilePage/>)
-    expect(await screen.findByRole('alert')).toHaveTextContent('La cuenta no está vinculada a un paciente.')
-  })
-
-  it('shows a retryable network error for the patient profile', async () => {
-    vi.mocked(getMyProfile).mockRejectedValueOnce({ isAxiosError: true }).mockResolvedValueOnce(patient)
-    render(<MyProfilePage/>)
-    expect(await screen.findByRole('alert')).toHaveTextContent('No pudimos cargar la información.')
-    fireEvent.click(screen.getByRole('button', { name: 'Reintentar' }))
-    expect(await screen.findByText('Nombre recibido')).toBeInTheDocument()
-  })
 })

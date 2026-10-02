@@ -4,7 +4,7 @@ import { apiClient } from '../../services/apiClient'
 const assistantSchema = z.object({
   id: z.string().min(1),
   name: z.string(),
-  email: z.string(),
+  email: z.email(),
   username: z.string(),
   role: z.literal('asistente'),
   activo: z.boolean(),
@@ -44,4 +44,9 @@ export async function activateAssistant(): Promise<void> {
 export async function changeAssistantPassword(values: ChangeAssistantPasswordValues): Promise<void> {
   requireApiBaseUrl()
   await apiClient.post('/usuarios/asistente/password', values)
+}
+
+export async function deleteAssistant(): Promise<void> {
+  requireApiBaseUrl()
+  await apiClient.delete('/usuarios/asistente')
 }
