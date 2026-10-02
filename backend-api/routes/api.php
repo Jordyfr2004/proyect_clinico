@@ -27,6 +27,7 @@ use App\Http\Controllers\Api\Inventario\MovimientoInventarioController;
 use App\Http\Controllers\Api\Reporte\ReporteController;
 use App\Http\Controllers\Api\Notificacion\NotificacionController;
 
+use App\Http\Controllers\Api\Actividad\ActividadController;
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -53,23 +54,33 @@ Route::prefix('auth')->group(function () {
 
 
 // Usuarios
-Route::middleware('auth:sanctum', 'role:doctora')->group(function () {
+Route::middleware('auth:sanctum', 'role:doctora')->group(function () { 
 
-    Route::prefix('usuarios')->group(function () {
-        Route::get('/', [UsuarioController::class, 'index']);
-        Route::get('/asistente',[UsuarioController::class, 'verAsistente']);
-        Route::get('/{id}', [UsuarioController::class, 'show']);
-        Route::put('/{id}', [UsuarioController::class, 'update']);
-        Route::delete('/asistente', [UsuarioController::class, 'eliminarAsistente']);
-        Route::delete('/{id}', [UsuarioController::class, 'destroy']);
-        Route::post('/asistente', [UsuarioController::class, 'crearAsistente']);
-        Route::post('/asistente/desactivar', [UsuarioController::class, 'desactivarAsistente']);
-        Route::post('/asistente/activar', [UsuarioController::class, 'activarAsistente']);
-        Route::post('asistente/password',[UsuarioController::class, 'cambiarPasswordAsistente']);
-        Route::get('/{id}', [UsuarioController::class, 'show']);
-    });
+    Route::prefix('usuarios')->group(function () { 
+
+        Route::get('/', [UsuarioController::class, 'index']); 
+
+        Route::get('/asistente', [UsuarioController::class, 'verAsistente']); 
+
+        Route::post('/asistente', [UsuarioController::class, 'crearAsistente']); 
+
+        Route::put('/asistente/desactivar', [UsuarioController::class, 'desactivarAsistente']); 
+
+        Route::put('/asistente/activar', [UsuarioController::class, 'activarAsistente']); 
+
+        Route::put('/asistente/password', [UsuarioController::class, 'cambiarPasswordAsistente']); 
+
+        Route::delete('/asistente', [UsuarioController::class, 'eliminarAsistente']); 
+
+        Route::get('/{id}', [UsuarioController::class, 'show']); 
+
+        Route::put('/{id}', [UsuarioController::class, 'update']); 
+
+        Route::delete('/{id}', [UsuarioController::class, 'destroy']); 
+
+    }); 
+
 });
-
 
 
 
@@ -205,3 +216,30 @@ Route::middleware('auth:sanctum')->prefix('reportes')->group(function () {
     Route::get('/dashboard', [ReporteController::class, 'dashboard']);
 
 });
+
+
+
+// Actividades - doctora y asistente pueden consultar
+Route::middleware('auth:sanctum','role:doctora,asistente')->prefix('actividades')->group(function () { 
+
+    Route::get('/', [ActividadController::class, 'index']); 
+
+    Route::get('/paciente/codigo/{codigo}', [ActividadController::class, 'buscarPacientePorCodigo']); 
+
+    Route::get('/resumen', [ActividadController::class, 'resumen']); 
+
+    Route::get('/{id}', [ActividadController::class, 'show']); 
+
+}); 
+
+
+// Actividades - solo doctora puede crear, editar y eliminar
+Route::middleware('auth:sanctum','role:doctora')->prefix('actividades')->group(function () { 
+
+    Route::post('/', [ActividadController::class, 'store']); 
+
+    Route::put('/{id}', [ActividadController::class, 'update']); 
+
+    Route::delete('/{id}', [ActividadController::class, 'destroy']); 
+
+}); 
