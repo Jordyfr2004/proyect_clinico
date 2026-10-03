@@ -27,6 +27,10 @@ use App\Http\Controllers\Api\Actividad\ActividadController;
 
 use App\Http\Controllers\Api\Agenda\AgendaController;
 
+use App\Http\Controllers\Api\Clinica\EvidenciaClinicaController;
+
+use App\Http\Controllers\Api\Reporte\EgresoController;
+
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
@@ -153,27 +157,49 @@ Route::prefix('odontogramas')->group(function () {
 });
 
 
-// Radiografías
-Route::middleware('auth:sanctum')->prefix('radiografias')->group(function () {
+// Fotografias y Radiografias
+Route::prefix('evidencias-clinicas')->group(function () {
 
-    Route::get('/paciente/{pacienteId}', [RadiografiaController::class, 'porPaciente']);
-    Route::get('/{id}', [RadiografiaController::class, 'show']);
-    Route::post('/', [RadiografiaController::class, 'store']);
-    Route::delete('/{id}', [RadiografiaController::class, 'destroy']);
+    // Doctora y asistente pueden consultar
+    Route::middleware('auth:sanctum', 'role:doctora,asistente')->group(function () {
+
+        Route::get('/', [EvidenciaClinicaController::class, 'index']);
+
+        Route::get('/paciente/{pacienteId}', [EvidenciaClinicaController::class, 'porPaciente']);
+
+        Route::get('/{id}', [EvidenciaClinicaController::class, 'show']);
+
+    });
+
+
+    // Solo doctora puede registrar, editar y eliminar
+    Route::middleware('auth:sanctum', 'role:doctora')->group(function () {
+
+        Route::post('/', [EvidenciaClinicaController::class, 'store']);
+
+        Route::put('/{id}', [EvidenciaClinicaController::class, 'update']);
+
+        Route::delete('/{id}', [EvidenciaClinicaController::class, 'destroy']);
+
+    });
 
 });
 
 
 
-
-
 // Reportes
-Route::middleware('auth:sanctum')->prefix('reportes')->group(function () {
+Route::middleware('auth:sanctum', 'role:doctora')->prefix('reportes')->group(function () {
 
     Route::get('/clinicos', [ReporteController::class, 'clinicos']);
+
     Route::get('/economicos', [ReporteController::class, 'economicos']);
+
     Route::get('/financieros', [ReporteController::class, 'financieros']);
+
     Route::get('/ingresos', [ReporteController::class, 'ingresos']);
+
+    Route::get('/caja', [ReporteController::class, 'resumenCaja']);
+
     Route::get('/dashboard', [ReporteController::class, 'dashboard']);
 
 });
@@ -246,6 +272,27 @@ Route::prefix('agenda')->group(function () {
         Route::get('/mis-citas', [AgendaController::class, 'misCitas']);
 
         Route::post('/solicitar-cita', [AgendaController::class, 'solicitarCita']);
+
+    });
+
+});
+
+//Caja
+Route::prefix('egresos')->group(function () {
+
+    Route::middleware('auth:sanctum', 'role:doctora')->group(function () {
+
+        Route::get('/', [EgresoController::class, 'index']);
+
+        Route::get('/resumen', [EgresoController::class, 'resumen']);
+
+        Route::get('/{id}', [EgresoController::class, 'show']);
+
+        Route::post('/', [EgresoController::class, 'store']);
+
+        Route::put('/{id}', [EgresoController::class, 'update']);
+
+        Route::delete('/{id}', [EgresoController::class, 'destroy']);
 
     });
 
