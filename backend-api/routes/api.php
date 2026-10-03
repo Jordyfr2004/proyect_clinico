@@ -249,6 +249,8 @@ Route::prefix('agenda')->group(function () {
     // Paciente
     Route::middleware('auth:sanctum', 'role:paciente')->group(function () {
 
+        Route::get('/mis-citas', [AgendaController::class, 'misCitas']);
+
         Route::post('/solicitar-cita', [AgendaController::class, 'solicitarCita']);
 
     });

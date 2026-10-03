@@ -102,7 +102,13 @@ class AgendaController extends Controller
             ],
         ]);
 
-        if ($this->horarioOcupado($datos['fecha'], $datos['hora_inicio'], $datos['hora_fin'])) {
+        if (
+            $this->horarioOcupado(
+                $datos['fecha'],
+                $datos['hora_inicio'],
+                $datos['hora_fin']
+            )
+        ) {
             return response()->json([
                 'message' => 'Ese horario ya se encuentra ocupado.',
             ], 409);
@@ -156,7 +162,13 @@ class AgendaController extends Controller
             $datos['codigo_paciente']
         )->firstOrFail();
 
-        if ($this->horarioOcupado($datos['fecha'], $datos['hora_inicio'], $datos['hora_fin'])) {
+        if (
+            $this->horarioOcupado(
+                $datos['fecha'],
+                $datos['hora_inicio'],
+                $datos['hora_fin']
+            )
+        ) {
             return response()->json([
                 'message' => 'Ese horario ya se encuentra ocupado.',
             ], 409);
@@ -255,7 +267,13 @@ class AgendaController extends Controller
             ],
         ]);
 
-        if ($this->horarioOcupado($datos['fecha'], $datos['hora_inicio'], $datos['hora_fin'])) {
+        if (
+            $this->horarioOcupado(
+                $datos['fecha'],
+                $datos['hora_inicio'],
+                $datos['hora_fin']
+            )
+        ) {
             return response()->json([
                 'message' => 'Ese horario ya se encuentra ocupado.',
             ], 409);
@@ -319,25 +337,43 @@ class AgendaController extends Controller
             ], 409);
         }
 
-        $fecha = $datos['fecha'] ?? $registro->fecha?->toDateString();
-        $horaInicio = $datos['hora_inicio'] ?? $registro->hora_inicio;
-        $horaFin = $datos['hora_fin'] ?? $registro->hora_fin;
+        $fecha = $datos['fecha']
+            ?? $registro->fecha?->toDateString();
 
-        if ($cambiaHorario && (!$fecha || !$horaInicio || !$horaFin)) {
+        $horaInicio = $datos['hora_inicio']
+            ?? $registro->hora_inicio;
+
+        $horaFin = $datos['hora_fin']
+            ?? $registro->hora_fin;
+
+        if (
+            $cambiaHorario &&
+            (!$fecha || !$horaInicio || !$horaFin)
+        ) {
             return response()->json([
                 'message' => 'La fecha y ambas horas son obligatorias para editar el horario.',
             ], 422);
         }
 
-        if ($cambiaHorario && substr($horaFin, 0, 5) <= substr($horaInicio, 0, 5)) {
+        if (
+            $cambiaHorario &&
+            substr($horaFin, 0, 5) <= substr($horaInicio, 0, 5)
+        ) {
             return response()->json([
                 'message' => 'La hora final debe ser posterior a la hora de inicio.',
             ], 422);
         }
 
-        if ($cambiaHorario
-            && $registro->estado !== 'cancelada'
-            && $this->horarioOcupado($fecha, $horaInicio, $horaFin, $registro->id)) {
+        if (
+            $cambiaHorario &&
+            $registro->estado !== 'cancelada' &&
+            $this->horarioOcupado(
+                $fecha,
+                $horaInicio,
+                $horaFin,
+                $registro->id
+            )
+        ) {
             return response()->json([
                 'message' => 'Ese horario ya se encuentra ocupado.',
             ], 409);
@@ -364,6 +400,18 @@ class AgendaController extends Controller
         if ($registro->tipo !== 'cita_medica') {
             return response()->json([
                 'message' => 'El registro no corresponde a una cita médica.',
+            ], 409);
+        }
+
+        if ($registro->estado === 'cancelada') {
+            return response()->json([
+                'message' => 'La cita ya se encuentra cancelada.',
+            ], 409);
+        }
+
+        if ($registro->estado === 'completada') {
+            return response()->json([
+                'message' => 'Una cita completada no puede cancelarse.',
             ], 409);
         }
 
@@ -403,6 +451,29 @@ class AgendaController extends Controller
         return response()->json([
             'message' => 'Cita marcada como completada.',
             'data' => $registro,
+        ]);
+    }
+    public function misCitas(Request $request): JsonResponse
+    {
+        $user = $request->user();
+
+        if (!$user->paciente_id) {
+            return response()->json([
+                'message' => 'El usuario no está vinculado a un paciente.',
+            ], 422);
+        }
+
+        $citas = Agenda::where(
+            'paciente_id',
+            $user->paciente_id
+        )
+            ->where('tipo', 'cita_medica')
+            ->orderBy('fecha')
+            ->orderBy('hora_inicio')
+            ->get();
+
+        return response()->json([
+            'data' => $citas,
         ]);
     }
 
