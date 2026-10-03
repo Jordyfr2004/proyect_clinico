@@ -1,9 +1,8 @@
-import { CalendarDays, ChartNoAxesCombined, Settings2 } from 'lucide-react'
+import { ChartNoAxesCombined, Settings2 } from 'lucide-react'
 
-type ModuleKey = 'agenda' | 'reportes' | 'configuracion'
+type ModuleKey = 'reportes' | 'configuracion'
 
 const modules = {
-  agenda: { title: 'Agenda', description: 'Citas, disponibilidad y lista de espera.', icon: CalendarDays, capabilities: ['Citas', 'Disponibilidad', 'Lista de espera'] },
   reportes: { title: 'Reportes', description: 'Información clínica, operativa y financiera.', icon: ChartNoAxesCombined, capabilities: ['Estadísticas', 'Reportes clínicos', 'Reportes administrativos'] },
   configuracion: { title: 'Configuración', description: 'Horarios, disponibilidad y parámetros de la clínica.', icon: Settings2, capabilities: ['Horarios', 'Disponibilidad', 'Parámetros'] },
 } as const

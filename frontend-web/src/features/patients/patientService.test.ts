@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { apiClient } from '../../services/apiClient'
-import { createPatient, getPatient, getPatients } from './patientService'
+import { createPatient, getPatient, getPatients, updatePatient } from './patientService'
 
 const originalBaseURL = apiClient.defaults.baseURL
 const patient = { id: 'patient-id', codigo_paciente: '001', nombres: 'Nombre recibido', cedula: '0912345678', telefono: null, direccion: null, fecha_nacimiento: '1990-01-01T00:00:00.000000Z' }
@@ -50,5 +50,23 @@ describe('patientService', () => {
     await expect(createPatient({ nombres: 'Nombre', cedula: '0912345678', telefono: null, direccion: null, fecha_nacimiento: null })).rejects.toThrow()
     apiClient.defaults.baseURL = undefined
     await expect(createPatient({ nombres: 'Nombre', cedula: '0912345678', telefono: null, direccion: null, fecha_nacimiento: null })).rejects.toThrow('VITE_API_BASE_URL')
+  })
+
+  it('updates only patient fields with PUT and validates the response', async () => {
+    apiClient.defaults.baseURL = 'https://api.clinica.test/api'
+    const put = vi.spyOn(apiClient, 'put').mockResolvedValue({ data: { message: 'Paciente actualizado correctamente.', data: patient } })
+    const values = { nombres: 'Nombre recibido', telefono: null }
+    expect(await updatePatient('patient-id', values)).toEqual({ message: 'Paciente actualizado correctamente.', patient })
+    expect(put).toHaveBeenCalledExactlyOnceWith('/pacientes/patient-id', values)
+  })
+
+  it('propagates 404 and 422 and rejects an invalid update response', async () => {
+    apiClient.defaults.baseURL = 'https://api.clinica.test/api'
+    const put = vi.spyOn(apiClient, 'put')
+    put.mockRejectedValueOnce({ response: { status: 404 } }).mockRejectedValueOnce({ response: { status: 422 } })
+      .mockResolvedValueOnce({ data: { message: 'Paciente actualizado correctamente.', data: { ...patient, nombres: null } } })
+    await expect(updatePatient('patient-id', { nombres: 'Nombre' })).rejects.toMatchObject({ response: { status: 404 } })
+    await expect(updatePatient('patient-id', { nombres: 'Nombre' })).rejects.toMatchObject({ response: { status: 422 } })
+    await expect(updatePatient('patient-id', { nombres: 'Nombre' })).rejects.toThrow()
   })
 })

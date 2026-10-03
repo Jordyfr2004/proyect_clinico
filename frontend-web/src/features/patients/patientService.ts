@@ -21,6 +21,7 @@ export type CreatePatientPayload = {
   fecha_nacimiento: string | null
 }
 export type CreatePatientResponse = { message: string; patient: Patient }
+export type UpdatePatientPayload = Partial<CreatePatientPayload>
 
 function requireApiBaseUrl(): void {
   if (!apiClient.defaults.baseURL) throw new Error('VITE_API_BASE_URL is not configured')
@@ -41,6 +42,13 @@ export async function getPatient(id: string): Promise<Patient> {
 export async function createPatient(values: CreatePatientPayload): Promise<CreatePatientResponse> {
   requireApiBaseUrl()
   const { data } = await apiClient.post<unknown>('/pacientes', values)
+  const parsed = z.object({ message: z.string(), data: patientSchema }).parse(data)
+  return { message: parsed.message, patient: parsed.data }
+}
+
+export async function updatePatient(id: string, values: UpdatePatientPayload): Promise<CreatePatientResponse> {
+  requireApiBaseUrl()
+  const { data } = await apiClient.put<unknown>(`/pacientes/${encodeURIComponent(id)}`, values)
   const parsed = z.object({ message: z.string(), data: patientSchema }).parse(data)
   return { message: parsed.message, patient: parsed.data }
 }

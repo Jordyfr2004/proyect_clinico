@@ -45,24 +45,28 @@ describe('assistantService', () => {
     expect(post).toHaveBeenCalledWith('/usuarios/asistente', values)
   })
 
-  it('sends the existing activation paths without a body', async () => {
+  it('uses PUT for both assistant status changes without a body', async () => {
     apiClient.defaults.baseURL = 'https://api.clinica.test/api'
-    const post = vi.spyOn(apiClient, 'post').mockResolvedValue({ data: null })
+    const put = vi.spyOn(apiClient, 'put').mockResolvedValue({ data: null })
+    const post = vi.spyOn(apiClient, 'post')
 
     await deactivateAssistant()
     await activateAssistant()
 
-    expect(post).toHaveBeenNthCalledWith(1, '/usuarios/asistente/desactivar')
-    expect(post).toHaveBeenNthCalledWith(2, '/usuarios/asistente/activar')
+    expect(put).toHaveBeenNthCalledWith(1, '/usuarios/asistente/desactivar')
+    expect(put).toHaveBeenNthCalledWith(2, '/usuarios/asistente/activar')
+    expect(post).not.toHaveBeenCalled()
   })
 
-  it('sends password and password_confirmation only', async () => {
+  it('uses PUT to send password and password_confirmation only', async () => {
     apiClient.defaults.baseURL = 'https://api.clinica.test/api'
-    const post = vi.spyOn(apiClient, 'post').mockResolvedValue({ data: null })
+    const put = vi.spyOn(apiClient, 'put').mockResolvedValue({ data: null })
+    const post = vi.spyOn(apiClient, 'post')
     const values = { password: 'clave-confirmada', password_confirmation: 'clave-confirmada' }
 
     await changeAssistantPassword(values)
-    expect(post).toHaveBeenCalledWith('/usuarios/asistente/password', values)
+    expect(put).toHaveBeenCalledExactlyOnceWith('/usuarios/asistente/password', values)
+    expect(post).not.toHaveBeenCalled()
   })
 
   it('deletes the assistant through the confirmed DELETE path without a body', async () => {

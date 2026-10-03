@@ -16,6 +16,14 @@ vi.mock('../features/patients/patientService', () => ({
   getPatients: vi.fn(() => Promise.resolve([])),
   getPatient: vi.fn(() => new Promise(() => {})),
 }))
+vi.mock('../features/agenda/agendaService', () => ({
+  getAgendaMonth: vi.fn(() => Promise.resolve([])),
+  getPendingRequests: vi.fn(() => Promise.resolve([])),
+}))
+vi.mock('../features/activities/activityService', () => ({
+  getActivities: vi.fn(() => Promise.resolve([])),
+  getActivityTotal: vi.fn(() => Promise.resolve({ total: '0' })),
+}))
 vi.mock('../features/clinical-history/clinicalHistoryService', () => ({
   getClinicalHistoryByPatient: vi.fn(() => new Promise(() => {})),
   createClinicalHistory: vi.fn(),
@@ -64,7 +72,7 @@ describe('AppRouter', () => {
     expect(screen.queryByRole('heading', { name: 'Mi perfil' })).not.toBeInTheDocument()
   })
 
-  it.each(['/', '/agenda', '/reportes', '/configuracion', '/usuarios', '/pacientes', '/pacientes/patient-id/historial', '/mi-perfil', '/registro'])('blocks the patient before mounting the administrative shell at %s', (path) => {
+  it.each(['/', '/agenda', '/actividades', '/reportes', '/configuracion', '/usuarios', '/pacientes', '/pacientes/patient-id/historial', '/mi-perfil', '/registro'])('blocks the patient before mounting the administrative shell at %s', (path) => {
     renderRouter('authenticated', path, undefined, authenticatedUser('paciente'))
     expect(screen.getByRole('heading', { name: 'Este portal está disponible para el personal de la clínica.' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Cerrar sesión' })).toBeEnabled()
@@ -210,7 +218,9 @@ describe('AppRouter', () => {
     expect(navigation.queryByRole('link', { name: 'Mi perfil' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Registrar paciente' })).not.toBeInTheDocument()
     expect(screen.queryAllByRole('link', { name: 'Abrir pacientes' })).toHaveLength(seesPatients ? 1 : 0)
-    expect(screen.getByRole('link', { name: 'Ver estado de Agenda' })).toBeInTheDocument()
+    expect(Boolean(navigation.queryByRole('link', { name: 'Agenda' }))).toBe(role === 'doctora')
+    expect(navigation.getByRole('link', { name: 'Actividades' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Ver estado de Agenda' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Ayuda' })).not.toBeInTheDocument()
     expect(within(screen.getByRole('banner')).getByText('Nombre de sesión')).toBeInTheDocument()
     expect(within(screen.getByRole('banner')).getByText(label)).toBeInTheDocument()
@@ -219,6 +229,10 @@ describe('AppRouter', () => {
   it.each([
     ['doctora', '/usuarios', true],
     ['doctora', '/pacientes', true],
+    ['doctora', '/agenda', true],
+    ['asistente', '/agenda', false],
+    ['doctora', '/actividades', true],
+    ['asistente', '/actividades', true],
     ['asistente', '/usuarios', false],
     ['asistente', '/pacientes', true],
     ['doctora', '/pacientes/patient-id/resumen', true],
@@ -228,7 +242,7 @@ describe('AppRouter', () => {
 
     if (permitted) {
       if (route.startsWith('/pacientes/')) expect(screen.getByRole('status')).toHaveTextContent('Cargando')
-      else expect(screen.getByRole('heading', { name: route === '/usuarios' ? 'Usuarios' : 'Pacientes' })).toBeInTheDocument()
+      else expect(screen.getByRole('heading', { name: route === '/usuarios' ? 'Usuarios' : route === '/agenda' ? 'Agenda' : route === '/actividades' ? 'Actividades' : 'Pacientes' })).toBeInTheDocument()
       expect(screen.queryByRole('heading', { name: 'Acceso no autorizado' })).not.toBeInTheDocument()
     } else {
       expect(screen.getByRole('heading', { name: 'Acceso no autorizado' })).toBeInTheDocument()

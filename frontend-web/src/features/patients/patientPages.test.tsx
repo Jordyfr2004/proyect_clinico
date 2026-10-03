@@ -3,17 +3,19 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { PatientsPage } from './PatientsPage'
 import { PatientSection, PatientWorkspace } from './PatientWorkspace'
-import { createPatient, getPatient, getPatients } from './patientService'
+import { createPatient, getPatient, getPatients, updatePatient } from './patientService'
+import { AuthContext } from '../auth/authContext'
+import type { UserRole } from '../auth/authService'
 
-vi.mock('./patientService', () => ({ getPatients: vi.fn(), getPatient: vi.fn(), createPatient: vi.fn() }))
+vi.mock('./patientService', () => ({ getPatients: vi.fn(), getPatient: vi.fn(), createPatient: vi.fn(), updatePatient: vi.fn() }))
 
 const patient = { id: 'patient-id', codigo_paciente: '001', nombres: 'Nombre recibido', cedula: '0912345678', telefono: null, direccion: null, fecha_nacimiento: '1990-01-01' }
 const httpError = (status: number, message: string) => ({ isAxiosError: true, response: { status, data: { message } } })
 
 beforeEach(() => vi.resetAllMocks())
 
-function renderDetail(path = '/pacientes/patient-id/resumen') {
-  render(<MemoryRouter initialEntries={[path]}><Routes><Route element={<PatientWorkspace/>} path="/pacientes/:patientId"><Route element={<PatientSection title="Resumen"/>} path="resumen"/><Route element={<PatientSection title="Historial clínico"/>} path="historial"/></Route></Routes></MemoryRouter>)
+function renderDetail(path = '/pacientes/patient-id/resumen', role: UserRole = 'doctora') {
+  render(<AuthContext.Provider value={{ status: 'authenticated', user: { id: 'user-id', name: 'Personal', username: 'personal', role, paciente_id: null, activo: true }, sessionError: null, login: async () => {}, logout: async () => {} }}><MemoryRouter initialEntries={[path]}><Routes><Route element={<PatientWorkspace/>} path="/pacientes/:patientId"><Route element={<PatientSection title="Resumen"/>} path="resumen"/><Route element={<PatientSection title="Historial clínico"/>} path="historial"/></Route></Routes></MemoryRouter></AuthContext.Provider>)
 }
 
 describe('patient views', () => {
@@ -213,6 +215,33 @@ describe('patient views', () => {
     vi.mocked(getPatient).mockRejectedValueOnce(httpError(404, 'No encontrado'))
     renderDetail()
     expect(await screen.findByRole('heading', { name: 'Paciente no encontrado' })).toBeInTheDocument()
+  })
+
+  it.each(['doctora', 'asistente'] as const)('edits patient fields as %s and refetches the backend record', async (role) => {
+    const refreshed = { ...patient, nombres: 'Nombre actualizado' }
+    vi.mocked(getPatient).mockResolvedValueOnce(patient).mockResolvedValueOnce(refreshed)
+    vi.mocked(updatePatient).mockResolvedValue({ message: 'Paciente actualizado correctamente.', patient: refreshed })
+    renderDetail(undefined, role)
+    fireEvent.click(await screen.findByRole('button', { name: 'Editar datos' }))
+    const form = screen.getByRole('form', { name: 'Editar datos del paciente' })
+    expect(within(form).queryByRole('textbox', { name: /Código/ })).not.toBeInTheDocument()
+    fireEvent.change(within(form).getByLabelText('Nombres'), { target: { value: 'Nombre actualizado' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Guardar cambios' }))
+    await waitFor(() => expect(updatePatient).toHaveBeenCalledWith('patient-id', { nombres: 'Nombre actualizado' }))
+    expect(await screen.findByRole('heading', { name: 'Nombre actualizado' })).toBeInTheDocument()
+    expect(getPatient).toHaveBeenCalledTimes(2)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('shows 422 without replacing the patient with unsaved values', async () => {
+    vi.mocked(getPatient).mockResolvedValue(patient)
+    vi.mocked(updatePatient).mockRejectedValue(httpError(422, 'Cédula duplicada.'))
+    renderDetail()
+    fireEvent.click(await screen.findByRole('button', { name: 'Editar datos' }))
+    fireEvent.change(screen.getByLabelText('Nombres'), { target: { value: 'Cambio no guardado' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Cédula duplicada.')
+    expect(screen.getByRole('heading', { name: 'Nombre recibido' })).toBeInTheDocument()
   })
 
 })

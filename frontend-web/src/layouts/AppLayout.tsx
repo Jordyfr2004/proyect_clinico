@@ -1,4 +1,4 @@
-import { BarChart3, CalendarDays, LayoutDashboard, LogOut, Menu, Settings, UserRound, UsersRound, X, type LucideIcon } from 'lucide-react'
+import { BarChart3, CalendarDays, ClipboardList, LayoutDashboard, LogOut, Menu, Settings, UserRound, UsersRound, X, type LucideIcon } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../features/auth/authContext'
@@ -9,7 +9,8 @@ type NavItem = { to: string; label: string; icon: LucideIcon; access?: Restricte
 
 const navItems: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/agenda', label: 'Agenda', icon: CalendarDays },
+  { to: '/agenda', label: 'Agenda', icon: CalendarDays, access: 'agenda' },
+  { to: '/actividades', label: 'Actividades', icon: ClipboardList, access: 'actividades' },
   { to: '/pacientes', label: 'Pacientes', icon: UsersRound, access: 'pacientes' },
   { to: '/reportes', label: 'Reportes', icon: BarChart3 },
   { to: '/usuarios', label: 'Usuarios', icon: UserRound, access: 'usuarios' },

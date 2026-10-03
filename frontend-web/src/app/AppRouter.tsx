@@ -12,6 +12,8 @@ import { ModulePage } from '../features/modules/ModulePage'
 import { PatientSection, PatientWorkspace } from '../features/patients/PatientWorkspace'
 import { PatientsPage } from '../features/patients/PatientsPage'
 import { ClinicalHistorySection } from '../features/clinical-history/ClinicalHistorySection'
+import { AgendaPage } from '../features/agenda/AgendaPage'
+import { ActivitiesPage } from '../features/activities/ActivitiesPage'
 import { AppLayout } from '../layouts/AppLayout'
 import { PublicLayout } from '../layouts/PublicLayout'
 
@@ -72,7 +74,12 @@ export function AppRouter() {
       </Route>
       <Route element={<ProtectedArea/>}>
         <Route element={<DashboardPage/>} index/>
-        <Route element={<ModulePage module="agenda"/>} path="agenda"/>
+        <Route element={<RestrictedRoute area="agenda"/>}>
+          <Route element={<AgendaPage/>} path="agenda"/>
+        </Route>
+        <Route element={<RestrictedRoute area="actividades"/>}>
+          <Route element={<ActivitiesPage/>} path="actividades"/>
+        </Route>
         <Route element={<RestrictedRoute area="pacientes"/>}>
           <Route element={<PatientsPage/>} path="pacientes"/>
           <Route element={<PatientWorkspace/>} path="pacientes/:patientId">

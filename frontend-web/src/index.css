@@ -111,15 +111,17 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .dashboard-module-card { position: relative; min-height: 168px; background: #fff; border: 1px solid var(--border); box-shadow: var(--shadow-surface); transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease; }
 .dashboard-module-card:hover { transform: translateY(-4px); border-color: #9bcaff; box-shadow: 0 20px 35px rgb(21 79 165 / 13%); }
 .dashboard-module-card::before { content: ''; position: absolute; top: 0; left: 22px; right: 22px; height: 2px; background: linear-gradient(90deg, #1f8dff, #65dbf7, transparent); }
-.dashboard-module-card:first-child { background: linear-gradient(145deg, #e6f4ff, #f9fcff 78%); }
-.dashboard-module-card:last-child { min-height: 130px; background: linear-gradient(115deg, #0d2f67, #1353a4); border-color: #2f69ad; }
-.dashboard-module-card:last-child :is(.text-ink-950, .admin-muted) { color: #fff; }
-.dashboard-module-card:last-child .admin-muted { color: #d2e9ff; }
-.dashboard-module-card:last-child svg { color: #9fe9ff; }
-.dashboard-module-card:last-child:hover { border-color: #6ccfff; box-shadow: 0 20px 36px rgb(11 62 139 / 22%); }
+.dashboard-module-card-patient { background: linear-gradient(145deg, #e6f4ff, #f9fcff 78%); }
+.dashboard-module-card-featured { min-height: 130px; background: linear-gradient(115deg, #0d2f67, #1353a4); border-color: #2f69ad; }
+.dashboard-module-card-featured :is(.text-ink-950, .admin-muted) { color: #fff; }
+.dashboard-module-card-featured .admin-muted { color: #d2e9ff; }
+.dashboard-module-card-featured svg { color: #9fe9ff; }
+.dashboard-module-card-featured:hover { border-color: #6ccfff; box-shadow: 0 20px 36px rgb(11 62 139 / 22%); }
 .dashboard-pending { background: linear-gradient(145deg, #f8fbff, #edf4fb); border: 1px solid var(--border); }
-.dashboard-pending-item { border: 1px solid #e0eaf5; background: rgb(255 255 255 / 67%); }
-.dashboard-pending-item:hover { border-color: #bdd4ee; background: #fff; }
+.dashboard-pending-list { overflow: hidden; border: 1px solid #dbe8f6; border-radius: 13px; background: rgb(255 255 255 / 58%); }
+.dashboard-pending-item { border-bottom: 1px solid #e2ebf5; }
+.dashboard-pending-item:last-child { border-bottom: 0; }
+@media (min-width: 640px) and (max-width: 1023px) { .dashboard-pending-item:nth-child(odd) { border-right: 1px solid #e2ebf5; } }
 @media (max-width: 639px) { .dashboard-module-card { min-height: 140px; } }
 .admin-skeleton { background: linear-gradient(90deg, #e6eff9 25%, #f4f9ff 50%, #e6eff9 75%); background-size: 200% 100%; animation: admin-shimmer 1.45s ease-in-out infinite; }
 .admin-reveal { animation: admin-rise .23s ease-out both; }

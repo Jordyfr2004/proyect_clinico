@@ -33,17 +33,17 @@ export async function createAssistant(values: CreateAssistantValues): Promise<As
 
 export async function deactivateAssistant(): Promise<void> {
   requireApiBaseUrl()
-  await apiClient.post('/usuarios/asistente/desactivar')
+  await apiClient.put('/usuarios/asistente/desactivar')
 }
 
 export async function activateAssistant(): Promise<void> {
   requireApiBaseUrl()
-  await apiClient.post('/usuarios/asistente/activar')
+  await apiClient.put('/usuarios/asistente/activar')
 }
 
 export async function changeAssistantPassword(values: ChangeAssistantPasswordValues): Promise<void> {
   requireApiBaseUrl()
-  await apiClient.post('/usuarios/asistente/password', values)
+  await apiClient.put('/usuarios/asistente/password', values)
 }
 
 export async function deleteAssistant(): Promise<void> {
