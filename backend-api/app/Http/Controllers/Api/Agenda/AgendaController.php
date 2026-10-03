@@ -17,18 +17,36 @@ class AgendaController extends Controller
         ?string $excluirId = null
     ): bool {
         return Agenda::whereDate('fecha', $fecha)
-            ->whereTime('hora_inicio', '<', substr($horaFin, 0, 5).':00')
-            ->whereTime('hora_fin', '>', substr($horaInicio, 0, 5).':00')
+            ->whereTime(
+                'hora_inicio',
+                '<',
+                substr($horaFin, 0, 5).':00'
+            )
+            ->whereTime(
+                'hora_fin',
+                '>',
+                substr($horaInicio, 0, 5).':00'
+            )
             ->where(function ($query) {
                 $query->where('tipo', 'personal')
                     ->orWhere(function ($q) {
                         $q->where('tipo', 'cita_medica')
-                            ->whereIn('estado', ['programada', 'completada']);
+                            ->whereIn(
+                                'estado',
+                                ['programada', 'completada']
+                            );
                     });
             })
-            ->when($excluirId, function ($query) use ($excluirId) {
-                $query->where('id', '!=', $excluirId);
-            })
+            ->when(
+                $excluirId,
+                function ($query) use ($excluirId) {
+                    $query->where(
+                        'id',
+                        '!=',
+                        $excluirId
+                    );
+                }
+            )
             ->exists();
     }
 
@@ -40,23 +58,38 @@ class AgendaController extends Controller
             ->orderBy('hora_inicio');
 
         if ($request->filled('fecha')) {
-            $query->whereDate('fecha', $request->fecha);
+            $query->whereDate(
+                'fecha',
+                $request->fecha
+            );
         }
 
         if (
             $request->filled('mes') &&
             $request->filled('anio')
         ) {
-            $query->whereMonth('fecha', $request->mes)
-                ->whereYear('fecha', $request->anio);
+            $query->whereMonth(
+                'fecha',
+                $request->mes
+            )
+                ->whereYear(
+                    'fecha',
+                    $request->anio
+                );
         }
 
         if ($request->filled('tipo')) {
-            $query->where('tipo', $request->tipo);
+            $query->where(
+                'tipo',
+                $request->tipo
+            );
         }
 
         if ($request->filled('estado')) {
-            $query->where('estado', $request->estado);
+            $query->where(
+                'estado',
+                $request->estado
+            );
         }
 
         return response()->json([
@@ -80,8 +113,9 @@ class AgendaController extends Controller
         ]);
     }
 
-    public function crearPersonal(Request $request): JsonResponse
-    {
+    public function crearPersonal(
+        Request $request
+    ): JsonResponse {
         $datos = $request->validate([
             'fecha' => [
                 'required',
@@ -130,8 +164,9 @@ class AgendaController extends Controller
         ], 201);
     }
 
-    public function crearCitaMedica(Request $request): JsonResponse
-    {
+    public function crearCitaMedica(
+        Request $request
+    ): JsonResponse {
         $datos = $request->validate([
             'codigo_paciente' => [
                 'required',
@@ -190,8 +225,9 @@ class AgendaController extends Controller
         ], 201);
     }
 
-    public function solicitarCita(Request $request): JsonResponse
-    {
+    public function solicitarCita(
+        Request $request
+    ): JsonResponse {
         $user = $request->user();
 
         if (!$user->paciente_id) {
@@ -204,8 +240,14 @@ class AgendaController extends Controller
             'paciente_id',
             $user->paciente_id
         )
-            ->where('tipo', 'cita_medica')
-            ->where('estado', 'pendiente')
+            ->where(
+                'tipo',
+                'cita_medica'
+            )
+            ->where(
+                'estado',
+                'pendiente'
+            )
             ->exists();
 
         if ($pendiente) {
@@ -327,11 +369,15 @@ class AgendaController extends Controller
             ],
         ]);
 
-        $cambiaHorario = array_key_exists('fecha', $datos)
-            || array_key_exists('hora_inicio', $datos)
-            || array_key_exists('hora_fin', $datos);
+        $cambiaHorario =
+            array_key_exists('fecha', $datos) ||
+            array_key_exists('hora_inicio', $datos) ||
+            array_key_exists('hora_fin', $datos);
 
-        if ($cambiaHorario && $registro->estado === 'pendiente') {
+        if (
+            $cambiaHorario &&
+            $registro->estado === 'pendiente'
+        ) {
             return response()->json([
                 'message' => 'Programa la solicitud pendiente desde su ruta específica.',
             ], 409);
@@ -357,7 +403,8 @@ class AgendaController extends Controller
 
         if (
             $cambiaHorario &&
-            substr($horaFin, 0, 5) <= substr($horaInicio, 0, 5)
+            substr($horaFin, 0, 5)
+                <= substr($horaInicio, 0, 5)
         ) {
             return response()->json([
                 'message' => 'La hora final debe ser posterior a la hora de inicio.',
@@ -387,8 +434,66 @@ class AgendaController extends Controller
         ]);
     }
 
-    public function cancelarCita(string $id): JsonResponse
-    {
+    public function registrarDatosClinicos(
+        Request $request,
+        string $id
+    ): JsonResponse {
+        $registro = Agenda::find($id);
+
+        if (!$registro) {
+            return response()->json([
+                'message' => 'Cita no encontrada.',
+            ], 404);
+        }
+
+        if ($registro->tipo !== 'cita_medica') {
+            return response()->json([
+                'message' => 'El registro no corresponde a una cita médica.',
+            ], 409);
+        }
+
+        if ($registro->estado === 'pendiente') {
+            return response()->json([
+                'message' => 'La cita todavía no ha sido programada.',
+            ], 409);
+        }
+
+        if ($registro->estado === 'cancelada') {
+            return response()->json([
+                'message' => 'No se pueden registrar datos clínicos en una cita cancelada.',
+            ], 409);
+        }
+
+        $datos = $request->validate([
+            'diagnostico' => [
+                'required',
+                'string',
+            ],
+            'tratamiento' => [
+                'required',
+                'string',
+            ],
+            'observacion' => [
+                'nullable',
+                'string',
+            ],
+        ]);
+
+        $registro->update([
+            'diagnostico' => $datos['diagnostico'],
+            'tratamiento' => $datos['tratamiento'],
+            'observacion' => $datos['observacion'] ?? null,
+        ]);
+
+        return response()->json([
+            'message' => 'Datos clínicos registrados correctamente.',
+            'data' => $registro->load('paciente'),
+        ]);
+    }
+
+    public function cancelarCita(
+        string $id
+    ): JsonResponse {
         $registro = Agenda::find($id);
 
         if (!$registro) {
@@ -425,8 +530,9 @@ class AgendaController extends Controller
         ]);
     }
 
-    public function completarCita(string $id): JsonResponse
-    {
+    public function completarCita(
+        string $id
+    ): JsonResponse {
         $registro = Agenda::find($id);
 
         if (!$registro) {
@@ -444,6 +550,15 @@ class AgendaController extends Controller
             ], 409);
         }
 
+        if (
+            !$registro->diagnostico ||
+            !$registro->tratamiento
+        ) {
+            return response()->json([
+                'message' => 'Debes registrar el diagnóstico y tratamiento antes de completar la cita.',
+            ], 409);
+        }
+
         $registro->update([
             'estado' => 'completada',
         ]);
@@ -453,8 +568,10 @@ class AgendaController extends Controller
             'data' => $registro,
         ]);
     }
-    public function misCitas(Request $request): JsonResponse
-    {
+
+    public function misCitas(
+        Request $request
+    ): JsonResponse {
         $user = $request->user();
 
         if (!$user->paciente_id) {
@@ -467,7 +584,10 @@ class AgendaController extends Controller
             'paciente_id',
             $user->paciente_id
         )
-            ->where('tipo', 'cita_medica')
+            ->where(
+                'tipo',
+                'cita_medica'
+            )
             ->orderBy('fecha')
             ->orderBy('hora_inicio')
             ->get();
@@ -477,8 +597,9 @@ class AgendaController extends Controller
         ]);
     }
 
-    public function destroy(string $id): JsonResponse
-    {
+    public function destroy(
+        string $id
+    ): JsonResponse {
         $registro = Agenda::find($id);
 
         if (!$registro) {

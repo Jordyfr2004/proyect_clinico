@@ -125,38 +125,30 @@ Route::middleware('auth:sanctum','role:paciente')->prefix('paciente')->group(fun
  
 }); 
 
-// Diagnósticos
-Route::middleware('auth:sanctum')->prefix('diagnosticos')->group(function () {
-
-    Route::get('/', [DiagnosticoController::class, 'index']);
-    Route::get('/paciente/{pacienteId}', [DiagnosticoController::class, 'porPaciente']);
-    Route::get('/{id}', [DiagnosticoController::class, 'show']);
-    Route::post('/', [DiagnosticoController::class, 'store']);
-    Route::put('/{id}', [DiagnosticoController::class, 'update']);
-
-});
 
 
-// Tratamientos
-Route::middleware('auth:sanctum')->prefix('tratamientos')->group(function () {
-
-    Route::get('/', [TratamientoController::class, 'index']);
-    Route::get('/paciente/{pacienteId}', [TratamientoController::class, 'porPaciente']);
-    Route::get('/{id}', [TratamientoController::class, 'show']);
-    Route::post('/', [TratamientoController::class, 'store']);
-    Route::put('/{id}', [TratamientoController::class, 'update']);
-
-});
 
 
 
 // Odontograma
-Route::middleware('auth:sanctum')->prefix('odontogramas')->group(function () {
+Route::prefix('odontogramas')->group(function () {
 
-    Route::get('/paciente/{pacienteId}', [OdontogramaController::class, 'porPaciente']);
-    Route::get('/{id}', [OdontogramaController::class, 'show']);
-    Route::post('/', [OdontogramaController::class, 'store']);
-    Route::put('/{id}', [OdontogramaController::class, 'update']);
+    // Doctora y asistente pueden consultar
+    Route::middleware('auth:sanctum', 'role:doctora,asistente')->group(function () {
+
+        Route::get('/paciente/{pacienteId}', [OdontogramaController::class, 'porPaciente']);
+
+    });
+
+
+    // Solo doctora puede guardar, actualizar o eliminar
+    Route::middleware('auth:sanctum', 'role:doctora')->group(function () {
+
+        Route::put('/paciente/{pacienteId}', [OdontogramaController::class, 'guardar']);
+
+        Route::delete('/paciente/{pacienteId}', [OdontogramaController::class, 'eliminarDatos']);
+
+    });
 
 });
 
@@ -242,6 +234,8 @@ Route::prefix('agenda')->group(function () {
         Route::put('/{id}/completar', [AgendaController::class, 'completarCita']);
 
         Route::delete('/{id}', [AgendaController::class, 'destroy']);
+
+        Route::put('/{id}/datos-clinicos', [AgendaController::class, 'registrarDatosClinicos']);
 
     });
 
