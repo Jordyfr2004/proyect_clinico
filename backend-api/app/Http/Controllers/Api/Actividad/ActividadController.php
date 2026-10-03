@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Actividad;
 use App\Http\Controllers\Controller;
 use App\Models\Actividad;
 use App\Models\Paciente;
+use App\Services\AuditoriaService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -108,6 +109,19 @@ class ActividadController extends Controller
             'precio' => $datos['precio'],
         ]);
 
+        $user = $request->user();
+
+        $detalle = $user->role === 'doctora'
+            ? "Registraste una actividad para el paciente {$paciente->codigo_paciente}."
+            : "Asistente registró una actividad para el paciente {$paciente->codigo_paciente}.";
+
+        AuditoriaService::registrarAccion(
+            $user,
+            'actividades',
+            'crear',
+            $detalle
+        );
+
         return response()->json([
             'message' => 'Actividad registrada correctamente.',
             'data' => [
@@ -182,15 +196,33 @@ class ActividadController extends Controller
 
         $actividad->save();
 
+        $actividad->load('paciente');
+
+        $user = $request->user();
+
+        $detalle = $user->role === 'doctora'
+            ? "Actualizaste una actividad del paciente {$actividad->paciente->codigo_paciente}."
+            : "Asistente actualizó una actividad del paciente {$actividad->paciente->codigo_paciente}.";
+
+        AuditoriaService::registrarAccion(
+            $user,
+            'actividades',
+            'actualizar',
+            $detalle
+        );
+
         return response()->json([
             'message' => 'Actividad actualizada correctamente.',
-            'data' => $actividad->load('paciente'),
+            'data' => $actividad,
         ]);
     }
 
-    public function destroy(string $id): JsonResponse
-    {
-        $actividad = Actividad::find($id);
+    public function destroy(
+        Request $request,
+        string $id
+    ): JsonResponse {
+        $actividad = Actividad::with('paciente')
+            ->find($id);
 
         if (!$actividad) {
             return response()->json([
@@ -198,7 +230,22 @@ class ActividadController extends Controller
             ], 404);
         }
 
+        $codigoPaciente = $actividad->paciente->codigo_paciente;
+
         $actividad->delete();
+
+        $user = $request->user();
+
+        $detalle = $user->role === 'doctora'
+            ? "Eliminaste una actividad del paciente {$codigoPaciente}."
+            : "Asistente eliminó una actividad del paciente {$codigoPaciente}.";
+
+        AuditoriaService::registrarAccion(
+            $user,
+            'actividades',
+            'eliminar',
+            $detalle
+        );
 
         return response()->json([
             'message' => 'Actividad eliminada correctamente.',

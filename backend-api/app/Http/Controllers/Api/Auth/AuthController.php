@@ -11,6 +11,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\ValidationException;
+use App\Services\AuditoriaService;
+
+
 
 class AuthController extends Controller
 {
@@ -43,6 +46,13 @@ class AuthController extends Controller
             ->createToken('auth_token')
             ->plainTextToken;
 
+        if (in_array($user->role, ['doctora', 'asistente'])) {
+            AuditoriaService::registrarSesion(
+                $user,
+                'inicio_sesion'
+            );
+        }
+
         return response()->json([
             'message' => 'Inicio de sesión correcto.',
             'token_type' => 'Bearer',
@@ -60,13 +70,22 @@ class AuthController extends Controller
 
     public function logout(Request $request): JsonResponse
     {
-        $request->user()->currentAccessToken()->delete();
+        $user = $request->user();
+
+        if (in_array($user->role, ['doctora', 'asistente'])) {
+            AuditoriaService::registrarSesion(
+                $user,
+                'cierre_sesion'
+            );
+        }
+
+        $user->currentAccessToken()->delete();
 
         return response()->json([
             'message' => 'Sesión cerrada correctamente.',
         ]);
     }
-
+    
     public function registerPaciente(
         RegisterPacienteRequest $request
     ): JsonResponse {

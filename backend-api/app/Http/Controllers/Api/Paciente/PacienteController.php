@@ -6,10 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Paciente\StorePacienteRequest;
 use App\Http\Requests\Paciente\UpdatePacienteRequest;
 use App\Models\Paciente;
+use App\Services\AuditoriaService;
 use Illuminate\Http\JsonResponse;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Http\Request;
-
+use Illuminate\Support\Facades\DB;
 
 class PacienteController extends Controller
 {
@@ -53,20 +53,51 @@ class PacienteController extends Controller
             'fecha_nacimiento' => $request->fecha_nacimiento,
         ]);
 
+        $user = $request->user();
+
+        $detalle = $user->role === 'doctora'
+            ? "Registraste al paciente {$paciente->codigo_paciente}."
+            : "Asistente registró al paciente {$paciente->codigo_paciente}.";
+
+        AuditoriaService::registrarAccion(
+            $user,
+            'pacientes',
+            'crear',
+            $detalle
+        );
+
         return response()->json([
             'message' => 'Paciente registrado correctamente.',
             'data' => $paciente,
         ], 201);
     }
 
-    public function update(UpdatePacienteRequest $request, string $id): JsonResponse
-    {
+    public function update(
+        UpdatePacienteRequest $request,
+        string $id
+    ): JsonResponse {
         $paciente = Paciente::findOrFail($id);
+
         $paciente->update($request->validated());
+
+        $paciente = $paciente->fresh();
+
+        $user = $request->user();
+
+        $detalle = $user->role === 'doctora'
+            ? "Actualizaste los datos del paciente {$paciente->codigo_paciente}."
+            : "Asistente actualizó los datos del paciente {$paciente->codigo_paciente}.";
+
+        AuditoriaService::registrarAccion(
+            $user,
+            'pacientes',
+            'actualizar',
+            $detalle
+        );
 
         return response()->json([
             'message' => 'Paciente actualizado correctamente.',
-            'data' => $paciente->fresh(),
+            'data' => $paciente,
         ]);
     }
 

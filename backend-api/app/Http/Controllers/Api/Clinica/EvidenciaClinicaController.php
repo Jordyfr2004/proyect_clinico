@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Clinica;
 use App\Http\Controllers\Controller;
 use App\Models\EvidenciaClinica;
 use App\Models\Paciente;
+use App\Services\AuditoriaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -134,6 +135,21 @@ class EvidenciaClinicaController extends Controller
             'fecha' => $datos['fecha'],
         ]);
 
+        $paciente = Paciente::findOrFail(
+            $evidencia->paciente_id
+        );
+
+        $tipoTexto = $evidencia->tipo === 'rx'
+            ? 'una radiografía'
+            : 'un caso clínico';
+
+        AuditoriaService::registrarAccion(
+            $request->user(),
+            'evidencias_clinicas',
+            'crear',
+            "Registraste {$tipoTexto} para el paciente {$paciente->codigo_paciente}."
+        );
+
         return response()->json([
             'message' => 'Evidencia clínica registrada correctamente.',
             'data' => $evidencia,
@@ -172,6 +188,21 @@ class EvidenciaClinicaController extends Controller
 
         $evidencia->update($datos);
 
+        $paciente = Paciente::findOrFail(
+            $evidencia->paciente_id
+        );
+
+        $tipoTexto = $evidencia->tipo === 'rx'
+            ? 'una radiografía'
+            : 'un caso clínico';
+
+        AuditoriaService::registrarAccion(
+            $request->user(),
+            'evidencias_clinicas',
+            'actualizar',
+            "Actualizaste {$tipoTexto} del paciente {$paciente->codigo_paciente}."
+        );
+
         return response()->json([
             'message' => 'Evidencia clínica actualizada correctamente.',
             'data' => $evidencia,
@@ -179,6 +210,7 @@ class EvidenciaClinicaController extends Controller
     }
 
     public function destroy(
+        Request $request,
         string $id
     ): JsonResponse {
         $evidencia = EvidenciaClinica::find($id);
@@ -189,7 +221,24 @@ class EvidenciaClinicaController extends Controller
             ], 404);
         }
 
+        $paciente = Paciente::findOrFail(
+            $evidencia->paciente_id
+        );
+
+        $tipoTexto = $evidencia->tipo === 'rx'
+            ? 'una radiografía'
+            : 'un caso clínico';
+
+        $codigoPaciente = $paciente->codigo_paciente;
+
         $evidencia->delete();
+
+        AuditoriaService::registrarAccion(
+            $request->user(),
+            'evidencias_clinicas',
+            'eliminar',
+            "Eliminaste {$tipoTexto} del paciente {$codigoPaciente}."
+        );
 
         return response()->json([
             'message' => 'Evidencia clínica eliminada correctamente.',

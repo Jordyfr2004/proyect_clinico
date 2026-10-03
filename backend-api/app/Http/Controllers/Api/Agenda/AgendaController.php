@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api\Agenda;
 use App\Http\Controllers\Controller;
 use App\Models\Agenda;
 use App\Models\Paciente;
+use App\Services\AuditoriaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -20,12 +21,12 @@ class AgendaController extends Controller
             ->whereTime(
                 'hora_inicio',
                 '<',
-                substr($horaFin, 0, 5).':00'
+                substr($horaFin, 0, 5) . ':00'
             )
             ->whereTime(
                 'hora_fin',
                 '>',
-                substr($horaInicio, 0, 5).':00'
+                substr($horaInicio, 0, 5) . ':00'
             )
             ->where(function ($query) {
                 $query->where('tipo', 'personal')
@@ -158,6 +159,13 @@ class AgendaController extends Controller
             'estado' => null,
         ]);
 
+        AuditoriaService::registrarAccion(
+            $request->user(),
+            'agenda',
+            'crear',
+            'Registraste una actividad personal en la agenda.'
+        );
+
         return response()->json([
             'message' => 'Actividad personal registrada correctamente.',
             'data' => $registro,
@@ -218,6 +226,13 @@ class AgendaController extends Controller
             'descripcion' => $datos['descripcion'] ?? null,
             'estado' => 'programada',
         ]);
+
+        AuditoriaService::registrarAccion(
+            $request->user(),
+            'agenda',
+            'crear_cita',
+            "Programaste una cita médica para el paciente {$paciente->codigo_paciente}."
+        );
 
         return response()->json([
             'message' => 'Cita médica registrada correctamente.',
@@ -328,9 +343,18 @@ class AgendaController extends Controller
             'estado' => 'programada',
         ]);
 
+        $registro->load('paciente');
+
+        AuditoriaService::registrarAccion(
+            $request->user(),
+            'agenda',
+            'programar_cita',
+            "Programaste una solicitud de cita del paciente {$registro->paciente->codigo_paciente}."
+        );
+
         return response()->json([
             'message' => 'Solicitud programada correctamente.',
-            'data' => $registro->load('paciente'),
+            'data' => $registro,
         ]);
     }
 
@@ -428,9 +452,24 @@ class AgendaController extends Controller
 
         $registro->update($datos);
 
+        $registro->load('paciente');
+
+        if ($registro->tipo === 'personal') {
+            $detalle = 'Actualizaste una actividad personal de la agenda.';
+        } else {
+            $detalle = "Actualizaste una cita médica del paciente {$registro->paciente->codigo_paciente}.";
+        }
+
+        AuditoriaService::registrarAccion(
+            $request->user(),
+            'agenda',
+            'actualizar',
+            $detalle
+        );
+
         return response()->json([
             'message' => 'Registro actualizado correctamente.',
-            'data' => $registro->load('paciente'),
+            'data' => $registro,
         ]);
     }
 
@@ -485,13 +524,23 @@ class AgendaController extends Controller
             'observacion' => $datos['observacion'] ?? null,
         ]);
 
+        $registro->load('paciente');
+
+        AuditoriaService::registrarAccion(
+            $request->user(),
+            'agenda',
+            'datos_clinicos',
+            "Registraste datos clínicos de la cita del paciente {$registro->paciente->codigo_paciente}."
+        );
+
         return response()->json([
             'message' => 'Datos clínicos registrados correctamente.',
-            'data' => $registro->load('paciente'),
+            'data' => $registro,
         ]);
     }
 
     public function cancelarCita(
+        Request $request,
         string $id
     ): JsonResponse {
         $registro = Agenda::find($id);
@@ -524,6 +573,15 @@ class AgendaController extends Controller
             'estado' => 'cancelada',
         ]);
 
+        $registro->load('paciente');
+
+        AuditoriaService::registrarAccion(
+            $request->user(),
+            'agenda',
+            'cancelar_cita',
+            "Cancelaste una cita médica del paciente {$registro->paciente->codigo_paciente}."
+        );
+
         return response()->json([
             'message' => 'Cita cancelada correctamente.',
             'data' => $registro,
@@ -531,6 +589,7 @@ class AgendaController extends Controller
     }
 
     public function completarCita(
+        Request $request,
         string $id
     ): JsonResponse {
         $registro = Agenda::find($id);
@@ -562,6 +621,15 @@ class AgendaController extends Controller
         $registro->update([
             'estado' => 'completada',
         ]);
+
+        $registro->load('paciente');
+
+        AuditoriaService::registrarAccion(
+            $request->user(),
+            'agenda',
+            'completar_cita',
+            "Marcaste como completada la cita médica del paciente {$registro->paciente->codigo_paciente}."
+        );
 
         return response()->json([
             'message' => 'Cita marcada como completada.',
@@ -598,9 +666,11 @@ class AgendaController extends Controller
     }
 
     public function destroy(
+        Request $request,
         string $id
     ): JsonResponse {
-        $registro = Agenda::find($id);
+        $registro = Agenda::with('paciente')
+            ->find($id);
 
         if (!$registro) {
             return response()->json([
@@ -608,7 +678,22 @@ class AgendaController extends Controller
             ], 404);
         }
 
+        if ($registro->tipo === 'personal') {
+            $detalle = 'Eliminaste una actividad personal de la agenda.';
+        } else {
+            $codigoPaciente = $registro->paciente?->codigo_paciente;
+
+            $detalle = "Eliminaste una cita médica del paciente {$codigoPaciente}.";
+        }
+
         $registro->delete();
+
+        AuditoriaService::registrarAccion(
+            $request->user(),
+            'agenda',
+            'eliminar',
+            $detalle
+        );
 
         return response()->json([
             'message' => 'Registro eliminado correctamente.',

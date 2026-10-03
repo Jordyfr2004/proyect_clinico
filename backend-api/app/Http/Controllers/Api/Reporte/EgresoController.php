@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Api\Reporte;
 
 use App\Http\Controllers\Controller;
 use App\Models\Egreso;
+use App\Services\AuditoriaService;
 use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -88,6 +89,20 @@ class EgresoController extends Controller
             'monto' => $datos['monto'],
         ]);
 
+        $user = $request->user();
+
+        AuditoriaService::registrarAccion(
+            $user,
+            'egresos',
+            'crear',
+            "Registraste un egreso de $" . number_format(
+                (float) $egreso->monto,
+                2,
+                '.',
+                ''
+            ) . " por {$egreso->concepto}."
+        );
+
         return response()->json([
             'message' => 'Egreso registrado correctamente.',
             'data' => $egreso,
@@ -128,14 +143,30 @@ class EgresoController extends Controller
 
         $egreso->update($datos);
 
+        $user = $request->user();
+
+        AuditoriaService::registrarAccion(
+            $user,
+            'egresos',
+            'actualizar',
+            "Actualizaste un egreso de $" . number_format(
+                (float) $egreso->monto,
+                2,
+                '.',
+                ''
+            ) . " por {$egreso->concepto}."
+        );
+
         return response()->json([
             'message' => 'Egreso actualizado correctamente.',
             'data' => $egreso,
         ]);
     }
 
-    public function destroy(string $id): JsonResponse
-    {
+    public function destroy(
+        Request $request,
+        string $id
+    ): JsonResponse {
         $egreso = Egreso::find($id);
 
         if (!$egreso) {
@@ -144,7 +175,24 @@ class EgresoController extends Controller
             ], 404);
         }
 
+        $monto = $egreso->monto;
+        $concepto = $egreso->concepto;
+
         $egreso->delete();
+
+        $user = $request->user();
+
+        AuditoriaService::registrarAccion(
+            $user,
+            'egresos',
+            'eliminar',
+            "Eliminaste un egreso de $" . number_format(
+                (float) $monto,
+                2,
+                '.',
+                ''
+            ) . " por {$concepto}."
+        );
 
         return response()->json([
             'message' => 'Egreso eliminado correctamente.',

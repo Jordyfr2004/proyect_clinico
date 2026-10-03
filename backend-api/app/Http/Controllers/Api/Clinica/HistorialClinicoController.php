@@ -4,8 +4,11 @@ namespace App\Http\Controllers\Api\Clinica;
 
 use App\Http\Controllers\Controller;
 use App\Models\HistorialClinico;
+use App\Models\Paciente;
+use App\Services\AuditoriaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+
 
 class HistorialClinicoController extends Controller
 {
@@ -86,6 +89,19 @@ class HistorialClinicoController extends Controller
 
         $historial = HistorialClinico::create($datos);
 
+        $paciente = Paciente::findOrFail(
+            $historial->paciente_id
+        );
+
+        $user = $request->user();
+
+        AuditoriaService::registrarAccion(
+            $user,
+            'historial_clinico',
+            'crear',
+            "Registraste el historial clínico del paciente {$paciente->codigo_paciente}."
+        );
+
         return response()->json([
             'message' => 'Historial clínico registrado correctamente.',
             'data' => $historial,
@@ -135,6 +151,19 @@ class HistorialClinicoController extends Controller
         ]);
 
         $historial->update($datos);
+
+        $paciente = Paciente::findOrFail(
+            $historial->paciente_id
+        );
+
+        $user = $request->user();
+
+        AuditoriaService::registrarAccion(
+            $user,
+            'historial_clinico',
+            'actualizar',
+            "Actualizaste el historial clínico del paciente {$paciente->codigo_paciente}."
+        );
 
         return response()->json([
             'message' => 'Historial clínico actualizado correctamente.',
