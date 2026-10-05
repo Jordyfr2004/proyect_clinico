@@ -8,10 +8,12 @@ import type { LoginValues } from '../features/auth/loginSchema'
 import type { AuthUser, UserRole } from '../features/auth/authService'
 import { getPatient } from '../features/patients/patientService'
 import { getClinicalHistoryByPatient } from '../features/clinical-history/clinicalHistoryService'
+import { getPatientEvidence } from '../features/evidence/evidenceService'
 
 vi.mock('../features/assistant/assistantService', () => ({
   getAssistant: vi.fn(() => new Promise(() => {})),
 }))
+vi.mock('../features/assistant/patientAccountsService', () => ({ getPatientAccounts: vi.fn(() => Promise.resolve([])) }))
 vi.mock('../features/patients/patientService', () => ({
   getPatients: vi.fn(() => Promise.resolve([])),
   getPatient: vi.fn(() => new Promise(() => {})),
@@ -29,6 +31,9 @@ vi.mock('../features/clinical-history/clinicalHistoryService', () => ({
   createClinicalHistory: vi.fn(),
   updateClinicalHistory: vi.fn(),
 }))
+vi.mock('../features/evidence/evidenceService', () => ({ getPatientEvidence: vi.fn(() => Promise.resolve([])) }))
+vi.mock('../features/cash/cashService', () => ({ getCashSummary: vi.fn(() => Promise.resolve({ periodo: 'mes', ingresos: '0.00', egresos: '0.00', saldo: '0.00' })), getExpenses: vi.fn(() => Promise.resolve([])) }))
+vi.mock('../features/audit/auditService', () => ({ getRecordedActions: vi.fn(() => Promise.resolve([])), getRecordedSessions: vi.fn(() => Promise.resolve([])) }))
 
 function renderRouter(status: AuthStatus, path = '/', login: (values: LoginValues) => Promise<void> = async () => {}, user: AuthUser | null = authenticatedUser('doctora')) {
   render(
@@ -53,6 +58,13 @@ describe('AppRouter', () => {
     expect(getClinicalHistoryByPatient).toHaveBeenCalledWith('patient-id')
     expect(screen.queryByText('Integración pendiente')).not.toBeInTheDocument()
   })
+  it('allows the assistant to consult patient evidence without write actions', async () => {
+    vi.mocked(getPatient).mockResolvedValueOnce({ id: 'patient-id', codigo_paciente: '001', nombres: 'Nombre recibido', cedula: '0912345678', telefono: null, direccion: null, fecha_nacimiento: null })
+    renderRouter('authenticated', '/pacientes/patient-id/radiografias', undefined, authenticatedUser('asistente'))
+    expect(await screen.findByRole('heading', { name: 'Evidencias clínicas' })).toBeInTheDocument()
+    expect(getPatientEvidence).toHaveBeenCalledWith('patient-id')
+    expect(screen.queryByRole('button', { name: /Subir|Eliminar evidencia/ })).not.toBeInTheDocument()
+  })
   it('redirects unauthenticated users from protected pages to login', () => {
     renderRouter('guest', '/pacientes')
     expect(screen.getByRole('heading', { name: 'Bienvenido de nuevo' })).toBeInTheDocument()
@@ -72,7 +84,7 @@ describe('AppRouter', () => {
     expect(screen.queryByRole('heading', { name: 'Mi perfil' })).not.toBeInTheDocument()
   })
 
-  it.each(['/', '/agenda', '/actividades', '/reportes', '/configuracion', '/usuarios', '/pacientes', '/pacientes/patient-id/historial', '/mi-perfil', '/registro'])('blocks the patient before mounting the administrative shell at %s', (path) => {
+  it.each(['/', '/agenda', '/actividades', '/caja', '/reportes', '/configuracion', '/usuarios', '/pacientes', '/pacientes/patient-id/historial', '/mi-perfil', '/registro'])('blocks the patient before mounting the administrative shell at %s', (path) => {
     renderRouter('authenticated', path, undefined, authenticatedUser('paciente'))
     expect(screen.getByRole('heading', { name: 'Este portal está disponible para el personal de la clínica.' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Cerrar sesión' })).toBeEnabled()
@@ -147,7 +159,7 @@ describe('AppRouter', () => {
     renderRouter('authenticated', '/usuarios', undefined, authenticatedUser('doctora'))
 
     expect(screen.getByRole('heading', { name: 'Usuarios' })).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('Cargando')
+    expect(screen.getAllByRole('status').some((status) => status.textContent?.includes('Cargando'))).toBe(true)
     expect(screen.queryByRole('heading', { name: 'Crear cuenta de asistente' })).not.toBeInTheDocument()
   })
 
@@ -219,6 +231,9 @@ describe('AppRouter', () => {
     expect(screen.queryByRole('link', { name: 'Registrar paciente' })).not.toBeInTheDocument()
     expect(screen.queryAllByRole('link', { name: 'Abrir pacientes' })).toHaveLength(seesPatients ? 1 : 0)
     expect(Boolean(navigation.queryByRole('link', { name: 'Agenda' }))).toBe(role === 'doctora')
+    expect(Boolean(navigation.queryByRole('link', { name: 'Caja' }))).toBe(role === 'doctora')
+    expect(Boolean(navigation.queryByRole('link', { name: 'Configuración' }))).toBe(role === 'doctora')
+    expect(Boolean(navigation.queryByRole('link', { name: 'Reportes' }))).toBe(role === 'doctora')
     expect(navigation.getByRole('link', { name: 'Actividades' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Ver estado de Agenda' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Ayuda' })).not.toBeInTheDocument()
@@ -233,6 +248,12 @@ describe('AppRouter', () => {
     ['asistente', '/agenda', false],
     ['doctora', '/actividades', true],
     ['asistente', '/actividades', true],
+    ['doctora', '/caja', true],
+    ['asistente', '/caja', false],
+    ['doctora', '/configuracion', true],
+    ['asistente', '/configuracion', false],
+    ['doctora', '/reportes', true],
+    ['asistente', '/reportes', false],
     ['asistente', '/usuarios', false],
     ['asistente', '/pacientes', true],
     ['doctora', '/pacientes/patient-id/resumen', true],
@@ -242,7 +263,7 @@ describe('AppRouter', () => {
 
     if (permitted) {
       if (route.startsWith('/pacientes/')) expect(screen.getByRole('status')).toHaveTextContent('Cargando')
-      else expect(screen.getByRole('heading', { name: route === '/usuarios' ? 'Usuarios' : route === '/agenda' ? 'Agenda' : route === '/actividades' ? 'Actividades' : 'Pacientes' })).toBeInTheDocument()
+      else expect(screen.getByRole('heading', { name: route === '/usuarios' ? 'Usuarios' : route === '/agenda' ? 'Agenda' : route === '/actividades' ? 'Actividades' : route === '/caja' ? 'Caja' : route === '/configuracion' ? 'Actividad del sistema' : route === '/reportes' ? 'Reportes' : 'Pacientes' })).toBeInTheDocument()
       expect(screen.queryByRole('heading', { name: 'Acceso no autorizado' })).not.toBeInTheDocument()
     } else {
       expect(screen.getByRole('heading', { name: 'Acceso no autorizado' })).toBeInTheDocument()

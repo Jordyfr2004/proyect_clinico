@@ -1,4 +1,4 @@
-import { BarChart3, CalendarDays, ClipboardList, LayoutDashboard, LogOut, Menu, Settings, UserRound, UsersRound, X, type LucideIcon } from 'lucide-react'
+import { BarChart3, CalendarDays, ClipboardList, LayoutDashboard, LogOut, Menu, Settings, UserRound, UsersRound, Wallet, X, type LucideIcon } from 'lucide-react'
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../features/auth/authContext'
@@ -11,10 +11,11 @@ const navItems: NavItem[] = [
   { to: '/', label: 'Dashboard', icon: LayoutDashboard },
   { to: '/agenda', label: 'Agenda', icon: CalendarDays, access: 'agenda' },
   { to: '/actividades', label: 'Actividades', icon: ClipboardList, access: 'actividades' },
+  { to: '/caja', label: 'Caja', icon: Wallet, access: 'caja' },
   { to: '/pacientes', label: 'Pacientes', icon: UsersRound, access: 'pacientes' },
-  { to: '/reportes', label: 'Reportes', icon: BarChart3 },
+  { to: '/reportes', label: 'Reportes', icon: BarChart3, access: 'reportes' },
   { to: '/usuarios', label: 'Usuarios', icon: UserRound, access: 'usuarios' },
-  { to: '/configuracion', label: 'Configuración', icon: Settings },
+  { to: '/configuracion', label: 'Configuración', icon: Settings, access: 'configuracion' },
 ]
 
 const roleLabels: Record<UserRole, string> = { doctora: 'Doctora', asistente: 'Asistente', paciente: 'Paciente' }

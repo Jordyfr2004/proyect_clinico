@@ -1,10 +1,9 @@
-import { ChartNoAxesCombined, Settings2 } from 'lucide-react'
+import { ChartNoAxesCombined } from 'lucide-react'
 
-type ModuleKey = 'reportes' | 'configuracion'
+type ModuleKey = 'reportes'
 
 const modules = {
   reportes: { title: 'Reportes', description: 'Información clínica, operativa y financiera.', icon: ChartNoAxesCombined, capabilities: ['Estadísticas', 'Reportes clínicos', 'Reportes administrativos'] },
-  configuracion: { title: 'Configuración', description: 'Horarios, disponibilidad y parámetros de la clínica.', icon: Settings2, capabilities: ['Horarios', 'Disponibilidad', 'Parámetros'] },
 } as const
 
 export function ModulePage({ module }: { module: ModuleKey }) {

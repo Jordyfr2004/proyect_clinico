@@ -1,4 +1,4 @@
-import { ArrowRight, ArrowUpRight, CalendarDays, ClipboardList, FileClock, FileText, Settings, ShieldCheck, Stethoscope, UsersRound } from 'lucide-react'
+import { ArrowRight, ArrowUpRight, CalendarDays, ClipboardList, FileClock, FileText, Settings, ShieldCheck, Stethoscope, UsersRound, Wallet } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../auth/authContext'
 import { canAccessArea } from '../auth/roleAccess'
@@ -7,9 +7,9 @@ const upcoming = [
   { name: 'Diagnósticos', icon: ClipboardList },
   { name: 'Tratamientos', icon: Stethoscope },
   { name: 'Odontograma', icon: FileClock },
-  { name: 'Radiografías', icon: FileText },
   { name: 'Reportes', icon: FileText, to: '/reportes' },
-  { name: 'Configuración', icon: Settings, to: '/configuracion' },
+  { name: 'Recetas', icon: FileText },
+  { name: 'Planes y presupuestos', icon: FileText },
 ] as const
 
 export function DashboardPage() {
@@ -18,6 +18,8 @@ export function DashboardPage() {
   const canManageUsers = canAccessArea(user?.role, 'usuarios')
   const canViewAgenda = canAccessArea(user?.role, 'agenda')
   const canViewActivities = canAccessArea(user?.role, 'actividades')
+  const canViewCash = canAccessArea(user?.role, 'caja')
+  const canViewAudit = canAccessArea(user?.role, 'configuracion')
 
   return (
     <div className="admin-reveal max-w-[1390px] space-y-8 lg:space-y-10">
@@ -55,14 +57,16 @@ export function DashboardPage() {
               {canViewPatients ? <Link className="dashboard-module-card admin-reveal flex flex-col justify-between overflow-hidden rounded-[19px] p-5 focus-visible:outline-2 focus-visible:outline-offset-2 sm:p-6" to="/pacientes"><span className="flex items-start justify-between"><FileClock aria-hidden="true" className="text-[#1269dd]" size={27} strokeWidth={1.6}/><ArrowUpRight aria-hidden="true" className="text-[#2776cc]" size={18}/></span><span className="mt-7"><span className="block text-lg font-bold text-ink-950">Historial clínico</span><span className="admin-muted mt-1 block text-sm leading-6">Accede desde el expediente de un paciente.</span></span></Link> : null}
               {canViewAgenda ? <Link className="dashboard-module-card admin-reveal flex flex-col justify-between overflow-hidden rounded-[19px] p-5 focus-visible:outline-2 focus-visible:outline-offset-2 sm:p-6" to="/agenda"><span className="flex items-start justify-between"><CalendarDays aria-hidden="true" className="text-[#1269dd]" size={27} strokeWidth={1.6}/><ArrowUpRight aria-hidden="true" className="text-[#2776cc]" size={18}/></span><span className="mt-7"><span className="block text-lg font-bold text-ink-950">Agenda</span><span className="admin-muted mt-1 block text-sm leading-6">Calendario y solicitudes pendientes.</span></span></Link> : null}
               {canViewActivities ? <Link className="dashboard-module-card admin-reveal flex flex-col justify-between overflow-hidden rounded-[19px] p-5 focus-visible:outline-2 focus-visible:outline-offset-2 sm:p-6" to="/actividades"><span className="flex items-start justify-between"><ClipboardList aria-hidden="true" className="text-[#1269dd]" size={27} strokeWidth={1.6}/><ArrowUpRight aria-hidden="true" className="text-[#2776cc]" size={18}/></span><span className="mt-7"><span className="block text-lg font-bold text-ink-950">Actividades</span><span className="admin-muted mt-1 block text-sm leading-6">Consulta de actividades registradas.</span></span></Link> : null}
-              {canManageUsers ? <Link className="dashboard-module-card dashboard-module-card-featured admin-reveal flex flex-col justify-between overflow-hidden rounded-[19px] p-5 focus-visible:outline-2 focus-visible:outline-offset-2 sm:col-span-2 sm:p-6" to="/usuarios"><span className="flex items-start justify-between"><ShieldCheck aria-hidden="true" className="text-[#1269dd]" size={27} strokeWidth={1.6}/><ArrowUpRight aria-hidden="true" className="text-[#2776cc]" size={18}/></span><span className="mt-7"><span className="block text-lg font-bold text-ink-950">Usuarios</span><span className="admin-muted mt-1 block text-sm leading-6">Administración de la cuenta de asistente.</span></span></Link> : null}
+              {canViewCash ? <Link className="dashboard-module-card admin-reveal flex flex-col justify-between overflow-hidden rounded-[19px] p-5 focus-visible:outline-2 focus-visible:outline-offset-2 sm:p-6" to="/caja"><span className="flex items-start justify-between"><Wallet aria-hidden="true" className="text-[#1269dd]" size={27} strokeWidth={1.6}/><ArrowUpRight aria-hidden="true" className="text-[#2776cc]" size={18}/></span><span className="mt-7"><span className="block text-lg font-bold text-ink-950">Caja</span><span className="admin-muted mt-1 block text-sm leading-6">Resumen y egresos del período.</span></span></Link> : null}
+              {canViewAudit ? <Link className="dashboard-module-card admin-reveal flex flex-col justify-between overflow-hidden rounded-[19px] p-5 focus-visible:outline-2 focus-visible:outline-offset-2 sm:p-6" to="/configuracion"><span className="flex items-start justify-between"><Settings aria-hidden="true" className="text-[#1269dd]" size={27} strokeWidth={1.6}/><ArrowUpRight aria-hidden="true" className="text-[#2776cc]" size={18}/></span><span className="mt-7"><span className="block text-lg font-bold text-ink-950">Configuración / Auditoría</span><span className="admin-muted mt-1 block text-sm leading-6">Acciones y sesiones registradas.</span></span></Link> : null}
+              {canManageUsers ? <Link className="dashboard-module-card dashboard-module-card-featured admin-reveal flex flex-col justify-between overflow-hidden rounded-[19px] p-5 focus-visible:outline-2 focus-visible:outline-offset-2 sm:col-span-2 sm:p-6" to="/usuarios"><span className="flex items-start justify-between"><ShieldCheck aria-hidden="true" className="text-[#1269dd]" size={27} strokeWidth={1.6}/><ArrowUpRight aria-hidden="true" className="text-[#2776cc]" size={18}/></span><span className="mt-7"><span className="block text-lg font-bold text-ink-950">Usuarios</span><span className="admin-muted mt-1 block text-sm leading-6">Gestiona asistente y cuentas de pacientes.</span></span></Link> : null}
             </div>
           </div>
           <div className="dashboard-pending rounded-[20px] p-5 sm:p-6">
             <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="admin-kicker">Próximamente</p><h3 className="mt-1 text-lg font-bold text-ink-950">En preparación</h3></div><span className="admin-pill admin-pill-pending">Pendiente</span></div>
             <p className="admin-muted mt-2 text-sm">Integración pendiente de backend.</p>
             <ul className="dashboard-pending-list mt-5 grid sm:grid-cols-2 lg:grid-cols-1">
-              {upcoming.map(({ name, icon: Icon, ...item }) => <li className="dashboard-pending-item flex min-h-12 items-center gap-3 px-4 text-sm text-[#496483]" key={name}><Icon aria-hidden="true" className="shrink-0 text-[#7094bb]" size={17}/><span className="flex-1">{name}</span>{'to' in item ? <Link aria-label={`Ver estado de ${name}`} className="grid size-8 place-items-center rounded-md text-[#1269dd] hover:bg-sky-100 focus-visible:outline-2 focus-visible:outline-offset-2" to={item.to}><ArrowRight aria-hidden="true" size={16}/></Link> : null}</li>)}
+              {upcoming.map(({ name, icon: Icon, ...item }) => <li className="dashboard-pending-item flex min-h-12 items-center gap-3 px-4 text-sm text-[#496483]" key={name}><Icon aria-hidden="true" className="shrink-0 text-[#7094bb]" size={17}/><span className="flex-1">{name}</span>{'to' in item && canAccessArea(user?.role, 'reportes') ? <Link aria-label={`Ver estado de ${name}`} className="grid size-8 place-items-center rounded-md text-[#1269dd] hover:bg-sky-100 focus-visible:outline-2 focus-visible:outline-offset-2" to={item.to}><ArrowRight aria-hidden="true" size={16}/></Link> : null}</li>)}
             </ul>
           </div>
         </div>

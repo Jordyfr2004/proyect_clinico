@@ -56,3 +56,8 @@ QA Playwright de baseline: login, Dashboard, Agenda, Pacientes, detalle (resumen
 
 - En `origin/backend` `4e460146d32f9d68e30aad205083192323a5f371`, PUT de pacientes, Agenda de doctora y Actividades de doctora/asistente tienen implementación real. Las menciones anteriores a PUT paciente y Agenda como pendientes son históricas. La web usa estos contratos con recarga desde GET después de mutaciones.
 - Diagnósticos, tratamientos, odontograma, radiografías, reportes/dashboard y recuperación de contraseña siguen pendientes de backend. Completar una cita requiere diagnóstico y tratamiento ya registrados según el backend actual; un 409 se muestra sin simular esos datos.
+
+## 2026-10-04 — Integraciones verificadas
+
+- Con `origin/backend` `fa89d0c056bfeaeb6c3b54115a1f1c3edef84714`, Agenda crea y programa desde el día seleccionado. La gestión de cuentas de pacientes, Caja y auditoría/sesiones usan sus contratos reales y las restricciones de doctora.
+- Evidencias clínicas se consultan en el expediente para doctora/asistente como metadatos de solo lectura. No se abre ni se sube el archivo hasta contar con el contrato de almacenamiento. Odontograma espera la estructura de `datos`; reportes generales y recuperación de contraseña permanecen pendientes.

@@ -2,6 +2,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { UsersPage } from './UsersPage'
 import { activateAssistant, changeAssistantPassword, createAssistant, deactivateAssistant, deleteAssistant, getAssistant } from './assistantService'
+import { getPatientAccounts } from './patientAccountsService'
 
 vi.mock('./assistantService', () => ({
   getAssistant: vi.fn(),
@@ -11,6 +12,7 @@ vi.mock('./assistantService', () => ({
   changeAssistantPassword: vi.fn(),
   deleteAssistant: vi.fn(),
 }))
+vi.mock('./patientAccountsService', () => ({ getPatientAccounts: vi.fn(() => Promise.resolve([])) }))
 
 const assistant = { id: 'assistant-id', name: 'Nombre recibido', email: 'recibido@backend.test', username: 'recibido', role: 'asistente' as const, activo: true }
 const httpError = (status: number, message: string) => ({ isAxiosError: true, response: { status, data: { message } } })
@@ -29,6 +31,7 @@ async function openCreateForm() {
 
 beforeEach(() => {
   vi.resetAllMocks()
+  vi.mocked(getPatientAccounts).mockResolvedValue([])
 })
 
 describe('UsersPage', () => {
@@ -71,7 +74,7 @@ describe('UsersPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Confirmar eliminación' }))
     expect(await screen.findByText('No existe una cuenta de asistente registrada.')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Crear asistente' })).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('Cuenta de asistente eliminada correctamente.')
+    expect(screen.getByText('Cuenta de asistente eliminada correctamente.')).toBeInTheDocument()
     expect(getAssistant).toHaveBeenCalledTimes(2)
   })
 
@@ -210,7 +213,7 @@ describe('UsersPage', () => {
     vi.mocked(getAssistant).mockReturnValue(new Promise((done) => { resolve = done }))
     render(<UsersPage/>)
 
-    expect(screen.getByRole('status')).toHaveTextContent('Cargando información')
+    expect(screen.getAllByRole('status').some((status) => status.textContent?.includes('Cargando información'))).toBe(true)
     expect(screen.queryByRole('heading', { name: 'Cuenta de asistente' })).not.toBeInTheDocument()
     resolve(assistant)
     expect(await screen.findByText('Nombre recibido')).toBeInTheDocument()
@@ -270,7 +273,7 @@ describe('UsersPage', () => {
     fireEvent.click(within(form).getByRole('button', { name: 'Crear cuenta de asistente' }))
     await waitFor(() => expect(createAssistant).toHaveBeenCalledWith({ name: 'Nombre recibido', email: 'recibido@backend.test', username: 'recibido', password: 'clave-confirmada' }))
     expect(await screen.findByText('Nombre recibido')).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('Cuenta de asistente creada.')
+    expect(screen.getByText('Cuenta de asistente creada.')).toBeInTheDocument()
   })
 
   it('rejects an invalid email and a short password before creating', async () => {

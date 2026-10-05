@@ -13,7 +13,7 @@ import { PatientFacts } from './PatientFacts'
 import { getPatient, updatePatient, type Patient, type UpdatePatientPayload } from './patientService'
 import { patientLoadError } from './patientLoadError'
 
-const sections = [['resumen', 'Resumen'], ['historial', 'Historial'], ['diagnosticos', 'Diagnósticos'], ['tratamientos', 'Tratamientos'], ['odontograma', 'Odontograma'], ['radiografias', 'Radiografías'], ['recetas', 'Recetas'], ['planes', 'Planes / presupuestos']]
+const sections = [['resumen', 'Resumen'], ['historial', 'Historial'], ['diagnosticos', 'Diagnósticos'], ['tratamientos', 'Tratamientos'], ['odontograma', 'Odontograma'], ['radiografias', 'Evidencias clínicas'], ['recetas', 'Recetas'], ['planes', 'Planes / presupuestos']]
 type PatientState = { kind: 'loading' } | { kind: 'ready'; patient: Patient } | { kind: 'missing' } | { kind: 'error'; message: string }
 
 function PatientDetail({ patientId }: { patientId: string }) {

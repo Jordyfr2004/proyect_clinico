@@ -5,6 +5,7 @@ import { LoadingState } from '../../components/states/LoadingState'
 import { AccessibleDialog } from '../../components/ui/AccessibleDialog'
 import { AssistantCreateForm } from '../modules/AssistantCreateForm'
 import { AssistantPasswordForm } from './AssistantPasswordForm'
+import { PatientAccountsSection } from './PatientAccountsSection'
 import { activateAssistant, changeAssistantPassword, createAssistant, deactivateAssistant, deleteAssistant, getAssistant, type Assistant, type ChangeAssistantPasswordValues, type CreateAssistantValues } from './assistantService'
 
 type AssistantState = { kind: 'loading' } | { kind: 'absent' } | { kind: 'ready'; assistant: Assistant } | { kind: 'error'; message: string }
@@ -233,6 +234,7 @@ export function UsersPage() {
           <AssistantPasswordForm disabled={mutation !== null} error={passwordError} onChangePassword={onChangePassword}/>
         </div>
       ) : null}
+      <PatientAccountsSection/>
     </div>
   )
 }

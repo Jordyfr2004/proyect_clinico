@@ -14,6 +14,9 @@ import { PatientsPage } from '../features/patients/PatientsPage'
 import { ClinicalHistorySection } from '../features/clinical-history/ClinicalHistorySection'
 import { AgendaPage } from '../features/agenda/AgendaPage'
 import { ActivitiesPage } from '../features/activities/ActivitiesPage'
+import { CashPage } from '../features/cash/CashPage'
+import { SystemActivityPage } from '../features/audit/SystemActivityPage'
+import { PatientEvidenceSection } from '../features/evidence/PatientEvidenceSection'
 import { AppLayout } from '../layouts/AppLayout'
 import { PublicLayout } from '../layouts/PublicLayout'
 
@@ -80,6 +83,9 @@ export function AppRouter() {
         <Route element={<RestrictedRoute area="actividades"/>}>
           <Route element={<ActivitiesPage/>} path="actividades"/>
         </Route>
+        <Route element={<RestrictedRoute area="caja"/>}>
+          <Route element={<CashPage/>} path="caja"/>
+        </Route>
         <Route element={<RestrictedRoute area="pacientes"/>}>
           <Route element={<PatientsPage/>} path="pacientes"/>
           <Route element={<PatientWorkspace/>} path="pacientes/:patientId">
@@ -89,16 +95,20 @@ export function AppRouter() {
             <Route element={<PatientSection title="Diagnósticos"/>} path="diagnosticos"/>
             <Route element={<PatientSection title="Tratamientos"/>} path="tratamientos"/>
             <Route element={<PatientSection title="Odontograma"/>} path="odontograma"/>
-            <Route element={<PatientSection title="Radiografías y documentos"/>} path="radiografias"/>
+            <Route element={<PatientEvidenceSection/>} path="radiografias"/>
             <Route element={<PatientSection title="Recetas"/>} path="recetas"/>
             <Route element={<PatientSection title="Planes y presupuestos"/>} path="planes"/>
           </Route>
         </Route>
-        <Route element={<ModulePage module="reportes"/>} path="reportes"/>
+        <Route element={<RestrictedRoute area="reportes"/>}>
+          <Route element={<ModulePage module="reportes"/>} path="reportes"/>
+        </Route>
         <Route element={<RestrictedRoute area="usuarios"/>}>
           <Route element={<UsersPage/>} path="usuarios"/>
         </Route>
-        <Route element={<ModulePage module="configuracion"/>} path="configuracion"/>
+        <Route element={<RestrictedRoute area="configuracion"/>}>
+          <Route element={<SystemActivityPage/>} path="configuracion"/>
+        </Route>
       </Route>
       <Route element={authStatus === 'loading' ? <LoadingSession/> : <Navigate replace to={authStatus === 'authenticated' ? '/' : '/login'}/>} path="*"/>
     </Routes>
