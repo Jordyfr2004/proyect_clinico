@@ -61,3 +61,4 @@ QA Playwright de baseline: login, Dashboard, Agenda, Pacientes, detalle (resumen
 
 - Con `origin/backend` `fa89d0c056bfeaeb6c3b54115a1f1c3edef84714`, Agenda crea y programa desde el día seleccionado. La gestión de cuentas de pacientes, Caja y auditoría/sesiones usan sus contratos reales y las restricciones de doctora.
 - Evidencias clínicas se consultan en el expediente para doctora/asistente como metadatos de solo lectura. No se abre ni se sube el archivo hasta contar con el contrato de almacenamiento. Odontograma espera la estructura de `datos`; reportes generales y recuperación de contraseña permanecen pendientes.
+- Diagnóstico, tratamiento y observación de citas médicas ya se registran desde Agenda mediante el contrato confirmado. Las vistas independientes de Diagnósticos y Tratamientos en el expediente permanecen pendientes; los listados históricos anteriores describen el estado de esas integraciones en su fecha.

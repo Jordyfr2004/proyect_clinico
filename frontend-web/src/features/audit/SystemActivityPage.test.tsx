@@ -12,8 +12,10 @@ describe('SystemActivityPage', () => {
   it('loads actions, switches to sessions and filters by date', async () => {
     render(<SystemActivityPage/>)
     expect(await screen.findByText('agenda · crear')).toBeInTheDocument()
+    expect(screen.getByText(/4 de octubre de 2026 · 10:00/)).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Sesiones' }))
     expect(await screen.findByText('login')).toBeInTheDocument()
+    expect(screen.getByText(/4 de octubre de 2026 · 09:00/)).toBeInTheDocument()
     expect(getRecordedSessions).toHaveBeenCalledWith(undefined)
     fireEvent.change(screen.getByLabelText('Fecha'), { target: { value: '2026-10-03' } })
     fireEvent.click(screen.getByRole('button', { name: 'Aplicar fecha' }))

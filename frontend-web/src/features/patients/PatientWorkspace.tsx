@@ -122,5 +122,10 @@ export function PatientWorkspace() {
 export function PatientSection({ title }: { title: string }) {
   const patient = useOutletContext<Patient>()
   if (title === 'Resumen') return <section className="admin-surface rounded-[20px] p-6 sm:p-8"><p className="admin-kicker">Información registrada</p><h2 className="mt-2 text-xl font-semibold text-ink-950">Datos del paciente</h2><div className="mt-5"><PatientFacts patient={patient}/></div></section>
-  return <section className="admin-surface rounded-[20px] p-6 sm:p-8"><span className="admin-pill admin-pill-pending">En preparación</span><h2 className="mt-4 text-xl font-semibold text-ink-950">{title}</h2><div className="mt-5"><IntegrationPending detail={title === 'Odontograma' ? 'El odontograma se habilitará cuando pueda verificarse la numeración y estructura clínica definida por la base de datos.' : `La información de ${title.toLowerCase()} se cargará desde los servicios reales del backend.`}/></div></section>
+  const detail = title === 'Odontograma'
+    ? 'El backend expone datos del odontograma, pero su estructura interna aún no está definida para esta vista.'
+    : title === 'Diagnósticos' || title === 'Tratamientos'
+      ? 'El diagnóstico, tratamiento y observación de cada cita médica se registran desde Agenda. Esta vista independiente sigue pendiente de contrato.'
+      : `La información de ${title.toLowerCase()} se cargará desde los servicios reales del backend.`
+  return <section className="admin-surface rounded-[20px] p-6 sm:p-8"><span className="admin-pill admin-pill-pending">En preparación</span><h2 className="mt-4 text-xl font-semibold text-ink-950">{title}</h2><div className="mt-5"><IntegrationPending detail={detail}/></div></section>
 }

@@ -15,7 +15,8 @@ describe('PatientAccountsSection', () => {
     render(<PatientAccountsSection/>)
     expect(screen.getByRole('status')).toBeInTheDocument()
     expect(await screen.findByText('Cuenta recibida')).toBeInTheDocument()
-    expect(screen.getByText(/Vinculada a expediente/)).toBeInTheDocument()
+    expect(screen.getByText('Activa')).toHaveClass('admin-pill-ready')
+    expect(screen.getByText('Vinculada a expediente')).toHaveClass('admin-pill-ready')
     expect(screen.queryByText('Asistente')).not.toBeInTheDocument()
   })
 
@@ -50,6 +51,8 @@ describe('PatientAccountsSection', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmar desvinculación' }))
     await waitFor(() => expect(unlinkPatientAccount).toHaveBeenCalledExactlyOnceWith(linked.id))
     expect(await screen.findByText(/Desvinculada/)).toBeInTheDocument()
+    expect(screen.getByText('Inactiva')).toHaveClass('admin-pill-pending')
+    expect(screen.getByText('Desvinculada')).toHaveClass('admin-pill-pending')
     expect(getPatientAccounts).toHaveBeenCalledTimes(2)
   })
 })

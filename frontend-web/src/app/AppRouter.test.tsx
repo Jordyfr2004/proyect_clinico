@@ -104,10 +104,10 @@ describe('AppRouter', () => {
     expect(screen.getByRole('heading', { name: 'Bienvenido de nuevo' })).toBeInTheDocument()
   })
 
-  it('redirects authenticated users away from password recovery', () => {
+  it('redirects authenticated users away from password recovery', async () => {
     renderRouter('authenticated', '/recuperar-contrasena', undefined, authenticatedUser('doctora'))
 
-    expect(screen.getByRole('heading', { name: 'Bienvenido' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Bienvenido' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Recupera tu acceso' })).not.toBeInTheDocument()
   })
 
@@ -144,21 +144,21 @@ describe('AppRouter', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent('No fue posible comunicarse con el servidor.')
   })
 
-  it('separates available modules from pending integrations without claiming there are no records', () => {
+  it('separates available modules from pending integrations without claiming there are no records', async () => {
     renderRouter('authenticated')
 
-    expect(screen.getByRole('heading', { name: 'Bienvenido' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Bienvenido' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Módulos' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Disponibles ahora' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'En preparación' })).toBeInTheDocument()
-    expect(screen.getByText('Integración pendiente de backend.')).toBeInTheDocument()
+    expect(screen.getByText(/Diagnóstico, tratamiento y observación se registran desde Agenda/)).toBeInTheDocument()
     expect(screen.queryByText(/No hay citas|No hay pacientes/)).not.toBeInTheDocument()
   })
 
-  it('starts the confirmed assistant consultation only on the authorized route', () => {
+  it('starts the confirmed assistant consultation only on the authorized route', async () => {
     renderRouter('authenticated', '/usuarios', undefined, authenticatedUser('doctora'))
 
-    expect(screen.getByRole('heading', { name: 'Usuarios' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Usuarios' })).toBeInTheDocument()
     expect(screen.getAllByRole('status').some((status) => status.textContent?.includes('Cargando'))).toBe(true)
     expect(screen.queryByRole('heading', { name: 'Crear cuenta de asistente' })).not.toBeInTheDocument()
   })
@@ -170,13 +170,13 @@ describe('AppRouter', () => {
     expect(screen.getByRole('button', { name: 'Registrar paciente' })).toBeEnabled()
   })
 
-  it('shows a dismissible notice after a forbidden response without blocking the current page', () => {
+  it('shows a dismissible notice after a forbidden response without blocking the current page', async () => {
     renderRouter('authenticated')
 
     act(() => window.dispatchEvent(new Event(AUTH_FORBIDDEN_EVENT)))
 
     expect(screen.getByRole('heading', { name: 'Acceso no autorizado' })).toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Bienvenido' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Bienvenido' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar aviso' }))
     expect(screen.queryByRole('heading', { name: 'Acceso no autorizado' })).not.toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Bienvenido' })).toBeInTheDocument()
@@ -221,7 +221,7 @@ describe('AppRouter', () => {
   it.each([
     ['doctora', true, true, 'Doctora'],
     ['asistente', false, true, 'Asistente'],
-  ] as const)('shows confirmed navigation and real identity for %s', (role, seesUsers, seesPatients, label) => {
+  ] as const)('shows confirmed navigation and real identity for %s', async (role, seesUsers, seesPatients, label) => {
     renderRouter('authenticated', '/', undefined, authenticatedUser(role))
 
     const navigation = within(screen.getByRole('navigation', { name: 'Navegación principal' }))
@@ -229,6 +229,7 @@ describe('AppRouter', () => {
     expect(Boolean(navigation.queryByRole('link', { name: 'Pacientes' }))).toBe(seesPatients)
     expect(navigation.queryByRole('link', { name: 'Mi perfil' })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Registrar paciente' })).not.toBeInTheDocument()
+    await screen.findByRole('heading', { name: 'Bienvenido' })
     expect(screen.queryAllByRole('link', { name: 'Abrir pacientes' })).toHaveLength(seesPatients ? 1 : 0)
     expect(Boolean(navigation.queryByRole('link', { name: 'Agenda' }))).toBe(role === 'doctora')
     expect(Boolean(navigation.queryByRole('link', { name: 'Caja' }))).toBe(role === 'doctora')
@@ -258,19 +259,19 @@ describe('AppRouter', () => {
     ['asistente', '/pacientes', true],
     ['doctora', '/pacientes/patient-id/resumen', true],
     ['asistente', '/pacientes/patient-id/historial', true],
-  ] as const)('applies confirmed access for %s at %s', (role, route, permitted) => {
+  ] as const)('applies confirmed access for %s at %s', async (role, route, permitted) => {
     renderRouter('authenticated', route, undefined, authenticatedUser(role))
 
     if (permitted) {
       if (route.startsWith('/pacientes/')) expect(screen.getByRole('status')).toHaveTextContent('Cargando')
-      else expect(screen.getByRole('heading', { name: route === '/usuarios' ? 'Usuarios' : route === '/agenda' ? 'Agenda' : route === '/actividades' ? 'Actividades' : route === '/caja' ? 'Caja' : route === '/configuracion' ? 'Actividad del sistema' : route === '/reportes' ? 'Reportes' : 'Pacientes' })).toBeInTheDocument()
+      else expect(await screen.findByRole('heading', { name: route === '/usuarios' ? 'Usuarios' : route === '/agenda' ? 'Agenda' : route === '/actividades' ? 'Actividades' : route === '/caja' ? 'Caja' : route === '/configuracion' ? 'Actividad del sistema' : route === '/reportes' ? 'Reportes' : 'Pacientes' })).toBeInTheDocument()
       expect(screen.queryByRole('heading', { name: 'Acceso no autorizado' })).not.toBeInTheDocument()
     } else {
       expect(screen.getByRole('heading', { name: 'Acceso no autorizado' })).toBeInTheDocument()
       const back = screen.getByRole('link', { name: 'Volver al Dashboard' })
       expect(back).toHaveAttribute('href', '/')
       fireEvent.click(back)
-      expect(screen.getByRole('heading', { name: 'Bienvenido' })).toBeInTheDocument()
+      expect(await screen.findByRole('heading', { name: 'Bienvenido' })).toBeInTheDocument()
     }
   })
 

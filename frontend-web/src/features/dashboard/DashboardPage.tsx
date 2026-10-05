@@ -64,7 +64,7 @@ export function DashboardPage() {
           </div>
           <div className="dashboard-pending rounded-[20px] p-5 sm:p-6">
             <div className="flex flex-wrap items-start justify-between gap-3"><div><p className="admin-kicker">Próximamente</p><h3 className="mt-1 text-lg font-bold text-ink-950">En preparación</h3></div><span className="admin-pill admin-pill-pending">Pendiente</span></div>
-            <p className="admin-muted mt-2 text-sm">Integración pendiente de backend.</p>
+            <p className="admin-muted mt-2 text-sm">Diagnóstico, tratamiento y observación se registran desde Agenda. Las vistas independientes y los demás módulos siguen en preparación.</p>
             <ul className="dashboard-pending-list mt-5 grid sm:grid-cols-2 lg:grid-cols-1">
               {upcoming.map(({ name, icon: Icon, ...item }) => <li className="dashboard-pending-item flex min-h-12 items-center gap-3 px-4 text-sm text-[#496483]" key={name}><Icon aria-hidden="true" className="shrink-0 text-[#7094bb]" size={17}/><span className="flex-1">{name}</span>{'to' in item && canAccessArea(user?.role, 'reportes') ? <Link aria-label={`Ver estado de ${name}`} className="grid size-8 place-items-center rounded-md text-[#1269dd] hover:bg-sky-100 focus-visible:outline-2 focus-visible:outline-offset-2" to={item.to}><ArrowRight aria-hidden="true" size={16}/></Link> : null}</li>)}
             </ul>

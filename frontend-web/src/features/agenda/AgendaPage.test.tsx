@@ -69,6 +69,7 @@ describe('AgendaPage', () => {
     const dialog = screen.getByRole('dialog', { name: 'Cita médica' })
     await within(dialog).findByRole('option', { name: /Paciente recibido/ })
     expect(within(dialog).queryByLabelText('Fecha')).not.toBeInTheDocument()
+    expect(within(dialog).getByText(/Fecha seleccionada:/)).toHaveTextContent('5 de octubre de 2026')
     fireEvent.change(within(dialog).getByLabelText('Paciente'), { target: { value: '001' } })
     fireEvent.change(within(dialog).getByLabelText('Hora de inicio'), { target: { value: '10:00' } })
     fireEvent.change(within(dialog).getByLabelText('Hora de fin'), { target: { value: '11:00' } })

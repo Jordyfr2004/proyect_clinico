@@ -11,8 +11,10 @@ beforeEach(() => { vi.resetAllMocks(); vi.mocked(getCashSummary).mockResolvedVal
 describe('CashPage', () => {
   it('displays totals from backend and sends selected filters', async () => {
     render(<CashPage/>)
-    expect(await screen.findByText('140.00')).toBeInTheDocument()
-    expect(screen.getByText('200.00')).toBeInTheDocument()
+    expect(await screen.findByText('$140.00')).toBeInTheDocument()
+    expect(screen.getByText('$200.00')).toBeInTheDocument()
+    expect(screen.getAllByText(/\$60\.00/)).toHaveLength(2)
+    expect(screen.getByText(/4 de octubre de 2026/)).toBeInTheDocument()
     const filterArea = screen.getByRole('region', { name: 'Filtros de Caja' })
     fireEvent.change(within(filterArea).getByLabelText('Período'), { target: { value: 'dia' } })
     fireEvent.change(within(filterArea).getByLabelText('Fecha'), { target: { value: '2026-10-03' } })

@@ -1,24 +1,31 @@
 import { Link, Navigate, Outlet, Route, Routes } from 'react-router-dom'
 import { LockKeyhole } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { lazy, Suspense, useEffect, useState } from 'react'
 import { AUTH_FORBIDDEN_EVENT } from '../services/apiClient'
 import { useAuth } from '../features/auth/authContext'
 import { canAccessArea, isStaffRole, type RestrictedArea } from '../features/auth/roleAccess'
 import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage'
 import { LoginPage } from '../features/auth/LoginPage'
-import { DashboardPage } from '../features/dashboard/DashboardPage'
-import { UsersPage } from '../features/assistant/UsersPage'
 import { ModulePage } from '../features/modules/ModulePage'
-import { PatientSection, PatientWorkspace } from '../features/patients/PatientWorkspace'
-import { PatientsPage } from '../features/patients/PatientsPage'
-import { ClinicalHistorySection } from '../features/clinical-history/ClinicalHistorySection'
-import { AgendaPage } from '../features/agenda/AgendaPage'
-import { ActivitiesPage } from '../features/activities/ActivitiesPage'
-import { CashPage } from '../features/cash/CashPage'
-import { SystemActivityPage } from '../features/audit/SystemActivityPage'
-import { PatientEvidenceSection } from '../features/evidence/PatientEvidenceSection'
+import { LoadingState } from '../components/states/LoadingState'
 import { AppLayout } from '../layouts/AppLayout'
 import { PublicLayout } from '../layouts/PublicLayout'
+
+const DashboardPage = lazy(() => import('../features/dashboard/DashboardPage').then((module) => ({ default: module.DashboardPage })))
+const AgendaPage = lazy(() => import('../features/agenda/AgendaPage').then((module) => ({ default: module.AgendaPage })))
+const ActivitiesPage = lazy(() => import('../features/activities/ActivitiesPage').then((module) => ({ default: module.ActivitiesPage })))
+const CashPage = lazy(() => import('../features/cash/CashPage').then((module) => ({ default: module.CashPage })))
+const PatientsPage = lazy(() => import('../features/patients/PatientsPage').then((module) => ({ default: module.PatientsPage })))
+const PatientWorkspace = lazy(() => import('../features/patients/PatientWorkspace').then((module) => ({ default: module.PatientWorkspace })))
+const PatientSection = lazy(() => import('../features/patients/PatientWorkspace').then((module) => ({ default: module.PatientSection })))
+const ClinicalHistorySection = lazy(() => import('../features/clinical-history/ClinicalHistorySection').then((module) => ({ default: module.ClinicalHistorySection })))
+const PatientEvidenceSection = lazy(() => import('../features/evidence/PatientEvidenceSection').then((module) => ({ default: module.PatientEvidenceSection })))
+const UsersPage = lazy(() => import('../features/assistant/UsersPage').then((module) => ({ default: module.UsersPage })))
+const SystemActivityPage = lazy(() => import('../features/audit/SystemActivityPage').then((module) => ({ default: module.SystemActivityPage })))
+
+function ProtectedRouteContent() {
+  return <Suspense fallback={<LoadingState/>}><Outlet/></Suspense>
+}
 
 function LoadingSession() {
   return <div className="grid min-h-screen place-items-center text-sm text-slate-500">Verificando sesión…</div>
@@ -76,6 +83,7 @@ export function AppRouter() {
         <Route element={authStatus === 'loading' ? <LoadingSession/> : authStatus === 'authenticated' ? <Navigate replace to="/"/> : <ForgotPasswordPage/>} path="/recuperar-contrasena"/>
       </Route>
       <Route element={<ProtectedArea/>}>
+        <Route element={<ProtectedRouteContent/>}>
         <Route element={<DashboardPage/>} index/>
         <Route element={<RestrictedRoute area="agenda"/>}>
           <Route element={<AgendaPage/>} path="agenda"/>
@@ -108,6 +116,7 @@ export function AppRouter() {
         </Route>
         <Route element={<RestrictedRoute area="configuracion"/>}>
           <Route element={<SystemActivityPage/>} path="configuracion"/>
+        </Route>
         </Route>
       </Route>
       <Route element={authStatus === 'loading' ? <LoadingSession/> : <Navigate replace to={authStatus === 'authenticated' ? '/' : '/login'}/>} path="*"/>
