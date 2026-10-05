@@ -84,7 +84,7 @@ describe('AppRouter', () => {
     expect(screen.queryByRole('heading', { name: 'Mi perfil' })).not.toBeInTheDocument()
   })
 
-  it.each(['/', '/agenda', '/actividades', '/caja', '/reportes', '/configuracion', '/usuarios', '/pacientes', '/pacientes/patient-id/historial', '/mi-perfil', '/registro'])('blocks the patient before mounting the administrative shell at %s', (path) => {
+  it.each(['/', '/agenda', '/citas-medicas', '/actividades', '/caja', '/reportes', '/configuracion', '/usuarios', '/pacientes', '/pacientes/patient-id/historial', '/mi-perfil', '/registro'])('blocks the patient before mounting the administrative shell at %s', (path) => {
     renderRouter('authenticated', path, undefined, authenticatedUser('paciente'))
     expect(screen.getByRole('heading', { name: 'Este portal está disponible para el personal de la clínica.' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Cerrar sesión' })).toBeEnabled()
@@ -151,7 +151,7 @@ describe('AppRouter', () => {
     expect(screen.getByRole('heading', { name: 'Módulos' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Disponibles ahora' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'En preparación' })).toBeInTheDocument()
-    expect(screen.getByText(/Diagnóstico, tratamiento y observación se registran desde Agenda/)).toBeInTheDocument()
+    expect(screen.getByText(/Diagnóstico, tratamiento y observación de citas se registran desde Citas médicas/)).toBeInTheDocument()
     expect(screen.queryByText(/No hay citas|No hay pacientes/)).not.toBeInTheDocument()
   })
 
@@ -232,6 +232,7 @@ describe('AppRouter', () => {
     await screen.findByRole('heading', { name: 'Bienvenido' })
     expect(screen.queryAllByRole('link', { name: 'Abrir pacientes' })).toHaveLength(seesPatients ? 1 : 0)
     expect(Boolean(navigation.queryByRole('link', { name: 'Agenda' }))).toBe(role === 'doctora')
+    expect(Boolean(navigation.queryByRole('link', { name: 'Citas médicas' }))).toBe(role === 'doctora')
     expect(Boolean(navigation.queryByRole('link', { name: 'Caja' }))).toBe(role === 'doctora')
     expect(Boolean(navigation.queryByRole('link', { name: 'Configuración' }))).toBe(role === 'doctora')
     expect(Boolean(navigation.queryByRole('link', { name: 'Reportes' }))).toBe(role === 'doctora')
@@ -247,6 +248,8 @@ describe('AppRouter', () => {
     ['doctora', '/pacientes', true],
     ['doctora', '/agenda', true],
     ['asistente', '/agenda', false],
+    ['doctora', '/citas-medicas', true],
+    ['asistente', '/citas-medicas', false],
     ['doctora', '/actividades', true],
     ['asistente', '/actividades', true],
     ['doctora', '/caja', true],
@@ -264,7 +267,7 @@ describe('AppRouter', () => {
 
     if (permitted) {
       if (route.startsWith('/pacientes/')) expect(screen.getByRole('status')).toHaveTextContent('Cargando')
-      else expect(await screen.findByRole('heading', { name: route === '/usuarios' ? 'Usuarios' : route === '/agenda' ? 'Agenda' : route === '/actividades' ? 'Actividades' : route === '/caja' ? 'Caja' : route === '/configuracion' ? 'Actividad del sistema' : route === '/reportes' ? 'Reportes' : 'Pacientes' })).toBeInTheDocument()
+      else expect(await screen.findByRole('heading', { name: route === '/usuarios' ? 'Usuarios' : route === '/agenda' ? 'Agenda' : route === '/citas-medicas' ? 'Citas médicas' : route === '/actividades' ? 'Actividades' : route === '/caja' ? 'Caja' : route === '/configuracion' ? 'Actividad del sistema' : route === '/reportes' ? 'Reportes' : 'Pacientes' })).toBeInTheDocument()
       expect(screen.queryByRole('heading', { name: 'Acceso no autorizado' })).not.toBeInTheDocument()
     } else {
       expect(screen.getByRole('heading', { name: 'Acceso no autorizado' })).toBeInTheDocument()

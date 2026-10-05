@@ -13,6 +13,7 @@ import { PublicLayout } from '../layouts/PublicLayout'
 
 const DashboardPage = lazy(() => import('../features/dashboard/DashboardPage').then((module) => ({ default: module.DashboardPage })))
 const AgendaPage = lazy(() => import('../features/agenda/AgendaPage').then((module) => ({ default: module.AgendaPage })))
+const MedicalAppointmentsPage = lazy(() => import('../features/medical-appointments/MedicalAppointmentsPage').then((module) => ({ default: module.MedicalAppointmentsPage })))
 const ActivitiesPage = lazy(() => import('../features/activities/ActivitiesPage').then((module) => ({ default: module.ActivitiesPage })))
 const CashPage = lazy(() => import('../features/cash/CashPage').then((module) => ({ default: module.CashPage })))
 const PatientsPage = lazy(() => import('../features/patients/PatientsPage').then((module) => ({ default: module.PatientsPage })))
@@ -87,6 +88,7 @@ export function AppRouter() {
         <Route element={<DashboardPage/>} index/>
         <Route element={<RestrictedRoute area="agenda"/>}>
           <Route element={<AgendaPage/>} path="agenda"/>
+          <Route element={<MedicalAppointmentsPage/>} path="citas-medicas"/>
         </Route>
         <Route element={<RestrictedRoute area="actividades"/>}>
           <Route element={<ActivitiesPage/>} path="actividades"/>
