@@ -8,6 +8,7 @@ import { IntegrationPending } from '../../components/states/IntegrationPending'
 import { LoadingState } from '../../components/states/LoadingState'
 import { AccessibleDialog } from '../../components/ui/AccessibleDialog'
 import { useAuth } from '../auth/authContext'
+import { canAccessArea } from '../auth/roleAccess'
 import { PatientEditForm } from './PatientEditForm'
 import { PatientFacts } from './PatientFacts'
 import { getPatient, updatePatient, type Patient, type UpdatePatientPayload } from './patientService'
@@ -121,11 +122,13 @@ export function PatientWorkspace() {
 
 export function PatientSection({ title }: { title: string }) {
   const patient = useOutletContext<Patient>()
+  const { user } = useAuth()
   if (title === 'Resumen') return <section className="admin-surface rounded-[20px] p-6 sm:p-8"><p className="admin-kicker">Información registrada</p><h2 className="mt-2 text-xl font-semibold text-ink-950">Datos del paciente</h2><div className="mt-5"><PatientFacts patient={patient}/></div></section>
+  const clinicalSection = title === 'Diagnósticos' || title === 'Tratamientos'
   const detail = title === 'Odontograma'
     ? 'El backend expone datos del odontograma, pero su estructura interna aún no está definida para esta vista.'
-    : title === 'Diagnósticos' || title === 'Tratamientos'
-      ? 'El diagnóstico, tratamiento y observación de cada cita médica se registran desde Agenda. Esta vista independiente sigue pendiente de contrato.'
+    : clinicalSection
+      ? `Los ${title.toLowerCase()} actualmente se registran dentro de cada cita médica. Esta vista independiente sigue pendiente de contrato.`
       : `La información de ${title.toLowerCase()} se cargará desde los servicios reales del backend.`
-  return <section className="admin-surface rounded-[20px] p-6 sm:p-8"><span className="admin-pill admin-pill-pending">En preparación</span><h2 className="mt-4 text-xl font-semibold text-ink-950">{title}</h2><div className="mt-5"><IntegrationPending detail={detail}/></div></section>
+  return <section className="admin-surface rounded-[20px] p-6 sm:p-8"><span className="admin-pill admin-pill-pending">En preparación</span><h2 className="mt-4 text-xl font-semibold text-ink-950">{title}</h2><div className="mt-5"><IntegrationPending detail={detail}/></div>{clinicalSection && canAccessArea(user?.role, 'agenda') ? <Link className="admin-secondary mt-5 inline-flex min-h-11 items-center rounded-[10px] px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2" to="/citas-medicas">Ir a Citas médicas</Link> : null}</section>
 }

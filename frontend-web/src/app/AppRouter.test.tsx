@@ -155,6 +155,19 @@ describe('AppRouter', () => {
     expect(screen.queryByText(/No hay citas|No hay pacientes/)).not.toBeInTheDocument()
   })
 
+  it.each(['doctora', 'asistente'] as const)('offers Citas médicas from the dashboard only to %s when authorized', async (role) => {
+    renderRouter('authenticated', '/', undefined, authenticatedUser(role))
+    await screen.findByRole('heading', { name: 'Disponibles ahora' })
+    const main = within(screen.getByRole('main'))
+    if (role === 'doctora') {
+      expect(main.getByRole('link', { name: /AgendaCalendario y registros existentes/ })).toHaveAttribute('href', '/agenda')
+      expect(main.getByRole('link', { name: /Citas médicasConsulta, programa y gestiona las citas registradas/ })).toHaveAttribute('href', '/citas-medicas')
+    } else {
+      expect(main.queryByRole('link', { name: /AgendaCalendario y registros existentes/ })).not.toBeInTheDocument()
+      expect(main.queryByRole('link', { name: /Citas médicasConsulta, programa y gestiona las citas registradas/ })).not.toBeInTheDocument()
+    }
+  })
+
   it('starts the confirmed assistant consultation only on the authorized route', async () => {
     renderRouter('authenticated', '/usuarios', undefined, authenticatedUser('doctora'))
 

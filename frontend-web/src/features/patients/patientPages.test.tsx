@@ -15,7 +15,7 @@ const httpError = (status: number, message: string) => ({ isAxiosError: true, re
 beforeEach(() => vi.resetAllMocks())
 
 function renderDetail(path = '/pacientes/patient-id/resumen', role: UserRole = 'doctora') {
-  render(<AuthContext.Provider value={{ status: 'authenticated', user: { id: 'user-id', name: 'Personal', username: 'personal', role, paciente_id: null, activo: true }, sessionError: null, login: async () => {}, logout: async () => {} }}><MemoryRouter initialEntries={[path]}><Routes><Route element={<PatientWorkspace/>} path="/pacientes/:patientId"><Route element={<PatientSection title="Resumen"/>} path="resumen"/><Route element={<PatientSection title="Historial clínico"/>} path="historial"/></Route></Routes></MemoryRouter></AuthContext.Provider>)
+  render(<AuthContext.Provider value={{ status: 'authenticated', user: { id: 'user-id', name: 'Personal', username: 'personal', role, paciente_id: null, activo: true }, sessionError: null, login: async () => {}, logout: async () => {} }}><MemoryRouter initialEntries={[path]}><Routes><Route element={<PatientWorkspace/>} path="/pacientes/:patientId"><Route element={<PatientSection title="Resumen"/>} path="resumen"/><Route element={<PatientSection title="Historial clínico"/>} path="historial"/><Route element={<PatientSection title="Diagnósticos"/>} path="diagnosticos"/><Route element={<PatientSection title="Tratamientos"/>} path="tratamientos"/></Route></Routes></MemoryRouter></AuthContext.Provider>)
 }
 
 describe('patient views', () => {
@@ -176,6 +176,22 @@ describe('patient views', () => {
     expect(await screen.findByRole('heading', { name: 'Nombre recibido' })).toBeInTheDocument()
     expect(getPatient).toHaveBeenCalledWith('patient-id')
     expect(screen.getByRole('status')).toHaveTextContent('Integración pendiente')
+  })
+
+  it.each([
+    ['doctora', 'diagnosticos', 'Diagnósticos', true],
+    ['doctora', 'tratamientos', 'Tratamientos', true],
+    ['asistente', 'diagnosticos', 'Diagnósticos', false],
+    ['asistente', 'tratamientos', 'Tratamientos', false],
+  ] as const)('keeps %s %s pending and only offers the authorized Citas médicas route', async (role, path, title, canOpenAppointments) => {
+    vi.mocked(getPatient).mockResolvedValue(patient)
+    renderDetail(`/pacientes/patient-id/${path}`, role)
+    expect(await screen.findByRole('heading', { name: title })).toBeInTheDocument()
+    expect(screen.getByText('En preparación')).toBeInTheDocument()
+    expect(screen.getByRole('status')).toHaveTextContent(`Los ${title.toLowerCase()} actualmente se registran dentro de cada cita médica.`)
+    const action = screen.queryByRole('link', { name: 'Ir a Citas médicas' })
+    if (canOpenAppointments) expect(action).toHaveAttribute('href', '/citas-medicas')
+    else expect(action).not.toBeInTheDocument()
   })
 
   it('shows confirmed basic fields on the patient summary', async () => {

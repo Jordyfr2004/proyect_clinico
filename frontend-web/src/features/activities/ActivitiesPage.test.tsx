@@ -12,10 +12,15 @@ function renderPage(role: UserRole) { render(<AuthContext.Provider value={{ stat
 
 describe('ActivitiesPage', () => {
   it('shows backend records and the backend period total without granting write to assistant', async () => {
+    vi.mocked(getActivityTotal).mockResolvedValue({ periodo: 'mes', total: '40.50' })
     renderPage('asistente')
     expect(await screen.findByText('Consulta registrada')).toBeInTheDocument()
     expect(screen.getByText('Paciente recibido')).toBeInTheDocument()
-    expect(screen.getAllByText('25.00')).toHaveLength(2)
+    expect(screen.getByText('5 de octubre de 2026')).toBeInTheDocument()
+    expect(screen.getByText('$25.00')).toBeInTheDocument()
+    expect(screen.getByText('$40.50')).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'enero' })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: 'diciembre' })).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Registrar actividad' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Editar' })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Eliminar' })).not.toBeInTheDocument()
