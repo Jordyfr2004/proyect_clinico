@@ -77,6 +77,19 @@ describe('ActivitiesPage', () => {
     await waitFor(() => expect(getActivities).toHaveBeenCalledTimes(2))
   })
 
+  it('keeps the dialog open and avoids a false success when refresh fails after a confirmed edit', async () => {
+    vi.mocked(getActivities).mockResolvedValueOnce([record]).mockRejectedValueOnce(new Error('network'))
+    vi.mocked(updateActivity).mockResolvedValue('Actividad actualizada correctamente.')
+    renderPage('doctora')
+    await screen.findByText('Consulta registrada')
+    fireEvent.click(screen.getByRole('button', { name: 'Editar' }))
+    const dialog = screen.getByRole('dialog', { name: 'Editar actividad' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }))
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('El cambio se confirmó, pero no fue posible actualizar las actividades.')
+    expect(screen.queryByText('Actividad actualizada correctamente.')).not.toBeInTheDocument()
+    expect(getActivities).toHaveBeenCalledTimes(2)
+  })
+
   it('requires confirmation before deleting and reloads after success', async () => {
     vi.mocked(deleteActivity).mockResolvedValue('Actividad eliminada correctamente.')
     renderPage('doctora')

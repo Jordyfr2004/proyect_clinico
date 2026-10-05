@@ -20,13 +20,18 @@ describe('PatientAccountsSection', () => {
     expect(screen.queryByText('Asistente')).not.toBeInTheDocument()
   })
 
-  it('deactivates and refetches the actual state', async () => {
+  it('confirms deactivation before mutating and refetches the actual state', async () => {
     vi.mocked(deactivatePatientAccount).mockResolvedValue('Cuenta desactivada.')
     vi.mocked(getPatientAccounts).mockResolvedValueOnce([linked]).mockResolvedValueOnce([{ ...linked, activo: false }])
     render(<PatientAccountsSection/>)
     fireEvent.click(await screen.findByRole('button', { name: 'Desactivar' }))
+    expect(deactivatePatientAccount).not.toHaveBeenCalled()
+    const dialog = screen.getByRole('dialog', { name: 'Desactivar cuenta de paciente' })
+    expect(dialog).toHaveTextContent('Se cerrarán sus sesiones activas.')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmar desactivación' }))
     await waitFor(() => expect(deactivatePatientAccount).toHaveBeenCalledExactlyOnceWith(linked.id))
     expect(await screen.findByText(/Inactiva/)).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Cuentas de pacientes' })).toHaveFocus()
     expect(getPatientAccounts).toHaveBeenCalledTimes(2)
   })
 
@@ -38,6 +43,20 @@ describe('PatientAccountsSection', () => {
     await waitFor(() => expect(activatePatientAccount).toHaveBeenCalledExactlyOnceWith(linked.id))
     expect(await screen.findByText(/Activa/)).toBeInTheDocument()
     expect(getPatientAccounts).toHaveBeenCalledTimes(2)
+  })
+
+  it('does not repeat a pending patient-account deactivation', async () => {
+    let resolve!: (message: string) => void
+    vi.mocked(deactivatePatientAccount).mockReturnValue(new Promise((done) => { resolve = done }))
+    render(<PatientAccountsSection/>)
+    fireEvent.click(await screen.findByRole('button', { name: 'Desactivar' }))
+    const confirmButton = within(screen.getByRole('dialog', { name: 'Desactivar cuenta de paciente' })).getByRole('button', { name: 'Confirmar desactivación' })
+    fireEvent.click(confirmButton)
+    fireEvent.click(confirmButton)
+    expect(deactivatePatientAccount).toHaveBeenCalledExactlyOnceWith(linked.id)
+    expect(confirmButton).toBeDisabled()
+    resolve('Cuenta desactivada.')
+    expect(await screen.findByText('Cuenta desactivada.')).toBeInTheDocument()
   })
 
   it('confirms unlinking, then refetches the inactive unlinked account', async () => {
@@ -53,6 +72,7 @@ describe('PatientAccountsSection', () => {
     expect(await screen.findByText(/Desvinculada/)).toBeInTheDocument()
     expect(screen.getByText('Inactiva')).toHaveClass('admin-pill-pending')
     expect(screen.getByText('Desvinculada')).toHaveClass('admin-pill-pending')
+    expect(screen.getByRole('heading', { name: 'Cuentas de pacientes' })).toHaveFocus()
     expect(getPatientAccounts).toHaveBeenCalledTimes(2)
   })
 })

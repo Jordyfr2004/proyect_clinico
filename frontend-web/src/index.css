@@ -79,6 +79,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 .admin-pill { display: inline-flex; align-items: center; gap: 6px; width: fit-content; padding: 5px 10px; border-radius: 999px; font-size: .72rem; font-weight: 700; letter-spacing: .025em; }
 .admin-pill-ready { color: #07569e; background: #e4f3ff; border: 1px solid #c8e6ff; }
 .admin-pill-pending { color: #526984; background: #edf2f8; border: 1px solid #dce5f0; }
+.admin-pill-completed { color: #176239; background: #edf9f0; border: 1px solid #bde2ca; }
+.admin-pill-cancelled { color: #9a3038; background: #fff1f1; border: 1px solid #f1c9cd; }
 .admin-avatar { display: grid; place-items: center; flex: none; color: #0b5db6; background: linear-gradient(145deg, #e4f4ff, #d4e7ff); border: 1px solid #cae3fb; font-weight: 750; letter-spacing: -.04em; }
 .admin-module-link, .admin-patient-row { transition: background-color .2s ease, border-color .2s ease, transform .2s ease, box-shadow .2s ease; }
 .admin-module-link:hover, .admin-patient-row:hover { background: #f1f8ff; transform: translateY(-2px); box-shadow: 0 10px 25px rgb(20 77 152 / 8%); }

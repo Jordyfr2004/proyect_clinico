@@ -13,7 +13,7 @@ beforeEach(() => { vi.resetAllMocks(); vi.mocked(getAgendaMonth).mockResolvedVal
 async function renderOctober() {
   render(<MedicalAppointmentsPage/>)
   fireEvent.change(screen.getByLabelText('Mes'), { target: { value: '2026-10' } })
-  await screen.findByText('Control recibido')
+  await screen.findAllByText('Control recibido')
 }
 
 describe('MedicalAppointmentsPage', () => {
@@ -42,6 +42,21 @@ describe('MedicalAppointmentsPage', () => {
     expect(screen.getByText('Cita cancelada')).toBeInTheDocument()
     expect(screen.queryByText('Control recibido')).not.toBeInTheDocument()
     expect(getAgendaMonth).toHaveBeenCalledTimes(calls)
+  })
+
+  it('distinguishes the four confirmed appointment states visually and by text', async () => {
+    vi.mocked(getAgendaMonth).mockResolvedValue([
+      medical,
+      { ...medical, id: 'pending-month', estado: 'pendiente' },
+      { ...medical, id: 'completed-month', estado: 'completada' },
+      { ...medical, id: 'cancelled-month', estado: 'cancelada' },
+    ])
+    await renderOctober()
+    const appointments = screen.getByRole('region', { name: 'Citas registradas' })
+    expect(within(appointments).getByText('Pendiente')).toHaveClass('admin-pill-pending')
+    expect(within(appointments).getByText('Programada')).toHaveClass('admin-pill-ready')
+    expect(within(appointments).getByText('Completada')).toHaveClass('admin-pill-completed')
+    expect(within(appointments).getByText('Cancelada')).toHaveClass('admin-pill-cancelled')
   })
 
   it('loads another month through the existing monthly endpoint', async () => {
@@ -106,6 +121,18 @@ describe('MedicalAppointmentsPage', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmar' }))
     await waitFor(() => expect(mutation).toHaveBeenCalledExactlyOnceWith('medical-1'))
     await waitFor(() => expect(getAgendaMonth).toHaveBeenCalledTimes(calls + 1))
+  })
+
+  it('moves focus to the page heading when deleting removes the original action', async () => {
+    vi.mocked(getPendingRequests).mockResolvedValue([])
+    vi.mocked(deleteAgendaEntry).mockResolvedValue('Registro eliminado correctamente.')
+    await renderOctober()
+    vi.mocked(getAgendaMonth).mockResolvedValue([])
+    fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Eliminar registro' })).getByRole('button', { name: 'Confirmar' }))
+    expect(await screen.findByText('Sin citas en esta vista')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Citas médicas' })).toHaveFocus()
   })
 
   it('registers clinical data and shows the confirmed values after refetch', async () => {

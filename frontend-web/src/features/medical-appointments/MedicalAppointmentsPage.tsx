@@ -17,6 +17,10 @@ const inputClass = 'admin-input mt-1 w-full text-sm'
 const statusLabels: Record<NonNullable<AgendaEntry['estado']>, string> = {
   pendiente: 'Pendiente', programada: 'Programada', cancelada: 'Cancelada', completada: 'Completada',
 }
+const statusClasses: Record<NonNullable<AgendaEntry['estado']>, string> = {
+  pendiente: 'admin-pill-pending', programada: 'admin-pill-ready',
+  cancelada: 'admin-pill-cancelled', completada: 'admin-pill-completed',
+}
 const dialogTitles: Record<DialogKind, string> = {
   program: 'Programar solicitud', edit: 'Editar registro', clinical: 'Datos clínicos',
   cancel: 'Cancelar cita médica', complete: 'Completar cita médica', delete: 'Eliminar registro',
@@ -107,6 +111,7 @@ export function MedicalAppointmentsPage() {
   const [busy, setBusy] = useState(false)
   const pendingMutation = useRef(false)
   const dialogTrigger = useRef<HTMLElement | null>(null)
+  const pageHeading = useRef<HTMLHeadingElement>(null)
   const requestId = useRef(0)
   const load = useCallback(async (): Promise<boolean> => {
     const id = ++requestId.current
@@ -135,7 +140,7 @@ export function MedicalAppointmentsPage() {
       else if (dialog.kind === 'complete') message = await completeAppointment(dialog.entry.id)
       else if (dialog.kind === 'delete') message = await deleteAgendaEntry(dialog.entry.id)
       else return
-      if (await load()) { setSuccess(message); setDialog(null); dialogTrigger.current?.focus() }
+      if (await load()) { setSuccess(message); setDialog(null); pageHeading.current?.focus() }
       else setActionError('El cambio se confirmó, pero no fue posible actualizar las citas. Reintenta la consulta.')
     } catch (error) { setActionError(errorMessage(error)) }
     finally { pendingMutation.current = false; setBusy(false) }
@@ -145,7 +150,7 @@ export function MedicalAppointmentsPage() {
     pendingMutation.current = true; setBusy(true); setActionError(null)
     try {
       const message = await registerClinicalData(dialog.entry.id, values)
-      if (await load()) { setSuccess(message); setDialog(null); dialogTrigger.current?.focus() }
+      if (await load()) { setSuccess(message); setDialog(null); pageHeading.current?.focus() }
       else setActionError('El cambio se confirmó, pero no fue posible actualizar las citas. Reintenta la consulta.')
     } catch (error) { setActionError(errorMessage(error)) }
     finally { pendingMutation.current = false; setBusy(false) }
@@ -154,7 +159,7 @@ export function MedicalAppointmentsPage() {
   const appointments = state.kind === 'ready' ? state.entries.filter((entry) => entry.tipo === 'cita_medica' && (statusFilter === 'todos' || entry.estado === statusFilter)) : []
   const monthLabel = new Intl.DateTimeFormat('es-EC', { month: 'long', year: 'numeric' }).format(new Date(month.year, month.value - 1, 1))
   return <div className="admin-reveal max-w-[1390px] space-y-6">
-    <header><p className="admin-kicker">Organización clínica</p><h1 className="admin-page-title mt-2">Citas médicas</h1><p className="admin-body mt-2">Consulta y gestión de las citas registradas en el período seleccionado.</p></header>
+    <header><p className="admin-kicker">Organización clínica</p><h1 className="admin-page-title mt-2 focus-visible:outline-2 focus-visible:outline-offset-2" ref={pageHeading} tabIndex={-1}>Citas médicas</h1><p className="admin-body mt-2">Consulta y gestión de las citas registradas en el período seleccionado.</p></header>
     {success ? <p className="admin-success rounded-xl p-4 text-sm" role="status">{success}</p> : null}
     <section aria-label="Filtros de citas médicas" className="admin-surface flex flex-wrap items-end gap-4 rounded-[20px] p-5 sm:p-6">
       <label className="min-w-44 flex-1 text-sm font-medium text-ink-950">Mes<input className={inputClass} onChange={(event) => { if (!event.target.value) return; const [year, value] = event.target.value.split('-').map(Number); setMonth({ year, value }) }} type="month" value={`${month.year}-${String(month.value).padStart(2, '0')}`}/></label>
@@ -163,7 +168,7 @@ export function MedicalAppointmentsPage() {
     {state.kind === 'loading' ? <LoadingState/> : state.kind === 'error' ? <ErrorState description={state.message} onRetry={() => { void load() }}/> : <>
       <section aria-labelledby="appointments-title" className="admin-surface rounded-[20px] p-5 sm:p-6"><div className="flex flex-wrap items-end justify-between gap-2"><div><p className="admin-kicker capitalize">{monthLabel}</p><h2 className="mt-2 text-xl font-semibold text-ink-950" id="appointments-title">Citas registradas</h2></div><p className="admin-muted text-sm">Citas encontradas: {appointments.length}</p></div>
         {appointments.length === 0 ? <div className="mt-5"><EmptyState description="No hay citas médicas que coincidan con el mes y estado seleccionados." icon={CalendarDays} title="Sin citas en esta vista"/></div> : <ul className="mt-5 grid gap-3">{appointments.map((entry) => <li className="min-w-0 rounded-xl border border-[#dbe6f2] p-4 sm:p-5" key={entry.id}>
-          <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><p className="font-semibold text-ink-950">{entry.paciente?.nombres ?? 'Paciente no disponible'}</p>{entry.paciente?.codigo_paciente ? <p className="admin-muted text-sm">Código: {entry.paciente.codigo_paciente}</p> : null}</div>{entry.estado ? <span className="admin-pill admin-pill-ready">{statusLabels[entry.estado]}</span> : null}</div>
+          <div className="flex flex-wrap items-start justify-between gap-3"><div className="min-w-0"><p className="font-semibold text-ink-950">{entry.paciente?.nombres ?? 'Paciente no disponible'}</p>{entry.paciente?.codigo_paciente ? <p className="admin-muted text-sm">Código: {entry.paciente.codigo_paciente}</p> : null}</div>{entry.estado ? <span className={`admin-pill ${statusClasses[entry.estado]}`}>{statusLabels[entry.estado]}</span> : null}</div>
           <p className="admin-muted mt-3 text-sm">{entry.fecha ? formatDate(entry.fecha) : 'Fecha pendiente'}{entry.hora_inicio && entry.hora_fin ? ` · ${entry.hora_inicio.slice(0, 5)}–${entry.hora_fin.slice(0, 5)}` : null}</p>
           {entry.descripcion ? <p className="admin-body mt-2 text-sm">{entry.descripcion}</p> : null}
           {entry.diagnostico ? <p className="admin-body mt-2 text-sm"><strong className="text-ink-950">Diagnóstico:</strong> {entry.diagnostico}</p> : null}
