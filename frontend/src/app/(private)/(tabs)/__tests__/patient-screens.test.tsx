@@ -378,4 +378,40 @@ describe("patient screens", () => {
     );
     expect(uploadProfilePhoto).not.toHaveBeenCalled();
   });
+
+  test("offers retry when the initial profile request fails", () => {
+    (useRemote as jest.Mock).mockReturnValue({
+      data: null,
+      loading: false,
+      error: "No fue posible cargar el perfil.",
+      reload: jest.fn(),
+    });
+
+    renderScreen(<Profile />);
+
+    expect(screen.getByText("No fue posible cargar el perfil.")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Reintentar" })).toBeTruthy();
+  });
+
+  test("keeps the confirmed profile visible during a refresh", () => {
+    (useRemote as jest.Mock).mockReturnValue({
+      data: {
+        photoUrl: null,
+        code: "PAC-1",
+        names: "Ana Pérez",
+        nationalId: "0102",
+        phone: "099",
+        address: "Quito",
+        birthdate: "1990-01-01",
+      },
+      loading: true,
+      error: "",
+      reload: jest.fn(),
+    });
+
+    renderScreen(<Profile />);
+
+    expect(screen.getByText("Ana Pérez")).toBeTruthy();
+    expect(screen.queryByText("Cargando información…")).toBeNull();
+  });
 });

@@ -52,6 +52,8 @@ export default function Profile() {
   const { data, loading, error, reload } = useRemote(loader);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
+  const initialLoading = loading && data === null;
+  const unavailable = Boolean(error) && data === null;
   const choosePhoto = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted)
@@ -121,7 +123,7 @@ export default function Profile() {
         title="Mi perfil"
         subtitle="Administra tu identidad y sesión."
       />
-      {error ? <Notice tone="error">{error}</Notice> : null}
+      {!initialLoading && error ? <Notice tone="error">{error}</Notice> : null}
       {feedback ? (
         <Notice
           tone={
@@ -133,7 +135,7 @@ export default function Profile() {
           {feedback}
         </Notice>
       ) : null}
-      {loading ? (
+      {initialLoading ? (
         <LoadingState />
       ) : data ? (
         <>
@@ -205,6 +207,13 @@ export default function Profile() {
             />
           ) : null}
         </>
+      ) : unavailable ? (
+        <Button
+          title="Reintentar"
+          icon="refresh"
+          variant="ghost"
+          onPress={() => void reload()}
+        />
       ) : null}
       <Button
         title="Cerrar sesión"
