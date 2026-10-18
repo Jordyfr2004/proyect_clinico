@@ -25,6 +25,27 @@ import {
   uploadProfilePhoto,
 } from "@/features/patient/profile";
 import { useRemote } from "@/hooks/use-remote";
+
+const supportedPhotoMime = new Set(["image/jpeg", "image/png", "image/webp"]);
+const photoMimeByExtension: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+};
+const resolvePhotoMime = (asset: ImagePicker.ImagePickerAsset) => {
+  if (asset.mimeType) {
+    const mime =
+      asset.mimeType.toLowerCase() === "image/jpg"
+        ? "image/jpeg"
+        : asset.mimeType.toLowerCase();
+    return supportedPhotoMime.has(mime) ? mime : null;
+  }
+  const name = asset.fileName ?? asset.uri;
+  const extension = /\.([a-z0-9]+)(?:[?#].*)?$/i.exec(name)?.[1].toLowerCase();
+  return extension ? (photoMimeByExtension[extension] ?? null) : null;
+};
+
 export default function Profile() {
   const { signOut } = useAuth();
   const loader = useCallback(() => getProfile(), []);
@@ -43,15 +64,14 @@ export default function Profile() {
     });
     if (result.canceled) return;
     const asset = result.assets[0];
-    const allowed = new Set(["image/jpeg", "image/png", "image/webp"]);
-    if (asset.mimeType && !allowed.has(asset.mimeType))
-      return setFeedback("La foto debe ser JPG, PNG o WebP.");
+    const mimeType = resolvePhotoMime(asset);
+    if (!mimeType) return setFeedback("La foto debe ser JPG, PNG o WebP.");
     if (asset.fileSize && asset.fileSize > 5 * 1024 * 1024)
       return setFeedback("La foto no puede superar 5 MB.");
     setBusy(true);
     setFeedback("");
     try {
-      await uploadProfilePhoto(asset.uri, asset.mimeType ?? "image/jpeg");
+      await uploadProfilePhoto(asset.uri, mimeType);
       setFeedback("Foto actualizada.");
       await reload();
     } catch (reason) {
@@ -220,9 +240,9 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 0,
     right: 0,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: palette.primary,
     borderWidth: 3,
     borderColor: palette.surface,

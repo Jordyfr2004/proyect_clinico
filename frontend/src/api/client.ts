@@ -117,9 +117,14 @@ export const apiRequest = async <T>(
     });
 
     if (!response.ok) {
-      const parsed = parseJsonText(await response.text());
-      const details = errorDetails(parsed);
       if (response.status === 401) await unauthorizedHandler();
+      let parsed: unknown;
+      try {
+        parsed = parseJsonText(await response.text());
+      } catch {
+        parsed = undefined;
+      }
+      const details = errorDetails(parsed);
       throw new ApiError(
         response.status,
         details.message,

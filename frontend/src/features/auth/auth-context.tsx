@@ -34,9 +34,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const clearSession = useCallback(async () => {
     tokenRef.current = null;
-    await clearAccessToken();
     setUser(null);
     setStatus('anonymous');
+    try {
+      await clearAccessToken();
+    } catch {
+      // Memory access is revoked even if the platform keystore is temporarily unavailable.
+    }
   }, []);
 
   useEffect(() => {
@@ -61,10 +65,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setStatus('authenticated');
       } catch {
         tokenRef.current = null;
-        await clearAccessToken();
         if (active) {
           setUser(null);
           setStatus('anonymous');
+        }
+        try {
+          await clearAccessToken();
+        } catch {
+          // A storage failure must not keep protected routes rendered in memory.
         }
       }
     })();

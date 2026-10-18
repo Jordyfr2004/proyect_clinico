@@ -17,12 +17,18 @@ import {
   requestAppointment,
 } from "@/features/patient/appointments";
 import { useRemote } from "@/hooks/use-remote";
+
+const appointmentTypeLabel = (type: string) =>
+  type === "cita_medica" ? "Cita médica" : type.replaceAll("_", " ");
+
 export default function Appointments() {
   const loader = useCallback(() => getAppointments(), []);
   const { data, loading, error, reload } = useRemote(loader);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [submitError, setSubmitError] = useState("");
+  const hasPendingRequest =
+    data?.some((item) => item.status.toLowerCase() === "pendiente") ?? false;
   const request = async () => {
     setBusy(true);
     setMessage("");
@@ -51,9 +57,10 @@ export default function Appointments() {
         <Notice tone="error">{submitError || error}</Notice>
       ) : null}
       <Button
-        title="Solicitar una cita"
+        title={hasPendingRequest ? "Solicitud pendiente" : "Solicitar una cita"}
         icon="calendar-plus"
         loading={busy}
+        disabled={hasPendingRequest}
         onPress={() => void request()}
       />
       {loading ? (
@@ -76,7 +83,9 @@ export default function Appointments() {
                       ? `Cita del ${item.date}`
                       : "Solicitud pendiente de programación"}
                   </Text>
-                  <Text style={styles.type}>{item.type}</Text>
+                  <Text style={styles.type}>
+                    {appointmentTypeLabel(item.type)}
+                  </Text>
                 </View>
                 <StatusBadge status={item.status} />
               </View>

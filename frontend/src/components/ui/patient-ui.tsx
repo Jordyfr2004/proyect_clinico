@@ -409,23 +409,38 @@ export function InfoRow({
     </View>
   );
 }
+type AppointmentStatusTone = "info" | "warning" | "danger" | "success";
+export const getAppointmentStatusTone = (
+  status: string,
+): AppointmentStatusTone => {
+  switch (status.toLowerCase()) {
+    case "pendiente":
+      return "warning";
+    case "cancelada":
+      return "danger";
+    case "completada":
+      return "success";
+    default:
+      return "info";
+  }
+};
 export function StatusBadge({ status }: { status: string }) {
-  const pending = status.toLowerCase().includes("pendiente");
+  const tone = getAppointmentStatusTone(status);
+  const toneStyle = {
+    info: styles.badgeInfo,
+    warning: styles.badgeWarning,
+    danger: styles.badgeDanger,
+    success: styles.badgeSuccess,
+  }[tone];
+  const toneColor = {
+    info: palette.primary,
+    warning: palette.warning,
+    danger: palette.danger,
+    success: palette.success,
+  }[tone];
   return (
-    <View
-      style={[
-        styles.badge,
-        pending ? styles.badgeWarning : styles.badgeSuccess,
-      ]}
-    >
-      <Text
-        style={[
-          styles.badgeText,
-          pending ? { color: palette.warning } : { color: palette.success },
-        ]}
-      >
-        {status}
-      </Text>
+    <View style={[styles.badge, toneStyle]}>
+      <Text style={[styles.badgeText, { color: toneColor }]}>{status}</Text>
     </View>
   );
 }
@@ -674,10 +689,12 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   badgeWarning: { backgroundColor: palette.warningSoft },
+  badgeInfo: { backgroundColor: palette.primarySoft },
+  badgeDanger: { backgroundColor: palette.dangerSoft },
   badgeSuccess: { backgroundColor: palette.successSoft },
   badgeText: { textTransform: "capitalize", ...typography.caption },
   chip: {
-    minHeight: 40,
+    minHeight: control.touch,
     paddingHorizontal: space.md,
     alignItems: "center",
     justifyContent: "center",

@@ -25,10 +25,10 @@ const parseAppointment = (value: unknown): Appointment => {
   return {
     id: asString(r, "id"),
     patientId: asString(r, "paciente_id"),
-    date: asOptionalString(r, "fecha_cita"),
+    date: asOptionalString(r, "fecha"),
     startTime: asOptionalString(r, "hora_inicio"),
     endTime: asOptionalString(r, "hora_fin"),
-    type: asString(r, "tipo_cita"),
+    type: asString(r, "tipo"),
     description: asOptionalString(r, "descripcion"),
     status: asString(r, "estado"),
     createdAt: asString(r, "created_at"),

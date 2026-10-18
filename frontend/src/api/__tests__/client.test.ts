@@ -6,7 +6,9 @@ const response = (status: number, body: unknown, retryAfter: string | null = nul
   ({
     ok: status >= 200 && status < 300,
     status,
-    headers: { get: (name: string) => (name.toLowerCase() === 'retry-after' ? retryAfter : null) },
+    headers: {
+      get: (name: string) => (name.toLowerCase() === 'retry-after' ? retryAfter : null),
+    },
     text: jest.fn().mockResolvedValue(body === undefined ? '' : JSON.stringify(body)),
     blob: jest.fn().mockResolvedValue(body),
   }) as unknown as Response;
@@ -51,22 +53,26 @@ describe('API client', () => {
     );
   });
 
-  test.each([403, 404, 409, 422, 429, 500, 503])(
-    'preserves the semantics of HTTP %s errors',
-    async (status) => {
-      (globalThis.fetch as jest.Mock).mockResolvedValue(
-        response(status, { message: 'Solicitud rechazada.', errors: { email: ['No válido.'] } }, '60'),
-      );
-
-      const promise = apiRequest('/resource');
-      await expect(promise).rejects.toMatchObject({
+  test.each([403, 404, 409, 422, 429, 500, 503])('preserves the semantics of HTTP %s errors', async (status) => {
+    (globalThis.fetch as jest.Mock).mockResolvedValue(
+      response(
         status,
-        message: 'Solicitud rechazada.',
-        fieldErrors: { email: ['No válido.'] },
-        retryAfter: '60',
-      } satisfies Partial<ApiError>);
-    },
-  );
+        {
+          message: 'Solicitud rechazada.',
+          errors: { email: ['No válido.'] },
+        },
+        '60',
+      ),
+    );
+
+    const promise = apiRequest('/resource');
+    await expect(promise).rejects.toMatchObject({
+      status,
+      message: 'Solicitud rechazada.',
+      fieldErrors: { email: ['No válido.'] },
+      retryAfter: '60',
+    } satisfies Partial<ApiError>);
+  });
 
   test('runs the unauthorized handler before rejecting a 401', async () => {
     const unauthorized = jest.fn();
@@ -74,6 +80,20 @@ describe('API client', () => {
     (globalThis.fetch as jest.Mock).mockResolvedValue(response(401, { message: 'No autenticado.' }));
 
     await expect(apiRequest('/user')).rejects.toBeInstanceOf(ApiError);
+    expect(unauthorized).toHaveBeenCalledTimes(1);
+  });
+
+  test('clears the session when a proxy returns a malformed 401 body', async () => {
+    const unauthorized = jest.fn();
+    setUnauthorizedHandler(unauthorized);
+    const malformed = response(401, undefined);
+    (malformed.text as jest.Mock).mockResolvedValue('<html>Unauthorized</html>');
+    (globalThis.fetch as jest.Mock).mockResolvedValue(malformed);
+
+    await expect(apiRequest('/user')).rejects.toMatchObject({
+      status: 401,
+      message: 'No se pudo completar la solicitud.',
+    });
     expect(unauthorized).toHaveBeenCalledTimes(1);
   });
 
@@ -94,14 +114,17 @@ describe('API client', () => {
   });
 
   test('aborts requests that exceed the configured timeout', async () => {
-    (globalThis.fetch as jest.Mock).mockImplementation((_url: string, init: RequestInit) =>
-      new Promise((_resolve, reject) => {
-        init.signal?.addEventListener('abort', () =>
-          reject(Object.assign(new Error('Aborted'), { name: 'AbortError' })),
-        );
-      }),
+    (globalThis.fetch as jest.Mock).mockImplementation(
+      (_url: string, init: RequestInit) =>
+        new Promise((_resolve, reject) => {
+          init.signal?.addEventListener('abort', () =>
+            reject(Object.assign(new Error('Aborted'), { name: 'AbortError' })),
+          );
+        }),
     );
 
-    await expect(apiRequest('/slow', { timeoutMs: 1 })).rejects.toMatchObject({ reason: 'timeout' });
+    await expect(apiRequest('/slow', { timeoutMs: 1 })).rejects.toMatchObject({
+      reason: 'timeout',
+    });
   });
 });

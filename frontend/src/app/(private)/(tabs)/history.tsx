@@ -3,6 +3,7 @@ import { useCallback } from "react";
 import {
   AppHeader,
   Button,
+  EmptyState,
   InfoRow,
   LoadingState,
   Notice,
@@ -37,22 +38,19 @@ export default function History() {
           </Section>
           <Section title="Antecedentes" icon="file-document-outline">
             <InfoRow label="Enfermedades" value={data.illnesses} />
-            <InfoRow label="Cirugías" value={data.surgeries} />
-            <InfoRow label="Alergias" value={data.allergies} />
-            <InfoRow
-              label="Antecedentes familiares"
-              value={data.familyHistory}
-              last
-            />
+            <InfoRow label="Cirugías" value={data.surgeries} last />
           </Section>
           <Section title="Tratamiento actual" icon="pill">
             <InfoRow label="Medicación" value={data.currentMedication} last />
           </Section>
-          <Section title="Notas" icon="note-text-outline">
-            <InfoRow label="Notas adicionales" value={data.notes} last />
-          </Section>
         </>
-      ) : null}
+      ) : (
+        <EmptyState
+          icon="file-document-outline"
+          title="Sin historial clínico"
+          detail="El personal autorizado todavía no ha registrado un historial para tu cuenta."
+        />
+      )}
       <Button
         title="Actualizar historial"
         icon="refresh"

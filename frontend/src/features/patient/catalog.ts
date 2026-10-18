@@ -10,7 +10,6 @@ import {
 export type ServiceCategory = {
   id: string;
   name: string;
-  description: string | null;
 };
 export type ClinicService = {
   id: string;
@@ -27,7 +26,6 @@ const category = (value: unknown): ServiceCategory => {
   return {
     id: asString(r, "id"),
     name: asString(r, "nombre"),
-    description: asOptionalString(r, "descripcion"),
   };
 };
 const service = (value: unknown): ClinicService => {
@@ -38,7 +36,7 @@ const service = (value: unknown): ClinicService => {
     throw new Error("duracion_minutos no tiene un formato válido");
   return {
     id: asString(r, "id"),
-    categoryId: asString(r, "categoria_servicio_id"),
+    categoryId: asString(r, "categoria_id"),
     name: asString(r, "nombre"),
     description: asOptionalString(r, "descripcion"),
     price: asString(r, "precio"),
