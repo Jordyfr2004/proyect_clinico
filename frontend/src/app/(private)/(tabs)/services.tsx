@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from "react";
 import { ScrollView, StyleSheet, Text, View } from "react-native";
 import {
   AppHeader,
+  Button,
   Card,
   CategoryChip,
   EmptyState,
@@ -27,76 +28,97 @@ export default function Services() {
     [services.data, selected],
   );
   const error = categories.error || services.error;
+  const initialLoading =
+    (categories.loading && categories.data === null) ||
+    (services.loading && services.data === null);
+  const retry = async () => {
+    const requests = [];
+    if (categories.error) requests.push(categories.reload());
+    if (services.error) requests.push(services.reload());
+    await Promise.all(requests);
+  };
   return (
     <Screen variant="tab">
       <AppHeader
         title="Servicios"
         subtitle="Catálogo activo publicado por la clínica."
       />
-      {error ? <Notice tone="error">{error}</Notice> : null}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.chips}
-      >
-        <CategoryChip
-          title="Todos"
-          selected={!selected}
-          onPress={() => setSelected(null)}
-        />
-        {categories.data?.map((item) => (
-          <CategoryChip
-            key={item.id}
-            title={item.name}
-            selected={selected === item.id}
-            onPress={() => setSelected(item.id)}
-          />
-        ))}
-      </ScrollView>
-      {services.loading || categories.loading ? (
+      {initialLoading ? (
         <LoadingState />
-      ) : visible.length ? (
-        <View style={styles.list}>
-          {visible.map((item) => (
-            <Card key={item.id}>
-              <View style={styles.top}>
-                <View style={styles.icon}>
-                  <MaterialCommunityIcons
-                    name="tooth-outline"
-                    size={26}
-                    color={palette.primary}
-                  />
-                </View>
-                <View style={styles.copy}>
-                  <Text style={styles.name}>{item.name}</Text>
-                  <Text style={styles.category}>{item.category.name}</Text>
-                </View>
-              </View>
-              {item.description ? (
-                <Text style={styles.description}>{item.description}</Text>
-              ) : null}
-              <View style={styles.footer}>
-                <View style={styles.meta}>
-                  <MaterialCommunityIcons
-                    name="clock-outline"
-                    size={18}
-                    color={palette.textMuted}
-                  />
-                  <Text style={styles.metaText}>
-                    {item.durationMinutes} min
-                  </Text>
-                </View>
-                <Text style={styles.price}>${item.price}</Text>
-              </View>
-            </Card>
-          ))}
-        </View>
       ) : (
-        <EmptyState
-          icon="tooth-outline"
-          title="Sin servicios disponibles"
-          detail="No hay servicios activos en esta categoría."
-        />
+        <>
+          {error ? <Notice tone="error">{error}</Notice> : null}
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chips}
+          >
+            <CategoryChip
+              title="Todos"
+              selected={!selected}
+              onPress={() => setSelected(null)}
+            />
+            {categories.data?.map((item) => (
+              <CategoryChip
+                key={item.id}
+                title={item.name}
+                selected={selected === item.id}
+                onPress={() => setSelected(item.id)}
+              />
+            ))}
+          </ScrollView>
+          {visible.length ? (
+            <View style={styles.list}>
+              {visible.map((item) => (
+                <Card key={item.id}>
+                  <View style={styles.top}>
+                    <View style={styles.icon}>
+                      <MaterialCommunityIcons
+                        name="tooth-outline"
+                        size={26}
+                        color={palette.primary}
+                      />
+                    </View>
+                    <View style={styles.copy}>
+                      <Text style={styles.name}>{item.name}</Text>
+                      <Text style={styles.category}>{item.category.name}</Text>
+                    </View>
+                  </View>
+                  {item.description ? (
+                    <Text style={styles.description}>{item.description}</Text>
+                  ) : null}
+                  <View style={styles.footer}>
+                    <View style={styles.meta}>
+                      <MaterialCommunityIcons
+                        name="clock-outline"
+                        size={18}
+                        color={palette.textMuted}
+                      />
+                      <Text style={styles.metaText}>
+                        {item.durationMinutes} min
+                      </Text>
+                    </View>
+                    <Text style={styles.price}>${item.price}</Text>
+                  </View>
+                </Card>
+              ))}
+            </View>
+          ) : error ? null : (
+            <EmptyState
+              icon="tooth-outline"
+              title="Sin servicios disponibles"
+              detail="No hay servicios activos en esta categoría."
+            />
+          )}
+          {error ? (
+            <Button
+              title="Reintentar"
+              icon="refresh"
+              variant="ghost"
+              onPress={() => void retry()}
+            />
+          ) : null}
+        </>
       )}
     </Screen>
   );

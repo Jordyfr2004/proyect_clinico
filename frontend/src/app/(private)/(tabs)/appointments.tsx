@@ -12,6 +12,7 @@ import {
   StatusBadge,
 } from "@/components/ui/patient-ui";
 import { palette, space, type as typography } from "@/constants/theme";
+import { ApiError } from "@/api/errors";
 import {
   getAppointments,
   requestAppointment,
@@ -27,16 +28,51 @@ export default function Appointments() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [submitError, setSubmitError] = useState("");
+  const [refreshWarning, setRefreshWarning] = useState("");
+  const [requestConfirmed, setRequestConfirmed] = useState(false);
   const hasPendingRequest =
     data?.some((item) => item.status.toLowerCase() === "pendiente") ?? false;
+  const pendingOrConfirmed = hasPendingRequest || requestConfirmed;
+  const initialLoading = loading && data === null;
+  const unavailable = Boolean(error) && data === null;
+  const requestDisabled =
+    loading || Boolean(error) || data === null || pendingOrConfirmed;
+
+  const refresh = async () => {
+    setRefreshWarning("");
+    const result = await reload();
+    if (result.ok) {
+      setRequestConfirmed(
+        result.data.some((item) => item.status.toLowerCase() === "pendiente"),
+      );
+    }
+  };
+
   const request = async () => {
     setBusy(true);
     setMessage("");
     setSubmitError("");
+    setRefreshWarning("");
     try {
-      setMessage(await requestAppointment());
-      await reload();
+      const confirmation = await requestAppointment();
+      setMessage(confirmation);
+      setRequestConfirmed(true);
+      const result = await reload();
+      if (result.ok) {
+        setRequestConfirmed(
+          result.data.some(
+            (item) => item.status.toLowerCase() === "pendiente",
+          ),
+        );
+      } else {
+        setRefreshWarning(
+          "La solicitud fue registrada, pero no se pudo actualizar el listado. Reintenta la actualización antes de solicitar otra cita.",
+        );
+      }
     } catch (reason) {
+      if (reason instanceof ApiError && reason.status === 409) {
+        setRequestConfirmed(true);
+      }
       setSubmitError(
         reason instanceof Error
           ? reason.message
@@ -53,19 +89,19 @@ export default function Appointments() {
         subtitle="Consulta tus citas o envía una nueva solicitud."
       />
       {message ? <Notice tone="success">{message}</Notice> : null}
-      {submitError || error ? (
-        <Notice tone="error">{submitError || error}</Notice>
+      {submitError || refreshWarning || (!initialLoading && error) ? (
+        <Notice tone="error">{submitError || refreshWarning || error}</Notice>
       ) : null}
       <Button
-        title={hasPendingRequest ? "Solicitud pendiente" : "Solicitar una cita"}
+        title={pendingOrConfirmed ? "Solicitud pendiente" : "Solicitar una cita"}
         icon="calendar-plus"
         loading={busy}
-        disabled={hasPendingRequest}
+        disabled={requestDisabled}
         onPress={() => void request()}
       />
-      {loading ? (
+      {initialLoading ? (
         <LoadingState />
-      ) : data?.length ? (
+      ) : unavailable ? null : data?.length ? (
         <View style={styles.list}>
           {data.map((item) => (
             <Card key={item.id}>
@@ -114,12 +150,14 @@ export default function Appointments() {
           detail="Puedes enviar una solicitud desde esta pantalla."
         />
       )}
-      <Button
-        title="Actualizar citas"
-        icon="refresh"
-        variant="ghost"
-        onPress={() => void reload()}
-      />
+      {initialLoading ? null : (
+        <Button
+          title={unavailable ? "Reintentar" : "Actualizar citas"}
+          icon="refresh"
+          variant="ghost"
+          onPress={() => void refresh()}
+        />
+      )}
     </Screen>
   );
 }

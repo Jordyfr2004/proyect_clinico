@@ -9,9 +9,12 @@ export function useRemote<T>(loader: () => Promise<T>) {
     setLoading(true);
     setError('');
     try {
-      setData(await loader());
+      const value = await loader();
+      setData(value);
+      return { ok: true as const, data: value };
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : 'No se pudo cargar la información.');
+      return { ok: false as const };
     } finally {
       setLoading(false);
     }
