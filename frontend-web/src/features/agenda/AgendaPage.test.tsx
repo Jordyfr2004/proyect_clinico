@@ -20,9 +20,9 @@ function selectOctober() {
   fireEvent.change(screen.getByLabelText('Mes'), { target: { value: '2026-10' } })
 }
 
-async function choosePatient(form: HTMLElement, search = 'Paciente') {
+async function choosePatient(form: HTMLElement, search = 'Paciente', option = /Paciente recibido.*001/) {
   fireEvent.change(within(form).getByRole('combobox', { name: 'Buscar paciente' }), { target: { value: search } })
-  fireEvent.click(await within(form).findByRole('option', { name: /Paciente recibido.*001/ }))
+  fireEvent.click(await within(form).findByRole('option', { name: option }))
 }
 
 describe('AgendaPage consultation', () => {
@@ -62,6 +62,44 @@ describe('AgendaPage consultation', () => {
     fireEvent.change(within(form).getByLabelText('Hora de fin'), { target: { value: '10:00' } })
     fireEvent.submit(form)
     await waitFor(() => expect(createMedicalAppointment).toHaveBeenCalledExactlyOnceWith({ codigo_paciente: '001', fecha: '2026-10-05', hora_inicio: '09:00', hora_fin: '10:00', descripcion: null }))
+  })
+
+  it('requires a new visible patient selection after changing the entry type', async () => {
+    const first = { id: 'patient-1', codigo_paciente: '001', nombres: 'Paciente anterior', cedula: '0912345678', telefono: null, direccion: null, fecha_nacimiento: null }
+    const second = { ...first, id: 'patient-2', codigo_paciente: '002', nombres: 'Paciente nuevo' }
+    vi.mocked(getPatients).mockImplementation(async (params) => ({
+      data: params?.buscar === 'Nuevo' ? [second] : [first],
+      current_page: 1, last_page: 1, per_page: 20, total: 1, next_page_url: null, prev_page_url: null,
+    }))
+    vi.mocked(createMedicalAppointment).mockResolvedValue('Cita registrada')
+    renderAgenda()
+    selectOctober()
+    fireEvent.click(screen.getByRole('button', { name: /Seleccionar 5 de octubre/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Agendar' }))
+    await choosePatient(screen.getByRole('form', { name: 'Agendar cita médica' }), 'Anterior', /Paciente anterior.*001/)
+    expect(screen.getByRole('status')).toHaveTextContent('Paciente seleccionado: Paciente anterior · Código: 001')
+    fireEvent.change(screen.getByLabelText('Hora de inicio'), { target: { value: '09:00' } })
+    fireEvent.change(screen.getByLabelText('Hora de fin'), { target: { value: '10:00' } })
+    fireEvent.change(screen.getByLabelText('Descripción (opcional)'), { target: { value: 'Control' } })
+
+    fireEvent.click(screen.getByRole('button', { name: 'Actividad personal' }))
+    expect(screen.queryByRole('combobox', { name: 'Buscar paciente' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Cita médica' }))
+    const form = screen.getByRole('form', { name: 'Agendar cita médica' })
+    const search = within(form).getByRole('combobox', { name: 'Buscar paciente' })
+    expect(search).toHaveValue('')
+    expect(within(form).queryByText(/Paciente seleccionado:/)).not.toBeInTheDocument()
+    expect(within(form).getByLabelText('Hora de inicio')).toHaveValue('09:00')
+    expect(within(form).getByLabelText('Hora de fin')).toHaveValue('10:00')
+    expect(within(form).getByLabelText('Descripción (opcional)')).toHaveValue('Control')
+    fireEvent.submit(form)
+    expect(await within(form).findByRole('alert')).toHaveTextContent('Selecciona un paciente')
+    expect(createMedicalAppointment).not.toHaveBeenCalled()
+
+    await choosePatient(form, 'Nuevo', /Paciente nuevo.*002/)
+    fireEvent.submit(form)
+    await waitFor(() => expect(createMedicalAppointment).toHaveBeenCalledExactlyOnceWith({ codigo_paciente: '002', fecha: '2026-10-05', hora_inicio: '09:00', hora_fin: '10:00', descripcion: 'Control' }))
+    expect(createPersonalEntry).not.toHaveBeenCalled()
   })
 
   it('finds by code with Enter and invalidates the selection when the text changes', async () => {

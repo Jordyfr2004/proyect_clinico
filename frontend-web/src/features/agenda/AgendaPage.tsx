@@ -34,7 +34,13 @@ function AgendaForm({ date, busy, error, onCancel, onSave, onKindChange }: { dat
   const [end, setEnd] = useState('')
   const [description, setDescription] = useState('')
   const [validation, setValidation] = useState<string | null>(null)
-  const selectKind = (next: 'medical' | 'personal') => { setKind(next); setValidation(null); onKindChange(next) }
+  const selectKind = (next: 'medical' | 'personal') => {
+    if (next === kind) return
+    setPatient(null)
+    setKind(next)
+    setValidation(null)
+    onKindChange(next)
+  }
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (busy) return
@@ -115,7 +121,7 @@ export function AgendaPage() {
     {state.kind === 'ready' && query.isFetching ? <p className="admin-muted text-sm" role="status">Actualizando agenda…</p> : null}
     {state.kind === 'ready' && query.isError ? <p className="text-sm text-red-700" role="alert">No fue posible actualizar la agenda. <button className="dashboard-retry" onClick={() => { void load() }} type="button">Reintentar</button></p> : null}
     {appointmentSuccess ? <p className="admin-success rounded-xl p-4 text-sm" role="status">{appointmentSuccess}</p> : null}
-    {appointmentOpen ? <AccessibleDialog busy={appointmentBusy} onClose={closeAppointment} title={appointmentKind === 'medical' ? 'Agendar cita médica' : 'Agendar actividad personal'} titleId="agenda-appointment-title"><AgendaForm busy={appointmentBusy} date={selectedDate} error={appointmentError} onCancel={closeAppointment} onKindChange={setAppointmentKind} onSave={(choice) => { void saveAppointment(choice) }}/></AccessibleDialog> : null}
+    {appointmentOpen ? <AccessibleDialog busy={appointmentBusy} onClose={closeAppointment} title={appointmentKind === 'medical' ? 'Agendar cita médica' : 'Agendar actividad personal'} titleId="agenda-appointment-title"><AgendaForm busy={appointmentBusy} date={selectedDate} error={appointmentError} onCancel={closeAppointment} onKindChange={(next) => { setAppointmentKind(next); setAppointmentError(null) }} onSave={(choice) => { void saveAppointment(choice) }}/></AccessibleDialog> : null}
     <div className="flex justify-end"><div className="flex items-center gap-2"><button aria-label="Mes anterior" className="admin-secondary grid size-11 place-items-center rounded-lg" onClick={() => shiftMonth(-1)} type="button"><ChevronLeft aria-hidden="true" size={18}/></button><label className="text-xs font-semibold text-ink-950">Mes<input aria-label="Mes" className="admin-input ml-2 text-sm" onChange={(event) => { if (!event.target.value) return; const [year, value] = event.target.value.split('-').map(Number); selectMonth(year, value) }} type="month" value={`${month.year}-${two(month.value)}`}/></label><button aria-label="Mes siguiente" className="admin-secondary grid size-11 place-items-center rounded-lg" onClick={() => shiftMonth(1)} type="button"><ChevronRight aria-hidden="true" size={18}/></button></div></div>
     <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,400px)_minmax(0,1fr)]">
       <section aria-label={`Calendario de ${monthLabel}`} className="admin-surface w-full max-w-[420px] min-w-0 rounded-[20px] p-3 sm:p-4 xl:max-w-none">
