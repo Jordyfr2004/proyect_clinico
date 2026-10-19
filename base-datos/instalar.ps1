@@ -70,6 +70,34 @@ SELECT format('REVOKE ALL ON DATABASE %I FROM PUBLIC', :'base') \gexec
 '@ | Out-Null
 # En PostgreSQL 15+ el esquema public no es de libre escritura: pasa a ser de la aplicación.
 Invoke-Psql "SELECT format('ALTER SCHEMA public OWNER TO %I', :'usuario') \gexec" $base | Out-Null
+# Base que ya existía con objetos de otro usuario (p. ej. migraciones corridas como postgres
+# o desde pgAdmin): sin esto Laravel falla con "permiso denegado a la tabla migrations" y no
+# llega a crear los esquemas por área ni la trazabilidad (auditoria.registro_cambios).
+# Se pasan a la aplicación los esquemas, tablas, secuencias y funciones (las de los triggers);
+# se omiten los del sistema y los de extensiones. Cambiar el dueño de una tabla arrastra
+# sus secuencias; las sueltas se cambian aparte.
+Invoke-Psql @'
+CREATE TEMP VIEW ajenos AS
+SELECT n.oid, n.nspname FROM pg_namespace n
+WHERE n.nspname NOT LIKE 'pg\_%' AND n.nspname <> 'information_schema';
+SELECT format('ALTER SCHEMA %I OWNER TO %I', a.nspname, :'usuario')
+FROM ajenos a JOIN pg_namespace n ON n.oid = a.oid
+WHERE n.nspowner <> (SELECT oid FROM pg_roles WHERE rolname = :'usuario') \gexec
+SELECT format('ALTER TABLE %I.%I OWNER TO %I', a.nspname, c.relname, :'usuario')
+FROM pg_class c JOIN ajenos a ON a.oid = c.relnamespace
+WHERE c.relkind IN ('r', 'p', 'v', 'm')
+  AND c.relowner <> (SELECT oid FROM pg_roles WHERE rolname = :'usuario')
+  AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = c.oid AND d.deptype = 'e') \gexec
+SELECT format('ALTER SEQUENCE %I.%I OWNER TO %I', a.nspname, c.relname, :'usuario')
+FROM pg_class c JOIN ajenos a ON a.oid = c.relnamespace
+WHERE c.relkind = 'S'
+  AND c.relowner <> (SELECT oid FROM pg_roles WHERE rolname = :'usuario')
+  AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = c.oid AND d.deptype IN ('a', 'i', 'e')) \gexec
+SELECT format('ALTER ROUTINE %s OWNER TO %I', p.oid::regprocedure, :'usuario')
+FROM pg_proc p JOIN ajenos a ON a.oid = p.pronamespace
+WHERE p.proowner <> (SELECT oid FROM pg_roles WHERE rolname = :'usuario')
+  AND NOT EXISTS (SELECT 1 FROM pg_depend d WHERE d.objid = p.oid AND d.deptype = 'e') \gexec
+'@ $base | Out-Null
 Write-Host "Base '$base' lista, propiedad de $AppUsuario."
 
 # 4. Escuchar en la red y aceptar solo al backend (y al administrador si se indicó).
