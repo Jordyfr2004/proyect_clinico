@@ -1,4 +1,5 @@
 import * as Notifications from "expo-notifications";
+import { AndroidImportance } from "expo-notifications";
 import { Platform } from "react-native";
 import type { Appointment } from "./appointments";
 import { planReminders, REMINDER_ID_PREFIX } from "./reminder-plan";
@@ -28,7 +29,7 @@ const configure = async () => {
   if (Platform.OS === "android") {
     await Notifications.setNotificationChannelAsync(CHANNEL_ID, {
       name: "Recordatorios de citas",
-      importance: Notifications.AndroidImportance.HIGH,
+      importance: AndroidImportance.HIGH,
     });
   }
 };
