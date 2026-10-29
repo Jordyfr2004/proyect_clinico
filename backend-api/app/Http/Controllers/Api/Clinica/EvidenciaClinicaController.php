@@ -87,25 +87,11 @@ class EvidenciaClinicaController extends Controller
                 'required',
                 'in:caso_clinico,rx',
             ],
-            'nombre_archivo' => [
+            'archivo' => [
                 'required',
-                'string',
-                'max:255',
-            ],
-            'ruta_archivo' => [
-                'required',
-                'string',
-                'max:2048',
-            ],
-            'mime_type' => [
-                'required',
-                'string',
-                'max:100',
-            ],
-            'tamano' => [
-                'required',
-                'integer',
-                'min:0',
+                'file',
+                'mimes:jpg,jpeg,png,webp,pdf',
+                'max:10240',
             ],
             'descripcion' => [
                 'nullable',
@@ -121,6 +107,7 @@ class EvidenciaClinicaController extends Controller
             ->evidenciaClinicaService
             ->crear(
                 $datos,
+                $request->file('archivo'),
                 $request->user()
             );
 
@@ -191,6 +178,73 @@ class EvidenciaClinicaController extends Controller
 
         return response()->json([
             'message' => 'Evidencia clínica eliminada correctamente.',
+        ]);
+    }
+    public function storePaciente(
+        Request $request
+    ): JsonResponse {
+        $user = $request->user();
+
+        if (!$user->paciente_id) {
+            return response()->json([
+                'message' => 'La cuenta no está vinculada a un paciente.',
+            ], 409);
+        }
+
+        $datos = $request->validate([
+            'tipo' => [
+                'required',
+                'in:caso_clinico,rx',
+            ],
+            'archivo' => [
+                'required',
+                'file',
+                'mimes:jpg,jpeg,png,webp,pdf',
+                'max:10240',
+            ],
+            'descripcion' => [
+                'nullable',
+                'string',
+            ],
+            'fecha' => [
+                'required',
+                'date',
+            ],
+        ]);
+
+        $datos['paciente_id'] = $user->paciente_id;
+
+        $evidencia = $this
+            ->evidenciaClinicaService
+            ->crear(
+                $datos,
+                $request->file('archivo'),
+                $user
+            );
+
+        return response()->json([
+            'message' => 'Evidencia clínica registrada correctamente.',
+            'data' => $evidencia,
+        ], 201);
+    }
+
+    public function mis(
+        Request $request
+    ): JsonResponse {
+        $user = $request->user();
+
+        if (!$user->paciente_id) {
+            return response()->json([
+                'message' => 'La cuenta no está vinculada a un paciente.',
+            ], 409);
+        }
+
+        $evidencias = $this
+            ->evidenciaClinicaService
+            ->obtenerPropias($user);
+
+        return response()->json([
+            'data' => $evidencias,
         ]);
     }
 }

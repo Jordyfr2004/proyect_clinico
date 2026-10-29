@@ -173,8 +173,22 @@ Route::prefix('odontogramas')->group(function () {
 });
 
 
-// Fotografias y Radiografias
+// Fotografías y Radiografías
 Route::prefix('evidencias-clinicas')->group(function () {
+
+    // Paciente
+    Route::middleware('auth:sanctum', 'role:paciente')->group(function () {
+
+        Route::get('/mis', [EvidenciaClinicaController::class, 'mis']);
+
+        Route::post('/mis', [EvidenciaClinicaController::class, 'storePaciente']);
+
+        Route::get('/mis/{id}', [EvidenciaClinicaController::class, 'verPropia']);
+
+        Route::get('/mis/{id}/archivo', [EvidenciaClinicaController::class, 'archivo']);
+
+    });
+
 
     // Doctora y asistente pueden consultar
     Route::middleware('auth:sanctum', 'role:doctora,asistente')->group(function () {
@@ -182,6 +196,8 @@ Route::prefix('evidencias-clinicas')->group(function () {
         Route::get('/', [EvidenciaClinicaController::class, 'index']);
 
         Route::get('/paciente/{pacienteId}', [EvidenciaClinicaController::class, 'porPaciente']);
+
+        Route::get('/{id}/archivo', [EvidenciaClinicaController::class, 'archivo']);
 
         Route::get('/{id}', [EvidenciaClinicaController::class, 'show']);
 
