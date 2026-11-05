@@ -90,6 +90,56 @@ describe('ActivitiesPage', () => {
     expect(within(screen.getByRole('dialog')).queryByRole('status')).not.toBeInTheDocument()
   })
 
+  it('keeps the newest lookup loading and ignores an older result that arrives first', async () => {
+    let resolveFirst!: (value: typeof record.paciente) => void
+    let resolveSecond!: (value: typeof record.paciente) => void
+    vi.mocked(lookupPatientByCode)
+      .mockReturnValueOnce(new Promise((resolve) => { resolveFirst = resolve }))
+      .mockReturnValueOnce(new Promise((resolve) => { resolveSecond = resolve }))
+    renderPage('doctora')
+    await screen.findByText('Consulta registrada')
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar actividad' }))
+    const dialog = screen.getByRole('dialog')
+    const code = within(dialog).getByLabelText('Código de paciente')
+    const search = within(dialog).getByRole('button', { name: 'Buscar paciente' })
+    fireEvent.change(code, { target: { value: '001' } })
+    fireEvent.click(search)
+    fireEvent.change(code, { target: { value: '002' } })
+    fireEvent.click(search)
+    expect(lookupPatientByCode).toHaveBeenNthCalledWith(2, '002')
+    resolveFirst(record.paciente)
+    await waitFor(() => expect(within(dialog).queryByText('Paciente recibido')).not.toBeInTheDocument())
+    expect(search).toBeDisabled()
+    expect(within(dialog).getByRole('button', { name: 'Guardar' })).toBeDisabled()
+    resolveSecond({ codigo_paciente: '002', nombres: 'Paciente nuevo' })
+    expect(await within(dialog).findByText('Paciente nuevo')).toBeInTheDocument()
+    expect(search).toBeEnabled()
+  })
+
+  it('ignores an older lookup error after a newer result succeeds', async () => {
+    let rejectFirst!: (reason: unknown) => void
+    let resolveSecond!: (value: typeof record.paciente) => void
+    vi.mocked(lookupPatientByCode)
+      .mockReturnValueOnce(new Promise((_, reject) => { rejectFirst = reject }))
+      .mockReturnValueOnce(new Promise((resolve) => { resolveSecond = resolve }))
+    renderPage('doctora')
+    await screen.findByText('Consulta registrada')
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar actividad' }))
+    const dialog = screen.getByRole('dialog')
+    const code = within(dialog).getByLabelText('Código de paciente')
+    const search = within(dialog).getByRole('button', { name: 'Buscar paciente' })
+    fireEvent.change(code, { target: { value: '001' } })
+    fireEvent.click(search)
+    fireEvent.change(code, { target: { value: '002' } })
+    fireEvent.click(search)
+    resolveSecond({ codigo_paciente: '002', nombres: 'Paciente nuevo' })
+    expect(await within(dialog).findByText('Paciente nuevo')).toBeInTheDocument()
+    rejectFirst(new Error('old request failed'))
+    await waitFor(() => expect(search).toBeEnabled())
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
+    expect(within(dialog).getByText('Paciente nuevo')).toBeInTheDocument()
+  })
+
   it('exposes real period filters and keeps the total general when filtering a patient', async () => {
     renderPage('doctora')
     await screen.findByText('Consulta registrada')

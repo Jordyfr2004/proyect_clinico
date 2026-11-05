@@ -51,7 +51,7 @@ function ActivityForm({ record, busy, error, onSave, onCancel }: { record?: Acti
     setLookingUp(true); setLookupError(null); setPatient(null)
     try { const found = await lookupPatientByCode(code.trim()); if (version === lookupVersion.current) setPatient(found.nombres) }
     catch (cause) { if (version === lookupVersion.current) setLookupError(errorMessage(cause)) }
-    finally { setLookingUp(false) }
+    finally { if (version === lookupVersion.current) setLookingUp(false) }
   }
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -61,7 +61,7 @@ function ActivityForm({ record, busy, error, onSave, onCancel }: { record?: Acti
   }
   return <form aria-label="Datos de actividad" noValidate onSubmit={submit}>
     <div className="grid gap-4 sm:grid-cols-2">
-      <div className="sm:col-span-2"><label className="text-sm font-medium text-ink-950" htmlFor="activity-code">Código de paciente</label><div className="mt-1 flex flex-wrap gap-2"><input className="admin-input min-w-0 flex-1 text-sm" data-dialog-initial id="activity-code" onChange={(event) => { lookupVersion.current += 1; setCode(event.target.value); setPatient(null); setLookupError(null) }} value={code}/><button className="admin-secondary min-h-11 rounded-lg px-4 text-sm font-semibold" disabled={lookingUp || busy} onClick={() => { void lookup() }} type="button">Buscar paciente</button></div>{patient ? <p className="admin-muted mt-2 text-sm" role="status">{patient}</p> : null}{lookupError ? <p className="mt-2 text-sm text-red-700" role="alert">{lookupError}</p> : null}</div>
+      <div className="sm:col-span-2"><label className="text-sm font-medium text-ink-950" htmlFor="activity-code">Código de paciente</label><div className="mt-1 flex flex-wrap gap-2"><input className="admin-input min-w-0 flex-1 text-sm" data-dialog-initial id="activity-code" onChange={(event) => { lookupVersion.current += 1; setCode(event.target.value); setPatient(null); setLookupError(null); setLookingUp(false) }} value={code}/><button className="admin-secondary min-h-11 rounded-lg px-4 text-sm font-semibold" disabled={lookingUp || busy} onClick={() => { void lookup() }} type="button">Buscar paciente</button></div>{patient ? <p className="admin-muted mt-2 text-sm" role="status">{patient}</p> : null}{lookupError ? <p className="mt-2 text-sm text-red-700" role="alert">{lookupError}</p> : null}</div>
       <label className="text-sm font-medium text-ink-950">Fecha<input className="admin-input mt-1 w-full text-sm" onChange={(event) => setDate(event.target.value)} type="date" value={date}/></label>
       <label className="text-sm font-medium text-ink-950">Actividad<input className="admin-input mt-1 w-full text-sm" maxLength={255} onChange={(event) => setActivity(event.target.value)} value={activity}/></label>
       <label className="text-sm font-medium text-ink-950">Precio<input className="admin-input mt-1 w-full text-sm" min="0" onChange={(event) => setPrice(event.target.value)} step="0.01" type="number" value={price}/></label>

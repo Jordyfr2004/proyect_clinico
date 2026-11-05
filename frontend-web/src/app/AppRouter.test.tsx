@@ -319,7 +319,7 @@ describe('AppRouter', () => {
     fireEvent.click(within(panel).getByRole('button', { name: 'Confirmar eliminación' }))
     await waitFor(() => expect(document.querySelectorAll('img[src="blob:profile-photo"]')).toHaveLength(0))
     expect(within(panel).queryByRole('button', { name: 'Eliminar foto' })).not.toBeInTheDocument()
-    expect(URL.revokeObjectURL).toHaveBeenCalled()
+    await waitFor(() => expect(URL.revokeObjectURL).toHaveBeenCalled())
   })
 
   it('traps keyboard focus and prevents closing the photo dialog during an upload', async () => {
