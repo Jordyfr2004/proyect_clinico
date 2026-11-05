@@ -1,11 +1,11 @@
 import { isAxiosError } from 'axios'
-import { useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { EmptyState } from '../../components/states/EmptyState'
 import { ErrorState } from '../../components/states/ErrorState'
 import { LoadingState } from '../../components/states/LoadingState'
 import { AccessibleDialog } from '../../components/ui/AccessibleDialog'
 import { formatDate } from '../../utils/displayFormat'
-import { CalendarDays, MoreVertical } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, MoreVertical } from 'lucide-react'
 import { cancelAppointment, completeAppointment, deleteAgendaEntry, getAgendaMonth, getPendingRequests, programRequest, registerClinicalData, updateAgendaEntry, type AgendaEntry, type AgendaSlot, type ClinicalDataPayload } from '../agenda/agendaService'
 import { markClinicalQueriesStale, useClinicalQuery } from '../../services/clinicalQuery'
 import { useClinicalViewState } from '../../services/clinicalViewState'
@@ -28,6 +28,8 @@ const dialogTitles: Record<DialogKind, string> = {
   cancel: 'Cancelar cita médica', complete: 'Completar cita médica', delete: 'Eliminar registro',
 }
 const clinicalActionLabel = (entry: AgendaEntry) => entry.diagnostico || entry.tratamiento || entry.observacion ? 'Editar datos clínicos' : 'Registrar datos clínicos'
+const two = (value: number) => String(value).padStart(2, '0')
+const dateKey = (date: Date) => `${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())}`
 
 function errorMessage(error: unknown): string {
   if (isAxiosError(error)) {
@@ -38,6 +40,60 @@ function errorMessage(error: unknown): string {
     }
   }
   return 'No fue posible completar la operación. Inténtalo de nuevo.'
+}
+
+function ProgramRequestCalendar({ value, onChange }: { value: string; onChange: (date: string) => void }) {
+  const today = new Date()
+  const initial = value ? new Date(`${value}T12:00:00`) : today
+  const [visibleMonth, setVisibleMonth] = useState({ year: initial.getFullYear(), month: initial.getMonth() + 1 })
+  const [focusedDate, setFocusedDate] = useState(value || dateKey(today))
+  const calendarRef = useRef<HTMLDivElement>(null)
+  const pendingFocus = useRef<string | null>(null)
+  const monthPrefix = `${visibleMonth.year}-${two(visibleMonth.month)}`
+  const monthLabel = new Intl.DateTimeFormat('es-EC', { month: 'long', year: 'numeric' }).format(new Date(visibleMonth.year, visibleMonth.month - 1, 1))
+  const dayCount = new Date(visibleMonth.year, visibleMonth.month, 0).getDate()
+  const offset = (new Date(visibleMonth.year, visibleMonth.month - 1, 1).getDay() + 6) % 7
+  const tabStop = focusedDate.startsWith(monthPrefix) ? focusedDate : value.startsWith(monthPrefix) ? value : dateKey(new Date(visibleMonth.year, visibleMonth.month - 1, 1))
+
+  useEffect(() => {
+    if (!pendingFocus.current) return
+    calendarRef.current?.querySelector<HTMLButtonElement>(`[data-calendar-day="${pendingFocus.current}"]`)?.focus()
+    pendingFocus.current = null
+  }, [focusedDate, visibleMonth])
+
+  const shiftMonth = (change: number) => {
+    const next = new Date(visibleMonth.year, visibleMonth.month - 1 + change, 1)
+    setVisibleMonth({ year: next.getFullYear(), month: next.getMonth() + 1 })
+    setFocusedDate(dateKey(next))
+  }
+  const moveFocus = (event: KeyboardEvent<HTMLButtonElement>, day: number) => {
+    const shifts: Record<string, number> = { ArrowLeft: -1, ArrowRight: 1, ArrowUp: -7, ArrowDown: 7 }
+    let next: Date
+    if (event.key in shifts) next = new Date(visibleMonth.year, visibleMonth.month - 1, day + shifts[event.key])
+    else if (event.key === 'Home') next = new Date(visibleMonth.year, visibleMonth.month - 1, day - ((offset + day - 1) % 7))
+    else if (event.key === 'End') next = new Date(visibleMonth.year, visibleMonth.month - 1, day + (6 - ((offset + day - 1) % 7)))
+    else return
+    event.preventDefault()
+    const key = dateKey(next)
+    pendingFocus.current = key
+    setFocusedDate(key)
+    if (next.getMonth() + 1 !== visibleMonth.month || next.getFullYear() !== visibleMonth.year) setVisibleMonth({ year: next.getFullYear(), month: next.getMonth() + 1 })
+  }
+
+  return <div aria-label="Fecha" className="sm:col-span-2" ref={calendarRef} role="group">
+    <p className="text-sm font-medium text-ink-950">Fecha</p>
+    <div className="mt-1 rounded-xl border border-[#dbe6f2] bg-[#fbfdff] p-3 sm:p-4">
+      <div className="mb-3 flex items-center justify-between gap-2"><button aria-label="Mes anterior" className="admin-secondary grid size-10 place-items-center rounded-lg" onClick={() => shiftMonth(-1)} type="button"><ChevronLeft aria-hidden="true" size={18}/></button><p aria-live="polite" className="text-sm font-bold capitalize text-ink-950">{monthLabel}</p><button aria-label="Mes siguiente" className="admin-secondary grid size-10 place-items-center rounded-lg" onClick={() => shiftMonth(1)} type="button"><ChevronRight aria-hidden="true" size={18}/></button></div>
+      <div className="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-[#526a87]">{['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((label, index) => <span aria-hidden="true" key={index}>{label}</span>)}{Array.from({ length: offset }, (_, index) => <span aria-hidden="true" key={`empty-${index}`}/>)}{Array.from({ length: dayCount }, (_, index) => {
+        const day = index + 1
+        const key = `${monthPrefix}-${two(day)}`
+        const selected = value === key
+        const isToday = dateKey(today) === key
+        return <button aria-current={isToday ? 'date' : undefined} aria-label={`Seleccionar ${day} de ${monthLabel}`} aria-pressed={selected} className={`min-h-10 rounded-lg border text-sm font-semibold transition-colors sm:min-h-11 ${selected ? 'border-clinic-600 bg-clinic-50 text-clinic-700 ring-1 ring-clinic-600' : isToday ? 'border-sky-400 bg-sky-50 text-ink-950 hover:bg-sky-100' : 'border-[#dbe6f2] bg-white text-ink-950 hover:bg-[#f3f8fe]'}`} data-calendar-day={key} data-dialog-initial={key === tabStop ? true : undefined} key={key} onClick={() => { setFocusedDate(key); onChange(key) }} onKeyDown={(event) => moveFocus(event, day)} tabIndex={key === tabStop ? 0 : -1} type="button">{day}</button>
+      })}</div>
+    </div>
+    <p className="admin-muted mt-2 text-xs">{value ? `Fecha seleccionada: ${formatDate(value)}` : 'Selecciona un día para programar la solicitud.'}</p>
+  </div>
 }
 
 function AppointmentDialogForm({ dialog, busy, error, onSave, onCancel }: {
@@ -63,7 +119,7 @@ function AppointmentDialogForm({ dialog, busy, error, onSave, onCancel }: {
   }
   return <form aria-label={dialog.kind === 'program' ? 'Programar solicitud' : 'Datos de agenda'} noValidate onSubmit={submit}>
     {confirmation ? <p className="admin-body text-sm">{dialog.kind === 'delete' ? '¿Eliminar este registro de agenda?' : dialog.kind === 'cancel' ? '¿Cancelar esta cita médica?' : '¿Completar esta cita médica? El backend requiere diagnóstico y tratamiento registrados previamente.'}</p> : <div className="grid gap-4 sm:grid-cols-2">
-      <label className="text-sm font-medium text-ink-950">Fecha<input className={inputClass} data-dialog-initial onChange={(event) => setFecha(event.target.value)} required type="date" value={fecha}/></label>
+      {dialog.kind === 'program' ? <ProgramRequestCalendar onChange={setFecha} value={fecha}/> : <label className="text-sm font-medium text-ink-950">Fecha<input className={inputClass} data-dialog-initial onChange={(event) => setFecha(event.target.value)} required type="date" value={fecha}/></label>}
       <label className="text-sm font-medium text-ink-950">Hora de inicio<input className={inputClass} onChange={(event) => setInicio(event.target.value)} required type="time" value={inicio}/></label>
       <label className="text-sm font-medium text-ink-950">Hora de fin<input className={inputClass} onChange={(event) => setFin(event.target.value)} required type="time" value={fin}/></label>
       {dialog.kind === 'edit' ? <label className="text-sm font-medium text-ink-950 sm:col-span-2">Descripción<textarea className={inputClass} onChange={(event) => setDescripcion(event.target.value)} rows={3} value={descripcion}/></label> : null}

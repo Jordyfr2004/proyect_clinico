@@ -150,10 +150,10 @@ describe('AgendaPage consultation', () => {
   })
 
   it('abandons obsolete patient searches and does not show their results', async () => {
-    const signals: AbortSignal[] = []
+    const signals: Array<{ term: string | undefined; signal: AbortSignal }> = []
     let finishOld!: (value: Awaited<ReturnType<typeof getPatients>>) => void
     vi.mocked(getPatients).mockImplementation((params, signal) => {
-      signals.push(signal!)
+      signals.push({ term: params?.buscar, signal: signal! })
       if (params?.buscar === 'viejo') return new Promise((resolve) => { finishOld = resolve })
       return Promise.resolve({ data: [], current_page: 1, last_page: 1, per_page: 20, total: 0, next_page_url: null, prev_page_url: null })
     })
@@ -165,18 +165,23 @@ describe('AgendaPage consultation', () => {
     await waitFor(() => expect(getPatients).toHaveBeenCalledWith({ buscar: 'viejo', page: 1 }, expect.any(AbortSignal)))
     fireEvent.change(search, { target: { value: 'nuevo' } })
     await waitFor(() => expect(getPatients).toHaveBeenCalledWith({ buscar: 'nuevo', page: 1 }, expect.any(AbortSignal)))
-    expect(signals[0].aborted).toBe(true)
+    expect(signals.find((request) => request.term === 'viejo')?.signal.aborted).toBe(true)
     finishOld({ data: [{ id: 'old', codigo_paciente: '099', nombres: 'Resultado viejo', cedula: '0912345678', telefono: null, direccion: null, fecha_nacimiento: null }], current_page: 1, last_page: 1, per_page: 20, total: 1, next_page_url: null, prev_page_url: null })
     expect(await screen.findByText('Sin coincidencias. Prueba otro nombre o código.')).toBeInTheDocument()
     expect(screen.queryByText('Resultado viejo')).not.toBeInTheDocument()
   })
 
   it('retries a failed search and selects the right patient among similar names', async () => {
-    vi.mocked(getPatients).mockRejectedValueOnce(new Error('network')).mockResolvedValueOnce({
+    const matchingPatients = {
       data: [
         { id: 'one', codigo_paciente: '001', nombres: 'María Uno', cedula: '0911111111', telefono: null, direccion: null, fecha_nacimiento: null },
         { id: 'two', codigo_paciente: '002', nombres: 'María Dos', cedula: '0922222222', telefono: null, direccion: null, fecha_nacimiento: null },
       ], current_page: 1, last_page: 2, per_page: 20, total: 21, next_page_url: '/pacientes?page=2', prev_page_url: null,
+    }
+    let searchAttempts = 0
+    vi.mocked(getPatients).mockImplementation((params) => {
+      if (params?.buscar === 'María') return ++searchAttempts === 1 ? Promise.reject(new Error('network')) : Promise.resolve(matchingPatients)
+      return Promise.resolve({ data: [], current_page: 1, last_page: 1, per_page: 20, total: 0, next_page_url: null, prev_page_url: null })
     })
     vi.mocked(createMedicalAppointment).mockResolvedValue('Cita registrada')
     renderAgenda()
@@ -184,7 +189,7 @@ describe('AgendaPage consultation', () => {
     fireEvent.click(screen.getByRole('button', { name: /Seleccionar 5 de octubre/ }))
     const form = screen.getByRole('form', { name: 'Agendar cita médica' })
     const search = within(form).getByRole('combobox', { name: 'Buscar paciente' })
-    expect(getPatients).not.toHaveBeenCalled()
+    await waitFor(() => expect(getPatients).toHaveBeenCalledWith({ page: 1 }, expect.any(AbortSignal)))
     fireEvent.change(search, { target: { value: 'María' } })
     expect(await within(form).findByRole('alert')).toHaveTextContent('No fue posible buscar pacientes')
     fireEvent.click(within(form).getByRole('button', { name: 'Reintentar' }))
@@ -204,10 +209,11 @@ describe('AgendaPage consultation', () => {
     const scrollIntoView = vi.fn()
     Object.defineProperty(HTMLElement.prototype, 'scrollIntoView', { configurable: true, value: scrollIntoView })
     try {
-      vi.mocked(getPatients).mockResolvedValueOnce({
+      const matchingPatients = {
         data: Array.from({ length: 20 }, (_, index) => ({ id: `patient-${index}`, codigo_paciente: `P${index}`, nombres: `Paciente ${index}`, cedula: `09000000${String(index).padStart(2, '0')}`, telefono: null, direccion: null, fecha_nacimiento: null })),
         current_page: 1, last_page: 1, per_page: 20, total: 20, next_page_url: null, prev_page_url: null,
-      })
+      }
+      vi.mocked(getPatients).mockImplementation((params) => Promise.resolve(params?.buscar === 'Paciente' ? matchingPatients : { data: [], current_page: 1, last_page: 1, per_page: 20, total: 0, next_page_url: null, prev_page_url: null }))
       renderAgenda()
       selectOctober()
       fireEvent.click(screen.getByRole('button', { name: /Seleccionar 5 de octubre/ }))
