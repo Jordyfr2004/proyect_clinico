@@ -204,7 +204,6 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 @media (prefers-reduced-motion: reduce) {
   .dashboard-quick-link:hover { transform: none; }
 }
-.admin-skeleton { background: linear-gradient(90deg, #e6eff9 25%, #f4f9ff 50%, #e6eff9 75%); background-size: 200% 100%; animation: admin-shimmer 1.45s ease-in-out infinite; }
 .admin-reveal { animation: admin-rise .23s ease-out both; }
 .admin-state { animation: admin-fade .2s ease-out both; }
 .admin-drawer-backdrop { animation: admin-fade .2s ease-out both; }
@@ -217,9 +216,8 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 @keyframes admin-accent { from { opacity: .4; transform: scaleY(.45); } to { opacity: 1; transform: scaleY(1); } }
 @keyframes admin-slide { from { transform: translateX(-22px); opacity: .86; } to { transform: translateX(0); opacity: 1; } }
 @keyframes admin-dialog-in { from { opacity: 0; transform: translateY(12px) scale(.985); } to { opacity: 1; transform: translateY(0) scale(1); } }
-@keyframes admin-shimmer { from { background-position: 200% 0; } to { background-position: -200% 0; } }
 @media (prefers-reduced-motion: reduce) {
-  .admin-reveal, .admin-state, .admin-drawer-backdrop, .admin-drawer-panel, .admin-dialog-backdrop, .admin-dialog-panel, .admin-nav-link[aria-current="page"]::before, .admin-skeleton { animation: none !important; }
+  .admin-reveal, .admin-state, .admin-drawer-backdrop, .admin-drawer-panel, .admin-dialog-backdrop, .admin-dialog-panel, .admin-nav-link[aria-current="page"]::before { animation: none !important; }
   .admin-shell :is(button, a, input, textarea, select) { transition: none !important; }
   .dashboard-metric { transition: none; }
   .dashboard-metric:hover { transform: none; }

@@ -31,7 +31,7 @@ function Sidebar({ close, compact = false, collapsed = false, toggleCollapse, ph
 
   return (
     <div className={`admin-sidebar flex h-full min-h-0 flex-col py-7 ${compact ? 'admin-sidebar-compact px-2' : 'px-4'}`}>
-      <div className="min-h-0 flex-1 overflow-y-auto">
+      <div className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
       <div className={`flex shrink-0 items-center border-b border-sky-200/15 pb-7 ${compact ? 'justify-center' : 'gap-3 px-2'}`}>
         <span aria-hidden="true" className="admin-brand-mark grid size-11 shrink-0 place-items-center rounded-[14px]"><svg viewBox="0 0 64 72" fill="none" className="h-7 w-6"><path d="M32 10C24 10 19 5 12 8 4 11 5 23 8 33c3 11 8 30 13 31 5 1 6-18 11-18s6 19 11 18c5-1 10-20 13-31 3-10 4-22-4-25-7-3-12 2-20 2Z" stroke="currentColor" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
         {!compact ? <div className="min-w-0">
