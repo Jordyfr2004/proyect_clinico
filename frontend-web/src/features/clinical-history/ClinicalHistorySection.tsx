@@ -112,9 +112,9 @@ export function ClinicalHistorySection() {
       {success ? <p className="admin-success mt-5 rounded-lg p-4 text-sm" role="status">{success}</p> : null}
       {mutationError && !(state.kind === 'absent' && canWrite) && !(state.kind === 'ready' && editing) ? <p className="mt-5 text-sm text-red-700" role="alert">{mutationError}</p> : null}
       {state.kind === 'absent' ? (
-        <div className="mt-6">
-          <p className="admin-body">El paciente no tiene historial clínico registrado.</p>
-          {canWrite ? <div className="mt-7"><h3 className="mb-5 text-lg font-semibold text-ink-950">Registrar historial clínico</h3><ClinicalHistoryForm error={mutationError} onSave={save}/></div> : null}
+        <div className="mx-auto mt-6 max-w-[1000px]">
+          <p className="admin-body mb-7">El paciente no tiene historial clínico registrado.</p>
+          {canWrite ? <ClinicalHistoryForm error={mutationError} onSave={save}/> : null}
         </div>
       ) : editing && canWrite ? (
         <div className="mt-6"><ClinicalHistoryForm error={mutationError} initial={state.history} onCancel={() => { restoreEditFocus.current = true; setMutationError(null); setEditing(false) }} onSave={save}/></div>
