@@ -75,6 +75,21 @@ describe('ActivitiesPage', () => {
     expect(createActivity).not.toHaveBeenCalled()
   })
 
+  it('ignores a lookup result after the patient code changes', async () => {
+    let finishLookup!: (value: typeof record.paciente) => void
+    vi.mocked(lookupPatientByCode).mockReturnValue(new Promise((resolve) => { finishLookup = resolve }))
+    renderPage('doctora')
+    await screen.findByText('Consulta registrada')
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar actividad' }))
+    const code = screen.getByLabelText('Código de paciente')
+    fireEvent.change(code, { target: { value: '001' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Buscar paciente' }))
+    fireEvent.change(code, { target: { value: '002' } })
+    finishLookup(record.paciente)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Buscar paciente' })).toBeEnabled())
+    expect(within(screen.getByRole('dialog')).queryByRole('status')).not.toBeInTheDocument()
+  })
+
   it('exposes real period filters and keeps the total general when filtering a patient', async () => {
     renderPage('doctora')
     await screen.findByText('Consulta registrada')

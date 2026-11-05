@@ -12,13 +12,10 @@ describe('loginSchema', () => {
     }
   })
 
-  it('rejects a password shorter than eight characters', () => {
+  it('accepts a nonempty password even when it is shorter than eight characters', () => {
     const result = loginSchema.safeParse({ username: '1234567890', password: '123' })
 
-    expect(result.success).toBe(false)
-    if (!result.success) {
-      expect(result.error.flatten().fieldErrors.password).toContain('La contraseña debe tener al menos 8 caracteres.')
-    }
+    expect(result.success).toBe(true)
   })
 
   it('accepts a username without requiring an email or changing case', () => {

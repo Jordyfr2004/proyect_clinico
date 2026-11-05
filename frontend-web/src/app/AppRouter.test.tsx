@@ -66,7 +66,7 @@ describe('AppRouter', () => {
     vi.mocked(getPatient).mockResolvedValueOnce({ id: 'patient-id', codigo_paciente: '001', nombres: 'Nombre recibido', cedula: '0912345678', telefono: null, direccion: null, fecha_nacimiento: null })
     renderRouter('authenticated', '/pacientes/patient-id/radiografias', undefined, authenticatedUser('asistente'))
     expect(await screen.findByRole('heading', { name: 'Evidencias clínicas' })).toBeInTheDocument()
-    expect(getPatientEvidence).toHaveBeenCalledWith('patient-id')
+    expect(getPatientEvidence).toHaveBeenCalledWith('patient-id', expect.any(AbortSignal))
     expect(screen.queryByRole('button', { name: /Subir|Eliminar evidencia/ })).not.toBeInTheDocument()
   })
   it('redirects unauthenticated users from protected pages to login', () => {
