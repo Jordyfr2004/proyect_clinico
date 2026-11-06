@@ -48,6 +48,7 @@ class AuditoriaTransaccionesTest extends TestCase
             '2026_10_03_043148_create_evidencia_clinicas_table.php',
             '2026_10_03_050424_create_egresos_table.php',
             '2026_10_03_191429_create_accion_registradas_table.php',
+            '2026_10_29_000001_add_agenda_id_to_actividades_table.php',
             '2026_10_03_191440_create_sesion_registradas_table.php',
         ] as $migration) {
             (require database_path('migrations/'.$migration))->up();
@@ -141,7 +142,8 @@ class AuditoriaTransaccionesTest extends TestCase
 
         $after = $this->estadoBaseDeDatos();
         $auditTable = $service === 'AuthService' ? 'sesiones_registradas' : 'acciones_registradas';
-        $this->assertCount(1, $after[$auditTable]);
+        $expectedAudits = $service === 'AgendaService' && $method === 'completarCita' ? 2 : 1;
+        $this->assertCount($expectedAudits, $after[$auditTable]);
         $this->assertSame($this->doctora->id, $after[$auditTable][0]['user_id']);
         unset($before['acciones_registradas'], $before['sesiones_registradas']);
         unset($after['acciones_registradas'], $after['sesiones_registradas']);
@@ -246,6 +248,7 @@ class AuditoriaTransaccionesTest extends TestCase
             return match ($method) {
                 'programarSolicitud' => fn () => $service->$method($record->id, array_intersect_key($data, array_flip(['fecha', 'hora_inicio', 'hora_fin'])), $actor),
                 'actualizar' => fn () => $service->$method($record->id, ['descripcion' => 'Modificada'], $actor),
+                'completarCita' => fn () => $service->$method($record->id, $actor, ['precio' => '30.50']),
                 'registrarDatosClinicos' => fn () => $service->$method($record->id, ['diagnostico' => 'Nuevo', 'tratamiento' => 'Nuevo'], $actor),
                 default => fn () => $service->$method($record->id, $actor),
             };

@@ -306,6 +306,28 @@ class ReporteService
             );
         }
 
+        $movimientos = $ingresosQuery->with('paciente')->get()->map(fn ($actividad) => [
+            'id' => $actividad->id,
+            'tipo' => 'ingreso',
+            'fecha' => $actividad->fecha->toDateString(),
+            'concepto' => $actividad->actividad,
+            'ingreso' => $actividad->precio,
+            'egreso' => '0.00',
+            'agenda_id' => $actividad->agenda_id,
+            'codigo_paciente' => $actividad->paciente?->codigo_paciente,
+            'nombres' => $actividad->paciente?->nombres,
+        ])->concat($egresosQuery->get()->map(fn ($egreso) => [
+            'id' => $egreso->id,
+            'tipo' => 'egreso',
+            'fecha' => $egreso->fecha->toDateString(),
+            'concepto' => $egreso->concepto,
+            'ingreso' => '0.00',
+            'egreso' => $egreso->monto,
+            'agenda_id' => null,
+            'codigo_paciente' => null,
+            'nombres' => null,
+        ]))->sortBy([['fecha', 'desc'], ['tipo', 'asc'], ['id', 'asc']])->values();
+
         $ingresos = (float) $ingresosQuery
             ->sum('precio');
 
@@ -316,6 +338,7 @@ class ReporteService
 
         return [
             'periodo' => $datos['periodo'],
+            'movimientos' => $movimientos,
 
             'ingresos' => number_format(
                 $ingresos,
