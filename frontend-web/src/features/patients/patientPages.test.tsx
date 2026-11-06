@@ -246,7 +246,14 @@ describe('patient views', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Odontograma' }))
     expect(screen.getByRole('button', { name: 'Odontograma' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByTestId('location')).toHaveTextContent('/pacientes/patient-id/diagnosticos')
-    expect(screen.getByRole('status')).toHaveTextContent('estructura clínica')
+    expect(screen.getByRole('status')).toHaveTextContent('temporales')
+    expect(screen.getByRole('button', { name: 'Guardar odontograma' })).toBeDisabled()
+    fireEvent.click(screen.getByRole('button', { name: 'Pieza 18' }))
+    const detail = screen.getByRole('complementary', { name: 'Detalle de la pieza 18' })
+    fireEvent.click(within(detail).getByRole('radio', { name: 'Caries' }))
+    fireEvent.change(within(detail).getByRole('textbox', { name: 'Observación' }), { target: { value: 'Ejemplo local' } })
+    expect(screen.getByText('1 pieza marcada')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Guardar odontograma' })).toBeDisabled()
     expect(within(screen.getByRole('navigation', { name: 'Secciones del expediente' })).getAllByRole('link')).toHaveLength(3)
   })
 
@@ -270,13 +277,14 @@ describe('patient views', () => {
   it.each([
     ['doctora', 'diagnosticos', true],
     ['asistente', 'diagnosticos', false],
-  ] as const)('keeps %s %s pending and only offers the authorized Citas médicas route', async (role, path, canOpenAppointments) => {
+  ] as const)('keeps %s %s preview separate from the authorized Citas médicas route', async (role, path, canOpenAppointments) => {
     vi.mocked(getPatient).mockResolvedValue(patient)
     renderDetail(`/pacientes/patient-id/${path}`, role)
     expect(await screen.findByRole('heading', { name: 'Evaluación clínica' })).toBeInTheDocument()
     expect(screen.getByRole('group', { name: 'Apartados de evaluación clínica' })).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('Integración pendiente')
+    expect(screen.getByRole('status')).toHaveTextContent('temporales')
     fireEvent.click(screen.getByRole('button', { name: 'Diagnóstico' }))
+    expect(screen.getByRole('status')).toHaveTextContent('Integración pendiente')
     const action = screen.queryByRole('link', { name: 'Ir a Citas médicas' })
     if (canOpenAppointments) expect(action).toHaveAttribute('href', '/citas-medicas')
     else expect(action).not.toBeInTheDocument()
