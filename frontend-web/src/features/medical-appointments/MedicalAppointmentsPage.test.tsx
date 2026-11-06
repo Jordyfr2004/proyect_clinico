@@ -140,7 +140,6 @@ describe('MedicalAppointmentsPage', () => {
 
   it.each([
     ['Cancelar cita', 'Cancelar cita médica', cancelAppointment],
-    ['Completar cita', 'Completar cita médica', completeAppointment],
     ['Eliminar', 'Eliminar registro', deleteAgendaEntry],
   ] as const)('confirms %s and refetches the monthly list', async (action, title, mutation) => {
     vi.mocked(mutation).mockResolvedValue('Operación completada.')
@@ -154,6 +153,49 @@ describe('MedicalAppointmentsPage', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmar' }))
     await waitFor(() => expect(mutation).toHaveBeenCalledExactlyOnceWith('medical-1'))
     await waitFor(() => expect(getAgendaMonth).toHaveBeenCalledTimes(calls + 1))
+  })
+
+  it('asks for an activity and price, then completes the appointment with one request', async () => {
+    vi.mocked(completeAppointment).mockResolvedValue('Cita marcada como completada.')
+    await renderOctober()
+    const calls = vi.mocked(getAgendaMonth).mock.calls.length
+    fireEvent.click(screen.getByRole('button', { name: 'Completar cita' }))
+    const dialog = screen.getByRole('dialog', { name: 'Completar cita médica' })
+    expect(within(dialog).getByText(/Actividades/)).toBeInTheDocument()
+    fireEvent.change(within(dialog).getByLabelText('Actividad realizada'), { target: { value: 'Limpieza dental' } })
+    fireEvent.change(within(dialog).getByLabelText('Precio'), { target: { value: '35.50' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Completar cita' }))
+    await waitFor(() => expect(completeAppointment).toHaveBeenCalledExactlyOnceWith('medical-1', { actividad: 'Limpieza dental', precio: 35.5 }))
+    await waitFor(() => expect(getAgendaMonth).toHaveBeenCalledTimes(calls + 1))
+    expect(await screen.findByText('Cita marcada como completada.')).toBeInTheDocument()
+  })
+
+  it('requires a valid activity and price before completing', async () => {
+    await renderOctober()
+    fireEvent.click(screen.getByRole('button', { name: 'Completar cita' }))
+    const dialog = screen.getByRole('dialog', { name: 'Completar cita médica' })
+    const complete = within(dialog).getByRole('button', { name: 'Completar cita' })
+    fireEvent.click(complete)
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('actividad')
+    fireEvent.change(within(dialog).getByLabelText('Actividad realizada'), { target: { value: 'Limpieza dental' } })
+    fireEvent.change(within(dialog).getByLabelText('Precio'), { target: { value: '35.999' } })
+    fireEvent.click(complete)
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('precio')
+    expect(completeAppointment).not.toHaveBeenCalled()
+  })
+
+  it('blocks a second completion while the first request is pending', async () => {
+    vi.mocked(completeAppointment).mockReturnValue(new Promise(() => {}))
+    await renderOctober()
+    fireEvent.click(screen.getByRole('button', { name: 'Completar cita' }))
+    const dialog = screen.getByRole('dialog', { name: 'Completar cita médica' })
+    fireEvent.change(within(dialog).getByLabelText('Actividad realizada'), { target: { value: 'Limpieza dental' } })
+    fireEvent.change(within(dialog).getByLabelText('Precio'), { target: { value: '35.50' } })
+    const form = within(dialog).getByRole('form', { name: 'Actividad realizada en la cita' })
+    fireEvent.submit(form)
+    fireEvent.submit(form)
+    expect(completeAppointment).toHaveBeenCalledTimes(1)
+    expect(within(dialog).getByRole('button', { name: 'Guardando…' })).toBeDisabled()
   })
 
   it('moves focus to the page heading when deleting removes the original action', async () => {
@@ -209,8 +251,23 @@ describe('MedicalAppointmentsPage', () => {
     await renderOctober()
     fireEvent.click(screen.getByRole('button', { name: 'Completar cita' }))
     const dialog = screen.getByRole('dialog', { name: 'Completar cita médica' })
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmar' }))
+    fireEvent.change(within(dialog).getByLabelText('Actividad realizada'), { target: { value: 'Limpieza dental' } })
+    fireEvent.change(within(dialog).getByLabelText('Precio'), { target: { value: '35.50' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Completar cita' }))
     expect(await within(dialog).findByRole('alert')).toHaveTextContent('Debes registrar el diagnóstico y tratamiento antes de completar la cita.')
+  })
+
+  it('keeps the completion form open when Laravel rejects the activity or price', async () => {
+    vi.mocked(completeAppointment).mockRejectedValue({ isAxiosError: true, response: { status: 422, data: { message: 'El precio no es válido.' } } })
+    await renderOctober()
+    fireEvent.click(screen.getByRole('button', { name: 'Completar cita' }))
+    const dialog = screen.getByRole('dialog', { name: 'Completar cita médica' })
+    fireEvent.change(within(dialog).getByLabelText('Actividad realizada'), { target: { value: 'Control' } })
+    fireEvent.change(within(dialog).getByLabelText('Precio'), { target: { value: '0' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Completar cita' }))
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('El precio no es válido.')
+    expect(completeAppointment).toHaveBeenCalledExactlyOnceWith('medical-1', { actividad: 'Control', precio: 0 })
+    expect(dialog).toBeInTheDocument()
   })
 
   it.each([[404, 'Cita no encontrada.'], [409, 'La cita todavía no ha sido programada.'], [422, 'Los datos clínicos no son válidos.']] as const)('shows backend %i from clinical registration', async (status, message) => {

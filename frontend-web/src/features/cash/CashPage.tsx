@@ -1,19 +1,34 @@
 import { isAxiosError } from 'axios'
-import { Wallet } from 'lucide-react'
-import { useRef, useState, type FormEvent } from 'react'
+import { ArrowDownRight, ArrowUpRight, Wallet } from 'lucide-react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { EmptyState } from '../../components/states/EmptyState'
 import { ErrorState } from '../../components/states/ErrorState'
 import { LoadingState } from '../../components/states/LoadingState'
 import { AccessibleDialog } from '../../components/ui/AccessibleDialog'
 import { IncrementalList } from '../../components/ui/IncrementalList'
-import { formatCurrency, formatDate } from '../../utils/displayFormat'
-import { createExpense, deleteExpense, getCashSummary, getExpenses, updateExpense, type CashPeriod, type Expense, type ExpenseFilters, type ExpensePayload } from './cashService'
 import { markClinicalQueriesStale, useClinicalQuery } from '../../services/clinicalQuery'
 import { useClinicalViewState } from '../../services/clinicalViewState'
+import { formatCurrency, formatDate } from '../../utils/displayFormat'
+import { createExpense, deleteExpense, getCashSummary, updateExpense, type CashMovement, type CashPeriod, type ExpenseUpdate } from './cashService'
 
-type Dialog = { kind: 'create' | 'edit' | 'delete'; expense?: Expense }
 type PeriodKind = CashPeriod['periodo']
+type Dialog = { kind: 'create' | 'edit' | 'delete'; movement?: CashMovement }
+const periods: { value: PeriodKind; label: string }[] = [
+  { value: 'dia', label: 'Hoy' }, { value: 'semana', label: 'Semana' },
+  { value: 'mes', label: 'Mes' }, { value: 'anio', label: 'Año' },
+]
 const inputClass = 'admin-input mt-1 w-full text-sm'
+
+function localDate(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+function currentPeriod(kind: PeriodKind, date: Date): CashPeriod {
+  if (kind === 'dia' || kind === 'semana') return { periodo: kind, fecha: localDate(date) }
+  if (kind === 'mes') return { periodo: kind, mes: date.getMonth() + 1, anio: date.getFullYear() }
+  return { periodo: kind, anio: date.getFullYear() }
+}
+
 function errorMessage(error: unknown): string {
   if (isAxiosError(error)) {
     if (!error.response) return 'No fue posible comunicarse con el servidor.'
@@ -22,76 +37,85 @@ function errorMessage(error: unknown): string {
   }
   return 'No fue posible completar la operación. Inténtalo de nuevo.'
 }
-function filters(kind: PeriodKind, date: string, month: string, year: string): { summary: CashPeriod; expenses: ExpenseFilters } {
-  const anio = Number(year)
-  const mes = Number(month)
-  if (kind === 'dia') return { summary: { periodo: kind, fecha: date }, expenses: { fecha: date } }
-  if (kind === 'semana') return { summary: { periodo: kind, fecha: date }, expenses: { semana: date } }
-  if (kind === 'mes') return { summary: { periodo: kind, mes, anio }, expenses: { mes, anio } }
-  return { summary: { periodo: kind, anio }, expenses: { anio } }
-}
 
-function ExpenseForm({ expense, busy, error, onSave, onCancel }: { expense?: Expense; busy: boolean; error: string | null; onSave: (values: ExpensePayload) => Promise<void>; onCancel: () => void }) {
-  const [fecha, setFecha] = useState(expense?.fecha.slice(0, 10) ?? '')
-  const [concepto, setConcepto] = useState(expense?.concepto ?? '')
-  const [monto, setMonto] = useState(expense ? String(expense.monto) : '')
+function ExpenseForm({ movement, today, busy, error, onSave, onCancel }: {
+  movement?: CashMovement; today: string; busy: boolean; error: string | null;
+  onSave: (values: ExpenseUpdate) => Promise<void>; onCancel: () => void
+}) {
+  const [concepto, setConcepto] = useState(movement?.concepto ?? '')
+  const [monto, setMonto] = useState(movement ? String(movement.egreso) : '')
   const [validation, setValidation] = useState<string | null>(null)
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (busy) return
-    if (!fecha || !concepto.trim() || concepto.trim().length > 255 || !Number.isFinite(Number(monto)) || Number(monto) < 0.01) { setValidation('Completa una fecha, un concepto y un monto válido.'); return }
+    const amount = Number(monto)
+    if (!concepto.trim() || concepto.trim().length > 255 || !monto.trim() || !Number.isFinite(amount) || amount < 0.01 || amount > 99999999.99 || !/^\d+(?:\.\d{1,2})?$/.test(monto.trim())) {
+      setValidation('Ingresa un concepto y un monto válido de hasta dos decimales.')
+      return
+    }
     setValidation(null)
-    void onSave({ fecha, concepto: concepto.trim(), monto: Number(monto) })
+    void onSave({ concepto: concepto.trim(), monto: amount })
   }
-  return <form aria-label="Datos del egreso" noValidate onSubmit={submit}><div className="grid gap-4 sm:grid-cols-2"><label className="text-sm font-medium text-ink-950">Fecha<input className={inputClass} data-dialog-initial onChange={(event) => setFecha(event.target.value)} required type="date" value={fecha}/></label><label className="text-sm font-medium text-ink-950">Monto<input className={inputClass} min="0.01" onChange={(event) => setMonto(event.target.value)} required step="0.01" type="number" value={monto}/></label><label className="text-sm font-medium text-ink-950 sm:col-span-2">Concepto<input className={inputClass} maxLength={255} onChange={(event) => setConcepto(event.target.value)} required value={concepto}/></label></div>{validation || error ? <p className="mt-4 text-sm text-red-700" role="alert">{validation ?? error}</p> : null}<div className="mt-6 flex gap-3"><button className="admin-primary min-h-11 rounded-lg px-4 text-sm font-semibold disabled:opacity-60" disabled={busy} type="submit">{busy ? 'Guardando…' : 'Guardar'}</button><button className="admin-secondary min-h-11 rounded-lg px-4 text-sm font-semibold" disabled={busy} onClick={onCancel} type="button">Volver</button></div></form>
+  return <form aria-label="Datos del egreso" noValidate onSubmit={submit}>
+    <div className="grid gap-4">
+      <div><span className="text-sm font-medium text-ink-950">Fecha</span><p className="admin-input mt-1 flex min-h-11 items-center text-sm text-ink-950" data-testid="expense-date">{formatDate(movement?.fecha ?? today)}</p><p className="admin-muted mt-1 text-xs">La fecha se asigna automáticamente y no se puede modificar.</p></div>
+      <label className="text-sm font-medium text-ink-950">Concepto<input className={inputClass} data-dialog-initial maxLength={255} onChange={(event) => setConcepto(event.target.value)} placeholder="Ej. Compra de guantes" required value={concepto}/></label>
+      <label className="text-sm font-medium text-ink-950">Monto<input className={inputClass} min="0.01" onChange={(event) => setMonto(event.target.value)} placeholder="0.00" required step="0.01" type="number" value={monto}/></label>
+    </div>
+    {validation || error ? <p className="mt-4 text-sm text-red-700" role="alert">{validation ?? error}</p> : null}
+    <div className="mt-6 flex flex-wrap gap-3"><button className="admin-primary min-h-11 rounded-lg px-4 text-sm font-semibold disabled:opacity-60" disabled={busy} type="submit">{busy ? 'Guardando…' : 'Guardar egreso'}</button><button className="admin-secondary min-h-11 rounded-lg px-4 text-sm font-semibold" disabled={busy} onClick={onCancel} type="button">Cancelar</button></div>
+  </form>
 }
 
 export function CashPage() {
-  const now = new Date()
-  const [period, setPeriod] = useClinicalViewState<PeriodKind>('cash.period', () => 'mes')
-  const [date, setDate] = useClinicalViewState('cash.date', () => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`)
-  const [month, setMonth] = useClinicalViewState('cash.month', () => String(now.getMonth() + 1))
-  const [year, setYear] = useClinicalViewState('cash.year', () => String(now.getFullYear()))
-  const [query, setQuery] = useClinicalViewState('cash.query', () => filters('mes', date, month, year))
+  const [period, setPeriod] = useClinicalViewState<PeriodKind>('cash.period', () => 'dia')
+  const [today, setToday] = useState(() => new Date())
   const [dialog, setDialog] = useState<Dialog | null>(null)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const pending = useRef(false)
   const trigger = useRef<HTMLElement | null>(null)
-  const summaryQuery = useClinicalQuery(['cash', 'summary', query.summary], (signal) => getCashSummary(query.summary, signal))
-  const expensesQuery = useClinicalQuery(['cash', 'expenses', query.expenses], (signal) => getExpenses(query.expenses, signal))
+  const params = currentPeriod(period, today)
+  const summaryQuery = useClinicalQuery(['cash', 'summary', params], (signal) => getCashSummary(params, signal))
   const summary = summaryQuery.data
-  const load = async (): Promise<boolean> => {
-    await markClinicalQueriesStale(['cash'])
-    const [summary, expenses] = await Promise.all([summaryQuery.refetch(), expensesQuery.refetch()])
-    return summary.isSuccess && expenses.isSuccess
-  }
+
+  useEffect(() => {
+    const nextMidnight = new Date(today.getFullYear(), today.getMonth(), today.getDate() + 1)
+    const timeout = window.setTimeout(() => setToday(new Date()), Math.max(1, nextMidnight.getTime() - Date.now()))
+    return () => window.clearTimeout(timeout)
+  }, [today])
+
   const closeDialog = () => { if (pending.current) return; setDialog(null); setActionError(null); trigger.current?.focus() }
-  const mutate = async (values?: ExpensePayload) => {
+  const open = (next: Dialog, element: HTMLElement) => { trigger.current = element; setActionError(null); setSuccess(null); setDialog(next) }
+  const mutate = async (values?: ExpenseUpdate) => {
     if (!dialog || pending.current) return
     pending.current = true; setBusy(true); setActionError(null); setSuccess(null)
     try {
       let message: string
-      if (dialog.kind === 'create' && values) message = await createExpense(values)
-      else if (dialog.kind === 'edit' && dialog.expense && values) message = await updateExpense(dialog.expense.id, values)
-      else if (dialog.kind === 'delete' && dialog.expense) message = await deleteExpense(dialog.expense.id)
+      if (dialog.kind === 'create' && values) message = await createExpense({ ...values, fecha: localDate(new Date()) })
+      else if (dialog.kind === 'edit' && dialog.movement && values) message = await updateExpense(dialog.movement.id, values)
+      else if (dialog.kind === 'delete' && dialog.movement) message = await deleteExpense(dialog.movement.id)
       else return
-      void markClinicalQueriesStale(['dashboard-report'])
-      void markClinicalQueriesStale(['reports'])
-      if (await load()) { setSuccess(message); setDialog(null); trigger.current?.focus() }
-      else setActionError('El cambio se confirmó, pero no fue posible actualizar Caja. Reintenta la consulta.')
+      setDialog(null); trigger.current?.focus()
+      await Promise.all([markClinicalQueriesStale(['cash']), markClinicalQueriesStale(['dashboard-report']), markClinicalQueriesStale(['reports'])])
+      const refreshed = await summaryQuery.refetch()
+      setSuccess(refreshed.isSuccess ? message : `${message} No fue posible actualizar Caja; vuelve a intentar la consulta.`)
     } catch (error) { setActionError(errorMessage(error)) }
     finally { pending.current = false; setBusy(false) }
   }
-  const open = (next: Dialog, element: HTMLElement) => { trigger.current = element; setActionError(null); setDialog(next) }
-  return <div className="admin-reveal max-w-[1390px] space-y-6"><header className="flex flex-wrap items-end justify-between gap-4"><div><p className="admin-kicker">Administración</p><h1 className="admin-page-title mt-2">Caja</h1><p className="admin-body mt-2">Resumen y egresos del período consultado.</p></div><button className="admin-primary min-h-11 rounded-lg px-5 text-sm font-semibold" onClick={(event) => open({ kind: 'create' }, event.currentTarget)} type="button">Registrar egreso</button></header>
+  const movements = summary?.movimientos ?? []
+  return <div className="admin-reveal max-w-[1390px] space-y-6">
+    <header className="flex flex-wrap items-end justify-between gap-4"><div><p className="admin-kicker">Administración</p><h1 className="admin-page-title mt-2">Caja</h1><p className="admin-body mt-2">Ingresos de actividades realizadas y egresos del período actual.</p></div><button className="admin-primary min-h-11 rounded-lg px-5 text-sm font-semibold" onClick={(event) => open({ kind: 'create' }, event.currentTarget)} type="button">Registrar egreso</button></header>
     {success ? <p className="admin-success rounded-lg p-4 text-sm" role="status">{success}</p> : null}
-    <section aria-label="Filtros de Caja" className="admin-surface rounded-[20px] p-5"><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5"><label className="text-sm font-medium text-ink-950">Período<select className={inputClass} onChange={(event) => setPeriod(event.target.value as PeriodKind)} value={period}><option value="dia">Día</option><option value="semana">Semana</option><option value="mes">Mes</option><option value="anio">Año</option></select></label>{period === 'dia' || period === 'semana' ? <label className="text-sm font-medium text-ink-950">Fecha<input className={inputClass} onChange={(event) => setDate(event.target.value)} type="date" value={date}/></label> : null}{period === 'mes' ? <label className="text-sm font-medium text-ink-950">Mes<select className={inputClass} onChange={(event) => setMonth(event.target.value)} value={month}>{Array.from({ length: 12 }, (_, index) => <option key={index + 1} value={index + 1}>{new Intl.DateTimeFormat('es-EC', { month: 'long' }).format(new Date(now.getFullYear(), index, 1))}</option>)}</select></label> : null}{period === 'mes' || period === 'anio' ? <label className="text-sm font-medium text-ink-950">Año<input className={inputClass} onChange={(event) => setYear(event.target.value)} type="number" value={year}/></label> : null}<button className="admin-secondary min-h-11 self-end rounded-lg px-4 text-sm font-semibold" onClick={() => { if ((period === 'dia' || period === 'semana') && !date) return; if ((period === 'mes' || period === 'anio') && !year) return; setQuery(filters(period, date, month, year)) }} type="button">Aplicar filtros</button></div></section>
-    {summary ? <section aria-label="Resumen de Caja" className="grid gap-4 sm:grid-cols-3">{(['ingresos', 'egresos', 'saldo'] as const).map((field) => <div className="admin-surface rounded-[20px] p-5" key={field}><p className="admin-kicker capitalize">{field}</p><p className="mt-2 text-2xl font-bold text-ink-950">{formatCurrency(summary[field])}</p></div>)}</section> : summaryQuery.isError ? <ErrorState description={errorMessage(summaryQuery.error)} onRetry={() => { void summaryQuery.refetch() }}/> : <LoadingState/>}
-    {expensesQuery.data ? <section aria-labelledby="expenses-title" className="admin-surface rounded-[20px] p-5 sm:p-6"><h2 className="text-xl font-semibold text-ink-950" id="expenses-title">Egresos</h2>{expensesQuery.data.length === 0 ? <div className="mt-5"><EmptyState description="Sin egresos para el período seleccionado." icon={Wallet} title="Sin egresos en esta vista"/></div> : <IncrementalList className="mt-4 divide-y divide-[#dbe6f2]" items={expensesQuery.data} renderItem={(expense) => <li className="flex flex-wrap items-center justify-between gap-4 py-4" key={expense.id}><div><p className="font-semibold text-ink-950">{expense.concepto}</p><p className="admin-muted text-sm">{formatDate(expense.fecha)} · {formatCurrency(expense.monto)}</p></div><div className="flex gap-2"><button className="admin-secondary min-h-11 rounded-lg px-3 text-sm font-semibold" onClick={(event) => open({ kind: 'edit', expense }, event.currentTarget)} type="button">Editar</button><button className="min-h-11 rounded-lg border border-red-200 px-3 text-sm font-semibold text-red-700" onClick={(event) => open({ kind: 'delete', expense }, event.currentTarget)} type="button">Eliminar</button></div></li>}/>}</section> : expensesQuery.isError ? <ErrorState description={errorMessage(expensesQuery.error)} onRetry={() => { void expensesQuery.refetch() }}/> : <LoadingState/>}
-    {summaryQuery.data && summaryQuery.isError ? <p className="text-sm text-red-700" role="alert">No fue posible actualizar el resumen. <button className="dashboard-retry" onClick={() => { void summaryQuery.refetch() }} type="button">Reintentar</button></p> : null}
-    {expensesQuery.data && expensesQuery.isError ? <p className="text-sm text-red-700" role="alert">No fue posible actualizar los egresos. <button className="dashboard-retry" onClick={() => { void expensesQuery.refetch() }} type="button">Reintentar</button></p> : null}
-    {dialog ? <AccessibleDialog busy={busy} onClose={closeDialog} title={dialog.kind === 'create' ? 'Registrar egreso' : dialog.kind === 'edit' ? 'Editar egreso' : 'Eliminar egreso'} titleId="expense-dialog-title">{dialog.kind === 'delete' ? <div><p className="admin-body text-sm">¿Eliminar este egreso?</p>{actionError ? <p className="mt-4 text-sm text-red-700" role="alert">{actionError}</p> : null}<div className="mt-6 flex gap-3"><button className="min-h-11 rounded-lg bg-red-700 px-4 text-sm font-semibold text-white disabled:opacity-60" data-dialog-initial disabled={busy} onClick={() => { void mutate() }} type="button">{busy ? 'Eliminando…' : 'Confirmar eliminación'}</button><button className="admin-secondary min-h-11 rounded-lg px-4 text-sm font-semibold" disabled={busy} onClick={closeDialog} type="button">Volver</button></div></div> : <ExpenseForm busy={busy} error={actionError} key={dialog.expense?.id ?? 'new'} onCancel={closeDialog} onSave={mutate} expense={dialog.expense}/>}</AccessibleDialog> : null}
+    <section aria-label="Período de Caja" className="admin-surface rounded-[20px] p-4 sm:p-5"><div aria-label="Período" className="flex flex-wrap gap-2" role="group">{periods.map((option) => <button aria-pressed={period === option.value} className={`min-h-11 rounded-lg px-5 text-sm font-semibold transition-colors ${period === option.value ? 'admin-primary' : 'admin-secondary'}`} key={option.value} onClick={() => setPeriod(option.value)} type="button">{option.label}</button>)}</div><p className="admin-muted mt-3 text-sm">Se muestra el período en curso.</p></section>
+    {summary ? <>
+      <section aria-label="Resumen de Caja" className="grid gap-4 sm:grid-cols-3">{(['ingresos', 'egresos', 'saldo'] as const).map((field) => <div className="admin-surface rounded-[20px] p-5" key={field}><p className="admin-kicker capitalize">{field}</p><p className="mt-2 text-2xl font-bold text-ink-950">{formatCurrency(summary[field])}</p></div>)}</section>
+      <section aria-labelledby="movements-title" className="admin-surface rounded-[20px] p-5 sm:p-6"><div className="flex flex-wrap items-baseline justify-between gap-2"><h2 className="text-xl font-semibold text-ink-950" id="movements-title">Movimientos</h2><p className="admin-muted text-sm">{movements.length} {movements.length === 1 ? 'movimiento' : 'movimientos'}</p></div>
+        {movements.length === 0 ? <div className="mt-5"><EmptyState description="Todavía no hay movimientos en este período." icon={Wallet} title="Sin movimientos"/></div> : <IncrementalList className="mt-4 divide-y divide-[#dbe6f2]" items={movements} renderItem={(movement) => <li className="flex flex-wrap items-center justify-between gap-4 py-4" key={`${movement.tipo}-${movement.id}`}><div className="flex min-w-0 items-start gap-3"><span aria-hidden="true" className={`mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full ${movement.tipo === 'ingreso' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{movement.tipo === 'ingreso' ? <ArrowUpRight size={20}/> : <ArrowDownRight size={20}/>}</span><div className="min-w-0"><p className="break-words font-semibold text-ink-950">{movement.concepto}</p><p className="admin-muted mt-1 text-sm">{formatDate(movement.fecha)}{movement.tipo === 'ingreso' && movement.nombres ? ` · ${movement.nombres}` : ''}</p></div></div><div className="ml-auto flex flex-wrap items-center gap-3 sm:gap-4"><span className={`text-sm font-medium ${movement.tipo === 'ingreso' ? 'text-emerald-700' : 'text-rose-700'}`}>{movement.tipo === 'ingreso' ? 'Ingreso' : 'Egreso'}</span><strong className={`min-w-20 text-right ${movement.tipo === 'ingreso' ? 'text-emerald-700' : 'text-rose-700'}`}>{movement.tipo === 'ingreso' ? '+' : '−'}{formatCurrency(movement.tipo === 'ingreso' ? movement.ingreso : movement.egreso)}</strong>{movement.tipo === 'egreso' ? <div className="flex gap-2"><button aria-label={`Editar ${movement.concepto}`} className="admin-secondary min-h-11 rounded-lg px-3 text-sm font-semibold" onClick={(event) => open({ kind: 'edit', movement }, event.currentTarget)} type="button">Editar</button><button aria-label={`Eliminar ${movement.concepto}`} className="min-h-11 rounded-lg border border-red-200 px-3 text-sm font-semibold text-red-700" onClick={(event) => open({ kind: 'delete', movement }, event.currentTarget)} type="button">Eliminar</button></div> : null}</div></li>}/>}
+      </section>
+    </> : summaryQuery.isError ? <ErrorState description={errorMessage(summaryQuery.error)} onRetry={() => { void summaryQuery.refetch() }}/> : <LoadingState/>}
+    {summary && summaryQuery.isError ? <p className="text-sm text-red-700" role="alert">No fue posible actualizar Caja. <button className="dashboard-retry" onClick={() => { void summaryQuery.refetch() }} type="button">Reintentar</button></p> : null}
+    {dialog ? <AccessibleDialog busy={busy} onClose={closeDialog} title={dialog.kind === 'create' ? 'Registrar egreso' : dialog.kind === 'edit' ? 'Editar egreso' : 'Eliminar egreso'} titleId="expense-dialog-title">{dialog.kind === 'delete' ? <div><p className="admin-body text-sm">¿Eliminar el egreso «{dialog.movement?.concepto}» del {formatDate(dialog.movement?.fecha ?? '')}? Esta acción no se puede deshacer.</p>{actionError ? <p className="mt-4 text-sm text-red-700" role="alert">{actionError}</p> : null}<div className="mt-6 flex flex-wrap gap-3"><button className="min-h-11 rounded-lg bg-red-700 px-4 text-sm font-semibold text-white disabled:opacity-60" data-dialog-initial disabled={busy} onClick={() => { void mutate() }} type="button">{busy ? 'Eliminando…' : 'Confirmar eliminación'}</button><button className="admin-secondary min-h-11 rounded-lg px-4 text-sm font-semibold" disabled={busy} onClick={closeDialog} type="button">Cancelar</button></div></div> : <ExpenseForm busy={busy} error={actionError} key={dialog.movement?.id ?? 'new'} movement={dialog.movement} onCancel={closeDialog} onSave={mutate} today={localDate(today)}/>}</AccessibleDialog> : null}
   </div>
 }

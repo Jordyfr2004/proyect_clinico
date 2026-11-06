@@ -35,11 +35,11 @@ describe('agendaService', () => {
     const remove = vi.spyOn(apiClient, 'delete').mockResolvedValue({ data: { message: 'Eliminado.' } })
     await updateAgendaEntry('entry-id', { descripcion: 'Cambio' })
     await cancelAppointment('entry-id')
-    await completeAppointment('entry-id')
+    await completeAppointment('entry-id', { actividad: 'Limpieza dental', precio: 35.5 })
     await deleteAgendaEntry('entry-id')
     expect(put).toHaveBeenNthCalledWith(1, '/agenda/entry-id', { descripcion: 'Cambio' })
     expect(put).toHaveBeenNthCalledWith(2, '/agenda/entry-id/cancelar')
-    expect(put).toHaveBeenNthCalledWith(3, '/agenda/entry-id/completar')
+    expect(put).toHaveBeenNthCalledWith(3, '/agenda/entry-id/completar', { actividad: 'Limpieza dental', precio: 35.5 })
     expect(remove).toHaveBeenCalledExactlyOnceWith('/agenda/entry-id')
   })
 

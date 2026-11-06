@@ -6,7 +6,7 @@ import { LoadingState } from '../../components/states/LoadingState'
 import { AccessibleDialog } from '../../components/ui/AccessibleDialog'
 import { formatDate } from '../../utils/displayFormat'
 import { CalendarDays, ChevronLeft, ChevronRight, MoreVertical } from 'lucide-react'
-import { cancelAppointment, completeAppointment, deleteAgendaEntry, getAgendaMonth, getPendingRequests, programRequest, registerClinicalData, updateAgendaEntry, type AgendaEntry, type AgendaSlot, type ClinicalDataPayload } from '../agenda/agendaService'
+import { cancelAppointment, completeAppointment, deleteAgendaEntry, getAgendaMonth, getPendingRequests, programRequest, registerClinicalData, updateAgendaEntry, type AgendaEntry, type AgendaSlot, type ClinicalDataPayload, type CompleteAppointmentPayload } from '../agenda/agendaService'
 import { markClinicalQueriesStale, useClinicalQuery } from '../../services/clinicalQuery'
 import { useClinicalViewState } from '../../services/clinicalViewState'
 
@@ -105,7 +105,7 @@ function AppointmentDialogForm({ dialog, busy, error, onSave, onCancel }: {
   const [fin, setFin] = useState(dialog.entry.hora_fin?.slice(0, 5) ?? '')
   const [descripcion, setDescripcion] = useState(dialog.entry.descripcion ?? '')
   const [validation, setValidation] = useState<string | null>(null)
-  const confirmation = ['cancel', 'complete', 'delete'].includes(dialog.kind)
+  const confirmation = ['cancel', 'delete'].includes(dialog.kind)
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (busy) return
@@ -118,7 +118,7 @@ function AppointmentDialogForm({ dialog, busy, error, onSave, onCancel }: {
     void onSave({ fecha, hora_inicio: inicio, hora_fin: fin, ...(dialog.kind === 'edit' ? { descripcion: descripcion.trim() || null } : {}) })
   }
   return <form aria-label={dialog.kind === 'program' ? 'Programar solicitud' : 'Datos de agenda'} noValidate onSubmit={submit}>
-    {confirmation ? <p className="admin-body text-sm">{dialog.kind === 'delete' ? '¿Eliminar este registro de agenda?' : dialog.kind === 'cancel' ? '¿Cancelar esta cita médica?' : '¿Completar esta cita médica? El backend requiere diagnóstico y tratamiento registrados previamente.'}</p> : <div className="grid gap-4 sm:grid-cols-2">
+    {confirmation ? <p className="admin-body text-sm">{dialog.kind === 'delete' ? '¿Eliminar este registro de agenda?' : '¿Cancelar esta cita médica?'}</p> : <div className="grid gap-4 sm:grid-cols-2">
       {dialog.kind === 'program' ? <ProgramRequestCalendar onChange={setFecha} value={fecha}/> : <label className="text-sm font-medium text-ink-950">Fecha<input className={inputClass} data-dialog-initial onChange={(event) => setFecha(event.target.value)} required type="date" value={fecha}/></label>}
       <label className="text-sm font-medium text-ink-950">Hora de inicio<input className={inputClass} onChange={(event) => setInicio(event.target.value)} required type="time" value={inicio}/></label>
       <label className="text-sm font-medium text-ink-950">Hora de fin<input className={inputClass} onChange={(event) => setFin(event.target.value)} required type="time" value={fin}/></label>
@@ -126,6 +126,36 @@ function AppointmentDialogForm({ dialog, busy, error, onSave, onCancel }: {
     </div>}
     {validation || error ? <p className="mt-4 text-sm text-red-700" role="alert">{validation ?? error}</p> : null}
     <div className="mt-6 flex flex-wrap gap-3"><button className="admin-primary min-h-11 rounded-[10px] px-5 text-sm font-semibold disabled:opacity-60" disabled={busy} type="submit">{busy ? 'Guardando…' : confirmation ? 'Confirmar' : 'Guardar'}</button><button className="admin-secondary min-h-11 rounded-[10px] px-5 text-sm font-semibold disabled:opacity-60" disabled={busy} onClick={onCancel} type="button">Volver</button></div>
+  </form>
+}
+
+function CompleteAppointmentForm({ busy, error, onSave, onCancel }: {
+  busy: boolean; error: string | null;
+  onSave: (values: CompleteAppointmentPayload) => Promise<void>; onCancel: () => void
+}) {
+  const [actividad, setActividad] = useState('')
+  const [precio, setPrecio] = useState('')
+  const [validation, setValidation] = useState<string | null>(null)
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (busy) return
+    const name = actividad.trim()
+    if (!name || name.length > 255) { setValidation('Indica la actividad realizada (máximo 255 caracteres).'); return }
+    const amount = Number(precio)
+    if (!/^\d+(?:\.\d{1,2})?$/.test(precio) || !Number.isFinite(amount) || amount > 99999999.99) {
+      setValidation('Ingresa un precio válido con hasta dos decimales.'); return
+    }
+    setValidation(null)
+    void onSave({ actividad: name, precio: amount })
+  }
+  return <form aria-label="Actividad realizada en la cita" noValidate onSubmit={submit}>
+    <p className="admin-body text-sm">Al completar la cita, la actividad y su precio aparecerán en Actividades. El diagnóstico y el tratamiento deben estar registrados.</p>
+    <div className="mt-5 grid gap-4 sm:grid-cols-[minmax(0,1fr)_170px]">
+      <label className="text-sm font-medium text-ink-950">Actividad realizada<input className={inputClass} data-dialog-initial disabled={busy} maxLength={255} onChange={(event) => { setActividad(event.target.value); setValidation(null) }} placeholder="Ej. limpieza dental" type="text" value={actividad}/></label>
+      <label className="text-sm font-medium text-ink-950">Precio<input className={inputClass} disabled={busy} inputMode="decimal" max="99999999.99" min="0" onChange={(event) => { setPrecio(event.target.value); setValidation(null) }} placeholder="0.00" step="0.01" type="number" value={precio}/></label>
+    </div>
+    {validation || error ? <p className="mt-4 text-sm text-red-700" role="alert">{validation ?? error}</p> : null}
+    <div className="mt-6 flex flex-wrap gap-3"><button className="admin-primary min-h-11 rounded-[10px] px-5 text-sm font-semibold disabled:opacity-60" disabled={busy} type="submit">{busy ? 'Guardando…' : 'Completar cita'}</button><button className="admin-secondary min-h-11 rounded-[10px] px-5 text-sm font-semibold disabled:opacity-60" disabled={busy} onClick={onCancel} type="button">Volver</button></div>
   </form>
 }
 
@@ -183,7 +213,7 @@ export function MedicalAppointmentsPage() {
 
   const openDialog = (next: DialogState, trigger: HTMLElement) => { dialogTrigger.current = trigger; setActionError(null); setDialog(next) }
   const closeDialog = () => { if (pendingMutation.current) return; setDialog(null); setActionError(null); dialogTrigger.current?.focus() }
-  const save = async (values?: AppointmentValues) => {
+  const save = async (values?: AppointmentValues, completion?: CompleteAppointmentPayload) => {
     if (!dialog || pendingMutation.current) return
     pendingMutation.current = true; setBusy(true); setActionError(null)
     try {
@@ -191,11 +221,15 @@ export function MedicalAppointmentsPage() {
       if (dialog.kind === 'program' && values) message = await programRequest(dialog.entry.id, { fecha: values.fecha, hora_inicio: values.hora_inicio, hora_fin: values.hora_fin })
       else if (dialog.kind === 'edit' && values) message = await updateAgendaEntry(dialog.entry.id, { fecha: values.fecha, hora_inicio: values.hora_inicio, hora_fin: values.hora_fin, descripcion: values.descripcion ?? null })
       else if (dialog.kind === 'cancel') message = await cancelAppointment(dialog.entry.id)
-      else if (dialog.kind === 'complete') message = await completeAppointment(dialog.entry.id)
+      else if (dialog.kind === 'complete' && completion) message = await completeAppointment(dialog.entry.id, completion)
       else if (dialog.kind === 'delete') message = await deleteAgendaEntry(dialog.entry.id)
       else return
       void markClinicalQueriesStale(['dashboard-report'])
       void markClinicalQueriesStale(['reports'])
+      if (dialog.kind === 'complete') {
+        void markClinicalQueriesStale(['activities'])
+        void markClinicalQueriesStale(['activities-total'])
+      }
       if (await load()) { setSuccess(message); setDialog(null); pageHeading.current?.focus() }
       else setActionError('El cambio se confirmó, pero no fue posible actualizar las citas. Reintenta la consulta.')
     } catch (error) { setActionError(errorMessage(error)) }
@@ -243,6 +277,6 @@ export function MedicalAppointmentsPage() {
       {state.pending.length > 0 ? <section aria-labelledby="pending-requests-title" className="admin-surface rounded-[20px] p-5 sm:p-6"><h2 className="text-xl font-semibold text-ink-950" id="pending-requests-title">Solicitudes pendientes</h2><ul className="mt-4 grid gap-3 md:grid-cols-2">{state.pending.map((entry) => <li className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[#dbe6f2] p-4" key={entry.id}><div><p className="font-semibold text-ink-950">{entry.paciente?.nombres ?? 'Paciente no disponible'}</p>{entry.paciente?.codigo_paciente ? <p className="admin-muted text-sm">Código: {entry.paciente.codigo_paciente}</p> : null}</div><button className="admin-primary min-h-11 rounded-lg px-4 text-sm font-semibold" onClick={(event) => openDialog({ kind: 'program', entry }, event.currentTarget)} type="button">Programar</button></li>)}</ul></section> : null}
       {pendingQuery.isError ? <ErrorState description={errorMessage(pendingQuery.error)} onRetry={() => { void pendingQuery.refetch() }}/>: null}
     </>}
-    {dialog ? <AccessibleDialog busy={busy} onClose={closeDialog} title={dialog.kind === 'clinical' ? clinicalActionLabel(dialog.entry) : dialogTitles[dialog.kind]} titleId="appointment-dialog-title">{dialog.kind === 'clinical' ? <ClinicalDataForm busy={busy} entry={dialog.entry} error={actionError} key={dialog.entry.id} onCancel={closeDialog} onSave={saveClinical}/> : <AppointmentDialogForm busy={busy} dialog={dialog} error={actionError} key={`${dialog.kind}-${dialog.entry.id}`} onCancel={closeDialog} onSave={save}/>}</AccessibleDialog> : null}
+    {dialog ? <AccessibleDialog busy={busy} onClose={closeDialog} title={dialog.kind === 'clinical' ? clinicalActionLabel(dialog.entry) : dialogTitles[dialog.kind]} titleId="appointment-dialog-title">{dialog.kind === 'clinical' ? <ClinicalDataForm busy={busy} entry={dialog.entry} error={actionError} key={dialog.entry.id} onCancel={closeDialog} onSave={saveClinical}/> : dialog.kind === 'complete' ? <CompleteAppointmentForm busy={busy} error={actionError} key={dialog.entry.id} onCancel={closeDialog} onSave={(values) => save(undefined, values)}/> : <AppointmentDialogForm busy={busy} dialog={dialog} error={actionError} key={`${dialog.kind}-${dialog.entry.id}`} onCancel={closeDialog} onSave={save}/>}</AccessibleDialog> : null}
   </div>
 }

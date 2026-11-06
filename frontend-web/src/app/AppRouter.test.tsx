@@ -33,7 +33,7 @@ vi.mock('../features/clinical-history/clinicalHistoryService', () => ({
   updateClinicalHistory: vi.fn(),
 }))
 vi.mock('../features/evidence/evidenceService', () => ({ getPatientEvidence: vi.fn(() => Promise.resolve([])) }))
-vi.mock('../features/cash/cashService', () => ({ getCashSummary: vi.fn(() => Promise.resolve({ periodo: 'mes', ingresos: '0.00', egresos: '0.00', saldo: '0.00' })), getExpenses: vi.fn(() => Promise.resolve([])) }))
+  vi.mock('../features/cash/cashService', () => ({ getCashSummary: vi.fn(() => Promise.resolve({ periodo: 'mes', ingresos: '0.00', egresos: '0.00', saldo: '0.00', movimientos: [] })) }))
 vi.mock('../features/audit/auditService', () => ({ getRecordedActions: vi.fn(() => Promise.resolve([])), getRecordedSessions: vi.fn(() => Promise.resolve([])) }))
 vi.mock('../features/auth/profilePhotoService', () => ({ getProfilePhoto: vi.fn(), uploadProfilePhoto: vi.fn(), deleteProfilePhoto: vi.fn() }))
 
