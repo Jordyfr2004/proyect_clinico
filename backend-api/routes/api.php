@@ -46,11 +46,16 @@ Route::get('/user', function (Request $request) {
 // Autenticación
 
 Route::prefix('auth')->group(function () {
+
     Route::post('/login', [AuthController::class, 'login'])
         ->middleware('throttle:auth-login');
 
     Route::post('/register-paciente', [AuthController::class, 'registerPaciente'])
         ->middleware('throttle:auth-register');
+
+    Route::post('/verify-email', [AuthController::class, 'verifyEmail']);
+
+    Route::post('/resend-verification-code', [AuthController::class, 'resendVerificationCode']);
 
     Route::post('/forgot-password', [PasswordController::class, 'forgotPassword'])
         ->middleware('throttle:password-forgot');
@@ -58,11 +63,11 @@ Route::prefix('auth')->group(function () {
     Route::post('/reset-password', [PasswordController::class, 'resetPassword'])
         ->middleware('throttle:password-reset');
 
-
     Route::post('/logout', [AuthController::class, 'logout'])
         ->middleware('auth:sanctum');
-        
+
 });
+
 
 // Usuarios
 Route::middleware('auth:sanctum', 'role:doctora')->prefix('usuarios')->group(function () {
