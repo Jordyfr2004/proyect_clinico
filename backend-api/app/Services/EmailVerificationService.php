@@ -161,9 +161,9 @@ class EmailVerificationService
                 $user,
                 $registro
             ) {
-                $user->update([
+                $user->forceFill([
                     'email_verified_at' => now(),
-                ]);
+                ])->save();
 
                 $registro->update([
                     'used_at' => now(),
