@@ -1,6 +1,6 @@
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useCallback, useState } from "react";
-import { StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import {
   AppHeader,
   Button,
@@ -18,6 +18,7 @@ import {
   requestAppointment,
 } from "@/features/patient/appointments";
 import { useRemote } from "@/hooks/use-remote";
+import { formatScheduledAppointment } from "@/features/patient/appointment-display";
 
 const appointmentTypeLabel = (type: string) =>
   type === "cita_medica" ? "Cita médica" : type.replaceAll("_", " ");
@@ -30,6 +31,7 @@ export default function Appointments() {
   const [submitError, setSubmitError] = useState("");
   const [refreshWarning, setRefreshWarning] = useState("");
   const [requestConfirmed, setRequestConfirmed] = useState(false);
+  const [selectedSchedule, setSelectedSchedule] = useState<string | null>(null);
   const hasPendingRequest =
     data?.some((item) => item.status.toLowerCase() === "pendiente") ?? false;
   const pendingOrConfirmed = hasPendingRequest || requestConfirmed;
@@ -103,8 +105,18 @@ export default function Appointments() {
         <LoadingState />
       ) : unavailable ? null : data?.length ? (
         <View style={styles.list}>
-          {data.map((item) => (
-            <Card key={item.id}>
+          {data.map((item) => {
+            const schedule = item.status.toLowerCase() === "programada"
+              ? formatScheduledAppointment(item.date, item.startTime)
+              : null;
+            return <Pressable
+              key={item.id}
+              accessibilityRole={schedule ? "button" : undefined}
+              accessibilityLabel={schedule ? `Ver cita programada, ${schedule}` : undefined}
+              disabled={!schedule}
+              onPress={() => setSelectedSchedule(schedule)}
+            >
+              <Card>
               <View style={styles.top}>
                 <View style={styles.calendar}>
                   <MaterialCommunityIcons
@@ -115,7 +127,9 @@ export default function Appointments() {
                 </View>
                 <View style={styles.copy}>
                   <Text style={styles.title}>
-                    {item.date
+                    {schedule
+                      ? "Cita programada"
+                      : item.date
                       ? `Cita del ${item.date}`
                       : "Solicitud pendiente de programación"}
                   </Text>
@@ -132,7 +146,9 @@ export default function Appointments() {
                   color={palette.textMuted}
                 />
                 <Text style={styles.metaText}>
-                  {item.startTime
+                  {schedule
+                    ? "Toca para ver día y hora"
+                    : item.startTime
                     ? `${item.startTime}${item.endTime ? ` – ${item.endTime}` : ""}`
                     : "Aún sin horario asignado"}
                 </Text>
@@ -140,8 +156,9 @@ export default function Appointments() {
               {item.description ? (
                 <Text style={styles.description}>{item.description}</Text>
               ) : null}
-            </Card>
-          ))}
+              </Card>
+            </Pressable>;
+          })}
         </View>
       ) : (
         <EmptyState
@@ -158,10 +175,44 @@ export default function Appointments() {
           onPress={() => void refresh()}
         />
       )}
+      {selectedSchedule ? (
+        <Modal
+          transparent
+          animationType="fade"
+          visible
+          onRequestClose={() => setSelectedSchedule(null)}
+        >
+          <View style={styles.modalBackdrop}>
+            <Pressable style={styles.modalDismiss} onPress={() => setSelectedSchedule(null)} />
+            <View style={styles.modalCard}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Cerrar"
+                onPress={() => setSelectedSchedule(null)}
+                style={styles.modalClose}
+              >
+                <MaterialCommunityIcons name="close" size={22} color={palette.textMuted} />
+              </Pressable>
+              <View style={styles.modalIcon}>
+                <MaterialCommunityIcons name="calendar-check-outline" size={28} color={palette.primary} />
+              </View>
+              <Text style={styles.modalTitle}>Cita agendada</Text>
+              <Text style={styles.modalSchedule}>{selectedSchedule}</Text>
+            </View>
+          </View>
+        </Modal>
+      ) : null}
     </Screen>
   );
 }
 const styles = StyleSheet.create({
+  modalBackdrop: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: palette.scrim, padding: space.lg },
+  modalDismiss: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0 },
+  modalCard: { width: "100%", maxWidth: 340, alignItems: "center", paddingHorizontal: space.lg, paddingTop: space.xl, paddingBottom: space.xl, borderRadius: 22, backgroundColor: palette.surface },
+  modalClose: { position: "absolute", top: space.sm, right: space.sm, width: 36, height: 36, alignItems: "center", justifyContent: "center", zIndex: 1 },
+  modalIcon: { width: 58, height: 58, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: palette.primarySoft, marginBottom: space.md },
+  modalTitle: { color: palette.navy, ...typography.section, textAlign: "center", marginBottom: space.xs },
+  modalSchedule: { color: palette.textMuted, ...typography.body, textAlign: "center" },
   list: { gap: space.md },
   top: { flexDirection: "row", alignItems: "center", gap: space.sm },
   calendar: {

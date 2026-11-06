@@ -83,6 +83,23 @@ describe('API client', () => {
     expect(unauthorized).toHaveBeenCalledTimes(1);
   });
 
+  test('keeps the verification flag and email from a pending login', async () => {
+    (globalThis.fetch as jest.Mock).mockResolvedValue(response(422, {
+      message: 'The given data was invalid.',
+      errors: {
+        username: ['Debes verificar tu correo antes de iniciar sesión.'],
+        requires_verification: [true],
+        email: ['ana@example.com'],
+      },
+    }));
+
+    await expect(apiRequest('/auth/login')).rejects.toMatchObject({
+      status: 422,
+      requiresVerification: true,
+      verificationEmail: 'ana@example.com',
+    });
+  });
+
   test('clears the session when a proxy returns a malformed 401 body', async () => {
     const unauthorized = jest.fn();
     setUnauthorizedHandler(unauthorized);

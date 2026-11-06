@@ -117,4 +117,14 @@ describe("patient API contracts", () => {
       })[0].price,
     ).toBe("20.00");
   });
+
+  test("keeps optional service price and duration empty when Laravel omits them", () => {
+    const [service] = parseServices({ data: [{
+      id: "s2", categoria_id: "c1", nombre: "Valoración", descripcion: null,
+      precio: null, duracion_minutos: null, imagen: "https://example.com/valoracion.jpg",
+      categoria: { id: "c1", nombre: "Consulta" },
+    }] });
+    expect(service.price).toBeNull();
+    expect(service.durationMinutes).toBeNull();
+  });
 });

@@ -16,8 +16,8 @@ export type ClinicService = {
   categoryId: string;
   name: string;
   description: string | null;
-  price: string;
-  durationMinutes: number;
+  price: string | null;
+  durationMinutes: number | null;
   image: string | null;
   category: { id: string; name: string };
 };
@@ -32,15 +32,15 @@ const service = (value: unknown): ClinicService => {
   const r = asRecord(value, "El servicio");
   const c = asRecord(r.categoria, "La categoría del servicio");
   const duration = r.duracion_minutos;
-  if (typeof duration !== "number")
+  if (duration !== null && duration !== undefined && typeof duration !== "number")
     throw new Error("duracion_minutos no tiene un formato válido");
   return {
     id: asString(r, "id"),
     categoryId: asString(r, "categoria_id"),
     name: asString(r, "nombre"),
     description: asOptionalString(r, "descripcion"),
-    price: asString(r, "precio"),
-    durationMinutes: duration,
+    price: asOptionalString(r, "precio"),
+    durationMinutes: duration == null ? null : duration as number,
     image: asOptionalString(r, "imagen"),
     category: { id: asString(c, "id"), name: asString(c, "nombre") },
   };

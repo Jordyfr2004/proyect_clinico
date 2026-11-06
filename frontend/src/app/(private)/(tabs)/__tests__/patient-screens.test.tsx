@@ -144,6 +144,31 @@ describe("patient screens", () => {
     expect(screen.getByText("Sin servicios disponibles")).toBeTruthy();
   });
 
+  test("shows service image, category and available details after filtering", () => {
+    const categories = { data: [{ id: "c1", name: "Consulta" }, { id: "c2", name: "Tratamientos" }], loading: false, error: "", reload: jest.fn() };
+    const services = { data: [
+        { id: "s1", categoryId: "c1", name: "Valoración", description: "Revisión inicial", price: "20.00", durationMinutes: 30, image: "https://example.com/consulta.jpg", category: { id: "c1", name: "Consulta" } },
+        { id: "s2", categoryId: "c2", name: "Limpieza", description: null, price: null, durationMinutes: null, image: "javascript:bad", category: { id: "c2", name: "Tratamientos" } },
+      ], loading: false, error: "", reload: jest.fn() };
+    let calls = 0;
+    (useRemote as jest.Mock).mockImplementation(() => (++calls % 2 ? categories : services));
+
+    renderScreen(<Services />);
+    expect(screen.getByLabelText("Imagen de Valoración")).toBeTruthy();
+    expect(screen.getByText("Revisión inicial")).toBeTruthy();
+    expect(screen.getByText("30 min")).toBeTruthy();
+    expect(screen.getByText("$20.00")).toBeTruthy();
+    expect(screen.queryByLabelText("Imagen de Limpieza")).toBeNull();
+
+    fireEvent.press(screen.getByRole("button", { name: "Elegir categoría, Todos los servicios" }));
+    fireEvent.press(screen.getByRole("button", { name: "Tratamientos" }));
+    expect(screen.queryByText("Valoración")).toBeNull();
+    expect(screen.getByText("Limpieza")).toBeTruthy();
+    expect(screen.getByText("Consultar precio")).toBeTruthy();
+    expect(screen.getByRole("button", { name: "Elegir categoría, Tratamientos" })).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Consulta" })).toBeNull();
+  });
+
   test("disables appointment requests during the initial load", () => {
     (useRemote as jest.Mock).mockReturnValue({
       data: null,
@@ -302,7 +327,8 @@ describe("patient screens", () => {
     renderScreen(<Appointments />);
 
     expect(screen.getByText("No se pudo actualizar el listado.")).toBeTruthy();
-    expect(screen.getByText("Cita del 2026-10-20")).toBeTruthy();
+    expect(screen.getByText("Cita programada")).toBeTruthy();
+    expect(screen.getByText("Toca para ver día y hora")).toBeTruthy();
     expect(screen.queryByText("Aún no tienes citas")).toBeNull();
   });
 
@@ -331,6 +357,30 @@ describe("patient screens", () => {
 
     expect(screen.getByText("Cita médica")).toBeTruthy();
     expect(screen.queryByText("cita_medica")).toBeNull();
+  });
+
+  test("opens a short schedule window only for a programmed appointment", () => {
+    (useRemote as jest.Mock).mockReturnValue({
+      data: [
+        { id: "a1", patientId: "p1", date: "2026-11-11", startTime: "13:00:00", endTime: "14:00:00", type: "cita_medica", description: null, status: "programada", createdAt: "2026-01-01", updatedAt: "2026-01-01" },
+        { id: "a2", patientId: "p1", date: null, startTime: null, endTime: null, type: "cita_medica", description: null, status: "pendiente", createdAt: "2026-01-01", updatedAt: "2026-01-01" },
+      ],
+      loading: false,
+      error: "",
+      reload: jest.fn(),
+    });
+
+    renderScreen(<Appointments />);
+    expect(screen.queryByText("Cita agendada")).toBeNull();
+    expect(screen.queryByText("2026-11-11")).toBeNull();
+    expect(screen.queryByText("13:00:00 – 14:00:00")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Ver solicitud pendiente/ })).toBeNull();
+    fireEvent.press(screen.getByRole("button", { name: /Ver cita programada/ }));
+    expect(screen.getByText("Cita agendada")).toBeTruthy();
+    expect(screen.getByText("Miércoles 11 de noviembre, 13:00")).toBeTruthy();
+    expect(screen.queryByText("14:00")).toBeNull();
+    fireEvent.press(screen.getByRole("button", { name: "Cerrar" }));
+    expect(screen.queryByText("Cita agendada")).toBeNull();
   });
 
   test("rejects an unsupported profile image when Android omits its MIME type", async () => {

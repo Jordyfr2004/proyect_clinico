@@ -31,6 +31,8 @@ function Probe() {
       <Text testID="status">{auth.status}</Text>
       <Text testID="name">{auth.user?.name ?? 'sin usuario'}</Text>
       <Button title="Ingresar" onPress={() => auth.signIn('0102030405', 'password123')} />
+      <Button title="Registrar" onPress={() => auth.signUp({ nombres: 'Ana', cedula: '0102030405', email: 'ana@example.com', telefono: '0999999999', direccion: 'Quito', fecha_nacimiento: '1990-01-01', password: 'password123', password_confirmation: 'password123' })} />
+      <Button title="Verificar" onPress={() => auth.verifyEmail('ana@example.com', '123456')} />
       <Button title="Salir" onPress={() => auth.signOut()} />
     </View>
   );
@@ -96,6 +98,22 @@ describe('AuthProvider', () => {
     fireEvent.press(screen.getByText('Salir'));
     await waitFor(() => expect(screen.getByTestId('status').props.children).toBe('anonymous'));
     expect(sessionStorage.clearAccessToken).toHaveBeenCalled();
+  });
+
+  test('registration stays anonymous until the code is verified', async () => {
+    (authService.registerPatient as jest.Mock).mockResolvedValue('ana@example.com');
+    (authService.verifyEmail as jest.Mock).mockResolvedValue({ accessToken: 'verified-token', tokenType: 'Bearer', user });
+    render(<AuthProvider><Probe /></AuthProvider>);
+    await waitFor(() => expect(screen.getByTestId('status').props.children).toBe('anonymous'));
+
+    fireEvent.press(screen.getByText('Registrar'));
+    await waitFor(() => expect(authService.registerPatient).toHaveBeenCalled());
+    expect(screen.getByTestId('status').props.children).toBe('anonymous');
+    expect(sessionStorage.saveAccessToken).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByText('Verificar'));
+    await waitFor(() => expect(screen.getByTestId('status').props.children).toBe('authenticated'));
+    expect(sessionStorage.saveAccessToken).toHaveBeenCalledWith('verified-token');
   });
 
   test('drops the in-memory session after a 401 even if SecureStore deletion fails', async () => {
