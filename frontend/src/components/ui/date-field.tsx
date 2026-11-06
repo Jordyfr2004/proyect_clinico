@@ -14,6 +14,26 @@ import {
 
 export const formatDateForApi = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+const monthNames = [
+  "enero",
+  "febrero",
+  "marzo",
+  "abril",
+  "mayo",
+  "junio",
+  "julio",
+  "agosto",
+  "septiembre",
+  "octubre",
+  "noviembre",
+  "diciembre",
+];
+export const formatDateForDisplay = (value: string) => {
+  const match = /^(\d{4})-(\d{2})-(\d{2})(?:T.*)?$/.exec(value);
+  if (!match) return value;
+  const monthName = monthNames[Number(match[2]) - 1];
+  return monthName ? `${match[3]} de ${monthName} de ${match[1]}` : value;
+};
 export const applyDateSelection = (
   current: string,
   eventType: DateTimePickerEvent["type"],
@@ -58,7 +78,7 @@ export function DateField({
           color={palette.textMuted}
         />
         <Text style={[styles.value, !value && styles.placeholder]}>
-          {value || "Seleccionar fecha"}
+          {value ? formatDateForDisplay(value) : "Seleccionar fecha"}
         </Text>
         <MaterialCommunityIcons
           name="chevron-down"

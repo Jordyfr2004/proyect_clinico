@@ -19,7 +19,10 @@ import { ApiError } from "@/api/errors";
 
 jest.mock("@/hooks/use-remote", () => ({ useRemote: jest.fn() }));
 jest.mock("@/features/auth/auth-context", () => ({
-  useAuth: () => ({ signOut: jest.fn() }),
+  useAuth: () => ({
+    signOut: jest.fn(),
+    user: { email: "ana@example.com" },
+  }),
 }));
 jest.mock("@/features/patient/profile", () => ({
   getProfile: jest.fn(),
@@ -413,5 +416,48 @@ describe("patient screens", () => {
 
     expect(screen.getByText("Ana Pérez")).toBeTruthy();
     expect(screen.queryByText("Cargando información…")).toBeNull();
+  });
+
+  test("shows the signed-in email in the patient profile", () => {
+    (useRemote as jest.Mock).mockReturnValue({
+      data: {
+        photoUrl: null,
+        code: "PAC-1",
+        names: "Ana PÃ©rez",
+        nationalId: "0102",
+        phone: "099",
+        address: "Quito",
+        birthdate: "1990-01-01",
+      },
+      loading: false,
+      error: "",
+      reload: jest.fn(),
+    });
+
+    renderScreen(<Profile />);
+
+    expect(screen.getByText("Correo")).toBeTruthy();
+    expect(screen.getByText("ana@example.com")).toBeTruthy();
+  });
+
+  test("shows the birthdate in a Spanish day-month-year format", () => {
+    (useRemote as jest.Mock).mockReturnValue({
+      data: {
+        photoUrl: null,
+        code: "PAC-1",
+        names: "Ana PÃ©rez",
+        nationalId: "0102",
+        phone: "099",
+        address: "Quito",
+        birthdate: "1990-10-08",
+      },
+      loading: false,
+      error: "",
+      reload: jest.fn(),
+    });
+
+    renderScreen(<Profile />);
+
+    expect(screen.getByText("08 de octubre de 1990")).toBeTruthy();
   });
 });

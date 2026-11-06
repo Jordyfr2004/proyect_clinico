@@ -12,6 +12,7 @@ import {
   Screen,
   Section,
 } from "@/components/ui/patient-ui";
+import { formatDateForDisplay } from "@/components/ui/date-field";
 import {
   elevation,
   palette,
@@ -47,7 +48,7 @@ const resolvePhotoMime = (asset: ImagePicker.ImagePickerAsset) => {
 };
 
 export default function Profile() {
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const loader = useCallback(() => getProfile(), []);
   const { data, loading, error, reload } = useRemote(loader);
   const [busy, setBusy] = useState(false);
@@ -178,6 +179,9 @@ export default function Profile() {
               icon="card-account-details-outline"
             />
             <InfoRow label="Teléfono" value={data.phone} icon="phone-outline" />
+            {user?.email ? (
+              <InfoRow label="Correo" value={user.email} icon="email-outline" />
+            ) : null}
             <InfoRow
               label="Dirección"
               value={data.address}
@@ -185,7 +189,7 @@ export default function Profile() {
             />
             <InfoRow
               label="Fecha de nacimiento"
-              value={data.birthdate}
+              value={formatDateForDisplay(data.birthdate)}
               icon="calendar-outline"
               last
             />
