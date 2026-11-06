@@ -1,6 +1,5 @@
 import { isAxiosError } from 'axios'
 import { useRef, useState, type FormEvent } from 'react'
-import { Link } from 'react-router-dom'
 import { EmptyState } from '../../components/states/EmptyState'
 import { ErrorState } from '../../components/states/ErrorState'
 import { LoadingState } from '../../components/states/LoadingState'
@@ -107,7 +106,7 @@ export function CatalogPage() {
     : undefined
 
   return <div className="admin-reveal max-w-[1200px] space-y-6">
-    <header><p className="admin-kicker">Administración</p><h1 className="admin-page-title mt-2">Servicios del consultorio</h1><p className="admin-body mt-2">Gestiona las categorías y los servicios registrados.</p><Link className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-clinic-700 underline" to="/configuracion">Volver a Configuración</Link></header>
+    <header><p className="admin-kicker">Administración</p><h1 className="admin-page-title mt-2">Mis servicios</h1><p className="admin-body mt-2">Gestiona las categorías y los servicios que ofreces a tus pacientes.</p></header>
     {error ? <p className="rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700" role="alert">{error}</p> : null}
     {success ? <p className="admin-success rounded-lg p-4 text-sm" role="status">{success}</p> : null}
     {categoriesQuery.data ? <>

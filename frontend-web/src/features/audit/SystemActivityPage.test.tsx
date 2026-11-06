@@ -15,7 +15,7 @@ describe('SystemActivityPage', () => {
     expect(screen.getByRole('heading', { name: 'Configuración' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Actividad del sistema/ })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /Sesiones/ })).toBeInTheDocument()
-    expect(screen.getByRole('link', { name: /Categorías y servicios/ })).toHaveAttribute('href', '/servicios')
+    expect(screen.queryByRole('link', { name: /Categorías y servicios/ })).not.toBeInTheDocument()
     expect(getRecordedActions).not.toHaveBeenCalled()
     expect(getRecordedSessions).not.toHaveBeenCalled()
     fireEvent.change(screen.getByRole('searchbox', { name: 'Buscar en configuración' }), { target: { value: 'sesiones' } })

@@ -51,12 +51,15 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
 }
 .admin-shell :is(button, a, input, textarea, select) { transition: color .2s ease, background-color .2s ease, border-color .2s ease, box-shadow .2s ease, transform .2s ease; }
 .admin-shell :is(button, a, input, textarea, select):focus-visible { outline-color: var(--primary-bright); }
-.admin-sidebar { position: relative; isolation: isolate; overflow: hidden; color: #e8f4ff; background: linear-gradient(160deg, #061632 4%, #092958 57%, #071a3d 100%); border-right: 1px solid rgb(114 192 255 / 19%); }
-.admin-sidebar::before { content: ''; position: absolute; z-index: -1; width: 340px; height: 340px; top: -180px; right: -175px; border: 1px solid rgb(102 209 255 / 20%); border-radius: 50%; box-shadow: 0 0 0 54px rgb(76 184 255 / 3%), 0 0 0 110px rgb(76 184 255 / 2%); pointer-events: none; }
-.admin-brand-mark { color: #b5e8ff; background: linear-gradient(145deg, rgb(23 111 218 / 44%), rgb(55 200 243 / 15%)); border: 1px solid rgb(149 226 255 / 40%); box-shadow: inset 0 1px rgb(255 255 255 / 18%), 0 7px 22px rgb(0 4 29 / 17%); }
+.admin-sidebar { position: relative; isolation: isolate; overflow: hidden; color: #eaf7ff; background: radial-gradient(ellipse at 105% 118%, rgb(0 184 213 / 68%), rgb(2 111 154 / 37%) 29%, transparent 52%), radial-gradient(ellipse at 3% 3%, rgb(8 94 140 / 45%), transparent 45%), linear-gradient(175deg, #06223d 0%, #08385a 52%, #07304e 100%); border-right: 1px solid rgb(74 177 216 / 26%); }
+.admin-sidebar-scroll { scrollbar-width: none; -ms-overflow-style: none; }
+.admin-sidebar-scroll::-webkit-scrollbar { display: none; }
+.admin-sidebar::before { content: ''; position: absolute; z-index: -1; width: 340px; height: 340px; top: -180px; right: -175px; border: 1px solid rgb(74 200 238 / 17%); border-radius: 50%; box-shadow: 0 0 0 54px rgb(20 159 213 / 4%), 0 0 0 110px rgb(15 143 201 / 3%); pointer-events: none; }
+.admin-sidebar::after { content: ''; position: absolute; z-index: -1; right: 0; bottom: 0; left: 0; height: 135px; background: linear-gradient(125deg, #075481 10%, #08779b 62%, #0b9db3 100%); clip-path: ellipse(105% 92% at 100% 100%); pointer-events: none; }
+.admin-brand-mark { color: #d6f7ff; background: linear-gradient(145deg, #07598a, #087eaa); border: 1px solid rgb(37 192 234 / 55%); box-shadow: inset 0 1px rgb(255 255 255 / 22%), 0 7px 22px rgb(0 15 39 / 20%); }
 .admin-nav-link { position: relative; border: 1px solid transparent; transition: background-color .2s ease, color .2s ease, border-color .2s ease, transform .2s ease; }
 .admin-nav-link:hover { transform: translateX(2px); }
-.admin-nav-link[aria-current="page"] { color: #fff; background: linear-gradient(90deg, rgb(21 110 219 / 42%), rgb(35 134 230 / 14%)); border-color: rgb(116 204 255 / 23%); box-shadow: inset 0 1px rgb(255 255 255 / 9%), 0 5px 18px rgb(0 10 42 / 10%); }
+.admin-nav-link[aria-current="page"] { color: #fff; background: linear-gradient(100deg, #0879ce, #15578e); border-color: rgb(73 187 239 / 29%); box-shadow: inset 0 1px rgb(255 255 255 / 12%), 0 5px 18px rgb(0 25 55 / 18%); }
 .admin-nav-link[aria-current="page"]::before { content: ""; position: absolute; inset-block: 9px; left: -10px; width: 3px; border-radius: 3px; background: var(--accent-cyan); box-shadow: 0 0 14px var(--accent-cyan); animation: admin-accent .2s ease-out both; }
 .admin-sidebar-compact .admin-nav-link[aria-current="page"] { border-color: rgb(140 219 255 / 55%); box-shadow: inset 0 0 0 1px rgb(140 219 255 / 16%), 0 5px 18px rgb(0 10 42 / 10%); }
 .admin-sidebar-compact .admin-nav-link[aria-current="page"]::before { left: 0; width: 4px; }
@@ -171,7 +174,7 @@ button:focus-visible, a:focus-visible, input:focus-visible, textarea:focus-visib
   .dashboard-shell > aside { width: 190px; }
   .dashboard-shell.admin-sidebar-collapsed { grid-template-columns: 72px minmax(0, 1fr); }
   .dashboard-shell > aside.admin-sidebar-compact-width { width: 72px; }
-  .dashboard-shell .admin-sidebar { padding: 17px 12px; background: linear-gradient(180deg, #0c213e, #071725); }
+  .dashboard-shell .admin-sidebar { padding: 17px 12px; background: radial-gradient(ellipse at 105% 118%, rgb(0 184 213 / 68%), rgb(2 111 154 / 37%) 29%, transparent 52%), radial-gradient(ellipse at 3% 3%, rgb(8 94 140 / 45%), transparent 45%), linear-gradient(175deg, #06223d 0%, #08385a 52%, #07304e 100%); }
   .dashboard-shell .admin-sidebar::before { display: none; }
   .dashboard-shell .admin-brand-mark { width: 36px; height: 36px; }
   .dashboard-shell .admin-sidebar nav a { min-height: 38px; font-size: 11px; }

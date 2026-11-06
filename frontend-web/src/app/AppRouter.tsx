@@ -117,6 +117,8 @@ export function AppRouter() {
         </Route>
         <Route element={<RestrictedRoute area="configuracion"/>}>
           <Route element={<SystemActivityPage/>} path="configuracion"/>
+        </Route>
+        <Route element={<RestrictedRoute area="servicios"/>}>
           <Route element={<CatalogPage/>} path="servicios"/>
         </Route>
         </Route>

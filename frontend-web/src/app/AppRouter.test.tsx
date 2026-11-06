@@ -53,6 +53,12 @@ function authenticatedUser(role: UserRole): AuthUser {
   return { id: 'user-id', name: 'Nombre de sesión', username: 'usuario', role, paciente_id: null, activo: true }
 }
 
+function openHeaderPhotoDialog() {
+  fireEvent.click(screen.getByRole('button', { name: 'Abrir menú de perfil' }))
+  fireEvent.click(within(screen.getByRole('menu', { name: 'Opciones de usuario' })).getByRole('menuitem', { name: 'Mi perfil / Cambiar fotografía' }))
+  return screen.getByRole('dialog', { name: 'Fotografía de perfil' })
+}
+
 describe('AppRouter', () => {
   it('loads the real history section through the existing patient route for the doctor', async () => {
     vi.mocked(getPatient).mockResolvedValueOnce({ id: 'patient-id', codigo_paciente: '001', nombres: 'Nombre recibido', cedula: '0912345678', telefono: null, direccion: null, fecha_nacimiento: null })
@@ -225,7 +231,7 @@ describe('AppRouter', () => {
     vi.spyOn(dialog, 'getClientRects').mockReturnValue({ length: 1 } as DOMRectList)
     const backdrop = within(dialog).getByRole('button', { name: 'Cerrar navegación' })
     const first = within(dialog).getByRole('button', { name: 'Cerrar menú' })
-    const last = within(dialog).getByRole('button', { name: 'Abrir menú de usuario' })
+    const last = within(dialog).getByRole('link', { name: 'Configuración' })
     expect(first).toHaveFocus()
     expect(backdrop).toHaveAttribute('tabindex', '-1')
     fireEvent.keyDown(document, { key: 'Tab', shiftKey: true })
@@ -240,12 +246,19 @@ describe('AppRouter', () => {
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
   })
 
-  it('opens the centered photo dialog and restores focus with Escape, X and Volver', () => {
+  it('opens header menu and photo dialog, restoring focus with Escape, X and Volver', () => {
     renderRouter('authenticated')
     const trigger = screen.getByRole('button', { name: 'Abrir menú de perfil' })
     fireEvent.click(trigger)
     expect(trigger).toHaveAttribute('aria-expanded', 'true')
-    const panel = screen.getByRole('dialog', { name: 'Fotografía de perfil' })
+    const menu = screen.getByRole('menu', { name: 'Opciones de usuario' })
+    expect(within(menu).getByRole('menuitem', { name: 'Mi perfil / Cambiar fotografía' })).toHaveFocus()
+    expect(within(menu).getByRole('menuitem', { name: 'Cerrar sesión' })).toBeInTheDocument()
+    fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
+    expect(trigger).toHaveFocus()
+    expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    const panel = openHeaderPhotoDialog()
+    expect(trigger).toHaveAttribute('aria-expanded', 'false')
     expect(panel).toHaveAttribute('aria-modal', 'true')
     expect(panel).toHaveClass('max-w-[420px]')
     expect(within(panel).getByText('Nombre de sesión')).toBeInTheDocument()
@@ -258,50 +271,35 @@ describe('AppRouter', () => {
     fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
     expect(trigger).toHaveFocus()
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
-    fireEvent.click(trigger)
-    fireEvent.click(within(screen.getByRole('dialog', { name: 'Fotografía de perfil' })).getByRole('button', { name: 'Volver' }))
+    const secondPanel = openHeaderPhotoDialog()
+    fireEvent.click(within(secondPanel).getByRole('button', { name: 'Volver' }))
     expect(trigger).toHaveFocus()
-    fireEvent.click(trigger)
-    fireEvent.click(within(screen.getByRole('dialog', { name: 'Fotografía de perfil' })).getByRole('button', { name: 'Cerrar' }))
+    const thirdPanel = openHeaderPhotoDialog()
+    fireEvent.click(within(thirdPanel).getByRole('button', { name: 'Cerrar' }))
     expect(trigger).toHaveFocus()
     expect(trigger).toHaveAttribute('aria-expanded', 'false')
   })
 
-  it('opens the sidebar user menu, enters photo controls, and signs out from the menu', async () => {
+  it('closes the header menu on outside click and signs out from its option', async () => {
     const { logout } = renderRouter('authenticated')
-    const sidebar = screen.getByRole('navigation', { name: 'Navegación principal' }).closest('aside') as HTMLElement
-    const trigger = within(sidebar).getByRole('button', { name: 'Abrir menú de usuario' })
-    fireEvent.click(trigger)
-    expect(trigger).toHaveAttribute('aria-expanded', 'true')
-    const menu = within(sidebar).getByRole('menu', { name: 'Opciones de usuario' })
-    expect(within(menu).getByRole('menuitem', { name: 'Mi perfil / Cambiar fotografía' })).toHaveFocus()
-    fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
-    expect(trigger).toHaveFocus()
+    const trigger = screen.getByRole('button', { name: 'Abrir menú de perfil' })
     fireEvent.click(trigger)
     fireEvent.pointerDown(document.body)
-    expect(within(sidebar).queryByRole('menu', { name: 'Opciones de usuario' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('menu', { name: 'Opciones de usuario' })).not.toBeInTheDocument()
     fireEvent.click(trigger)
-    fireEvent.click(within(sidebar).getByRole('menuitem', { name: 'Mi perfil / Cambiar fotografía' }))
-    expect(screen.getByRole('dialog', { name: 'Fotografía de perfil' })).toBeInTheDocument()
-    fireEvent.click(within(screen.getByRole('dialog', { name: 'Fotografía de perfil' })).getByRole('button', { name: 'Volver' }))
-    expect(trigger).toHaveFocus()
-    fireEvent.click(trigger)
-    fireEvent.click(within(sidebar).getByRole('menuitem', { name: 'Cerrar sesión' }))
+    fireEvent.click(within(screen.getByRole('menu', { name: 'Opciones de usuario' })).getByRole('menuitem', { name: 'Cerrar sesión' }))
     await waitFor(() => expect(logout).toHaveBeenCalledOnce())
   })
 
-  it('keeps the mobile drawer open when the user menu handles Escape', () => {
+  it('keeps the sidebar and mobile drawer free of a duplicate account menu', () => {
     renderRouter('authenticated')
+    const sidebar = screen.getByRole('navigation', { name: 'Navegación principal' }).closest('aside') as HTMLElement
+    expect(within(sidebar).queryByRole('button', { name: 'Abrir menú de usuario' })).not.toBeInTheDocument()
     const drawerTrigger = screen.getByRole('button', { name: 'Abrir menú' })
     fireEvent.click(drawerTrigger)
     const drawer = screen.getByRole('dialog', { name: 'Menú de navegación' })
-    const userTrigger = within(drawer).getByRole('button', { name: 'Abrir menú de usuario' })
-    fireEvent.click(userTrigger)
-    expect(within(drawer).getByRole('menu', { name: 'Opciones de usuario' })).toBeInTheDocument()
-    fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
-    expect(within(drawer).queryByRole('menu', { name: 'Opciones de usuario' })).not.toBeInTheDocument()
-    expect(drawerTrigger).toHaveAttribute('aria-expanded', 'true')
-    expect(userTrigger).toHaveFocus()
+    expect(within(drawer).queryByRole('button', { name: 'Abrir menú de usuario' })).not.toBeInTheDocument()
+    expect(within(drawer).getByRole('link', { name: 'Configuración' })).toBeInTheDocument()
   })
 
   it('synchronizes the large photo and header avatar after upload and confirmed deletion', async () => {
@@ -311,10 +309,9 @@ describe('AppRouter', () => {
     vi.mocked(getProfilePhoto).mockResolvedValue(new Blob(['photo'], { type: 'image/png' }))
     vi.mocked(deleteProfilePhoto).mockResolvedValue(null)
     renderRouter('authenticated')
-    fireEvent.click(screen.getByRole('button', { name: 'Abrir menú de perfil' }))
-    const panel = screen.getByRole('dialog', { name: 'Fotografía de perfil' })
+    const panel = openHeaderPhotoDialog()
     fireEvent.change(within(panel).getByLabelText('Seleccionar foto'), { target: { files: [new File(['photo'], 'perfil.png', { type: 'image/png' })] } })
-    await waitFor(() => expect(document.querySelectorAll('img[src="blob:profile-photo"]')).toHaveLength(3))
+    await waitFor(() => expect(document.querySelectorAll('img[src="blob:profile-photo"]')).toHaveLength(2))
     fireEvent.click(within(panel).getByRole('button', { name: 'Eliminar foto' }))
     fireEvent.click(within(panel).getByRole('button', { name: 'Confirmar eliminación' }))
     await waitFor(() => expect(document.querySelectorAll('img[src="blob:profile-photo"]')).toHaveLength(0))
@@ -328,8 +325,7 @@ describe('AppRouter', () => {
     vi.mocked(getProfilePhoto).mockResolvedValue(new Blob(['photo'], { type: 'image/png' }))
     renderRouter('authenticated')
     const trigger = screen.getByRole('button', { name: 'Abrir menú de perfil' })
-    fireEvent.click(trigger)
-    const panel = screen.getByRole('dialog', { name: 'Fotografía de perfil' })
+    const panel = openHeaderPhotoDialog()
     const close = within(panel).getByRole('button', { name: 'Cerrar' })
     const back = within(panel).getByRole('button', { name: 'Volver' })
     vi.spyOn(close, 'getClientRects').mockReturnValue({ length: 1 } as DOMRectList)
@@ -396,6 +392,8 @@ describe('AppRouter', () => {
     expect(Boolean(navigation.queryByRole('link', { name: 'Agenda' }))).toBe(role === 'doctora')
     expect(Boolean(navigation.queryByRole('link', { name: 'Citas médicas' }))).toBe(role === 'doctora')
     expect(Boolean(navigation.queryByRole('link', { name: 'Caja' }))).toBe(role === 'doctora')
+    expect(Boolean(navigation.queryByRole('link', { name: 'Mis servicios' }))).toBe(role === 'doctora')
+    if (role === 'doctora') expect(navigation.getByRole('link', { name: 'Mis servicios' })).toHaveAttribute('href', '/servicios')
     expect(Boolean(navigation.queryByRole('link', { name: 'Configuración' }))).toBe(role === 'doctora')
     expect(Boolean(navigation.queryByRole('link', { name: 'Reportes' }))).toBe(role === 'doctora')
     expect(navigation.getByRole('link', { name: 'Actividades' })).toBeInTheDocument()
@@ -431,7 +429,7 @@ describe('AppRouter', () => {
 
     if (permitted) {
       if (route.startsWith('/pacientes/')) expect(screen.getByRole('status')).toHaveTextContent('Cargando')
-      else expect(await screen.findByRole('heading', { name: route === '/usuarios' ? 'Usuarios' : route === '/agenda' ? 'Agenda' : route === '/citas-medicas' ? 'Citas médicas' : route === '/actividades' ? 'Actividades' : route === '/caja' ? 'Caja' : route === '/configuracion' ? 'Configuración' : route === '/reportes' ? 'Reportes' : route === '/servicios' ? 'Servicios del consultorio' : 'Pacientes' })).toBeInTheDocument()
+      else expect(await screen.findByRole('heading', { name: route === '/usuarios' ? 'Usuarios' : route === '/agenda' ? 'Agenda' : route === '/citas-medicas' ? 'Citas médicas' : route === '/actividades' ? 'Actividades' : route === '/caja' ? 'Caja' : route === '/configuracion' ? 'Configuración' : route === '/reportes' ? 'Reportes' : route === '/servicios' ? 'Mis servicios' : 'Pacientes' })).toBeInTheDocument()
       expect(screen.queryByRole('heading', { name: 'Acceso no autorizado' })).not.toBeInTheDocument()
     } else {
       expect(screen.getByRole('heading', { name: 'Acceso no autorizado' })).toBeInTheDocument()

@@ -32,6 +32,8 @@ describe('CatalogPage', () => {
 
   it('lists backend categories and services without offering broken category deletion', async () => {
     render(<MemoryRouter><CatalogPage/></MemoryRouter>)
+    expect(screen.getByRole('heading', { name: 'Mis servicios' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Volver a Configuración' })).not.toBeInTheDocument()
     const categories = await screen.findByRole('region', { name: 'Categorías' })
     expect(within(categories).getByText(category.nombre)).toBeInTheDocument()
     expect(screen.getByText(service.nombre)).toBeInTheDocument()
