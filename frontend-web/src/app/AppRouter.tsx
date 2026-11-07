@@ -1,4 +1,4 @@
-import { Link, Navigate, Outlet, Route, Routes } from 'react-router-dom'
+import { Link, Navigate, Outlet, Route, Routes, useLocation } from 'react-router-dom'
 import { LockKeyhole } from 'lucide-react'
 import { lazy, Suspense, useEffect, useState } from 'react'
 import { AUTH_FORBIDDEN_EVENT } from '../services/apiClient'
@@ -9,6 +9,7 @@ import { LoginPage } from '../features/auth/LoginPage'
 import { LoadingState } from '../components/states/LoadingState'
 import { AppLayout } from '../layouts/AppLayout'
 import { PublicLayout } from '../layouts/PublicLayout'
+import { PublicHomePage } from '../features/public-home/PublicHomePage'
 
 const DashboardPage = lazy(() => import('../features/dashboard/DashboardPage').then((module) => ({ default: module.DashboardPage })))
 const AgendaPage = lazy(() => import('../features/agenda/AgendaPage').then((module) => ({ default: module.AgendaPage })))
@@ -47,6 +48,7 @@ function RestrictedRoute({ area }: { area: RestrictedArea }) {
 
 function ProtectedArea() {
   const { status: authStatus, user, logout } = useAuth()
+  const location = useLocation()
   const [forbidden, setForbidden] = useState(false)
   const [logoutPending, setLogoutPending] = useState(false)
   useEffect(() => {
@@ -56,7 +58,7 @@ function ProtectedArea() {
     return () => window.removeEventListener(AUTH_FORBIDDEN_EVENT, onForbidden)
   }, [authStatus])
   if (authStatus === 'loading') return <LoadingSession/>
-  if (authStatus !== 'authenticated') return <Navigate replace to="/login"/>
+  if (authStatus !== 'authenticated') return location.pathname === '/' ? <PublicHomePage/> : <Navigate replace to="/inicio"/>
   if (!isStaffRole(user?.role)) return (
     <main className="grid min-h-screen place-items-center bg-slate-50 p-6">
       <section className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-6" aria-labelledby="staff-only-title">
@@ -80,8 +82,10 @@ export function AppRouter() {
 
   return (
     <Routes>
+      <Route element={<PublicHomePage/>} path="/inicio"/>
+      <Route element={authStatus === 'loading' ? <LoadingSession/> : <Navigate replace to={authStatus === 'authenticated' ? '/' : '/inicio'}/>} path="/login"/>
       <Route element={<PublicLayout/>}>
-        <Route element={authStatus === 'loading' ? <LoadingSession/> : authStatus === 'authenticated' ? <Navigate replace to="/"/> : <LoginPage/>} path="/login"/>
+        <Route element={authStatus === 'loading' ? <LoadingSession/> : authStatus === 'authenticated' ? <Navigate replace to="/"/> : <LoginPage/>} path="/acceso"/>
         <Route element={authStatus === 'loading' ? <LoadingSession/> : authStatus === 'authenticated' ? <Navigate replace to="/"/> : <ForgotPasswordPage/>} path="/recuperar-contrasena"/>
       </Route>
       <Route element={<ProtectedArea/>}>
@@ -123,7 +127,7 @@ export function AppRouter() {
         </Route>
         </Route>
       </Route>
-      <Route element={authStatus === 'loading' ? <LoadingSession/> : <Navigate replace to={authStatus === 'authenticated' ? '/' : '/login'}/>} path="*"/>
+      <Route element={authStatus === 'loading' ? <LoadingSession/> : <Navigate replace to={authStatus === 'authenticated' ? '/' : '/inicio'}/>} path="*"/>
     </Routes>
   )
 }

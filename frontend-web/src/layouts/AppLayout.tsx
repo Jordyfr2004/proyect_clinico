@@ -1,5 +1,5 @@
-import { BarChart3, CalendarClock, CalendarDays, Camera, ChevronDown, ClipboardList, Layers3, LayoutDashboard, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Settings, UserRound, UsersRound, Wallet, X, type LucideIcon } from 'lucide-react'
-import { useEffect, useId, useRef, useState } from 'react'
+import { BarChart3, CalendarDays, Camera, ChevronDown, ClipboardList, Layers3, LayoutDashboard, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Settings, UserRound, UsersRound, Wallet, X, type LucideIcon } from 'lucide-react'
+import { useEffect, useId, useRef, useState, type SVGProps } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../features/auth/authContext'
 import type { UserRole } from '../features/auth/authService'
@@ -8,22 +8,41 @@ import { ProtectedPhoto } from '../features/auth/ProtectedPhoto'
 import { ProfilePhotoControl } from '../features/auth/ProfilePhotoControl'
 import { AccessibleDialog } from '../components/ui/AccessibleDialog'
 
-type NavItem = { to: string; label: string; icon: LucideIcon; access?: RestrictedArea }
+function ToothNavIcon({ size = 18, strokeWidth = 1.8, ...props }: SVGProps<SVGSVGElement> & { size?: number; strokeWidth?: number }) {
+  return <svg {...props} fill="none" height={size} viewBox="0 0 64 72" width={size}><path d="M32 10C24 10 19 5 12 8 4 11 5 23 8 33c3 11 8 30 13 31 5 1 6-18 11-18s6 19 11 18c5-1 10-20 13-31 3-10 4-22-4-25-7-3-12 2-20 2Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth * 2.3}/></svg>
+}
+
+type NavItem = { to: string; label: string; icon: LucideIcon | typeof ToothNavIcon; tone: 'blue' | 'cyan' | 'mint' | 'violet'; access?: RestrictedArea }
 
 const navItems: NavItem[] = [
-  { to: '/', label: 'Dashboard', icon: LayoutDashboard },
-  { to: '/agenda', label: 'Agenda', icon: CalendarDays, access: 'agenda' },
-  { to: '/citas-medicas', label: 'Citas médicas', icon: CalendarClock, access: 'agenda' },
-  { to: '/actividades', label: 'Actividades', icon: ClipboardList, access: 'actividades' },
-  { to: '/caja', label: 'Caja', icon: Wallet, access: 'caja' },
-  { to: '/pacientes', label: 'Pacientes', icon: UsersRound, access: 'pacientes' },
-  { to: '/servicios', label: 'Mis servicios', icon: Layers3, access: 'servicios' },
-  { to: '/reportes', label: 'Reportes', icon: BarChart3, access: 'reportes' },
-  { to: '/usuarios', label: 'Usuarios', icon: UserRound, access: 'usuarios' },
-  { to: '/configuracion', label: 'Configuración', icon: Settings, access: 'configuracion' },
+  { to: '/', label: 'Dashboard', icon: LayoutDashboard, tone: 'blue' },
+  { to: '/agenda', label: 'Agenda', icon: CalendarDays, tone: 'cyan', access: 'agenda' },
+  { to: '/citas-medicas', label: 'Citas médicas', icon: ToothNavIcon, tone: 'mint', access: 'agenda' },
+  { to: '/actividades', label: 'Actividades', icon: ClipboardList, tone: 'violet', access: 'actividades' },
+  { to: '/caja', label: 'Caja', icon: Wallet, tone: 'mint', access: 'caja' },
+  { to: '/pacientes', label: 'Pacientes', icon: UserRound, tone: 'cyan', access: 'pacientes' },
+  { to: '/servicios', label: 'Mis servicios', icon: Layers3, tone: 'cyan', access: 'servicios' },
+  { to: '/reportes', label: 'Reportes', icon: BarChart3, tone: 'blue', access: 'reportes' },
+  { to: '/usuarios', label: 'Usuarios', icon: UsersRound, tone: 'violet', access: 'usuarios' },
+  { to: '/configuracion', label: 'Configuración', icon: Settings, tone: 'blue', access: 'configuracion' },
 ]
 
 const roleLabels: Record<UserRole, string> = { doctora: 'Doctora', asistente: 'Asistente', paciente: 'Paciente' }
+
+function BrandEmblem() {
+  const gradientId = useId()
+
+  return <span aria-hidden="true" className="admin-brand-mark">
+    <svg className="admin-brand-art" fill="none" viewBox="-12 -10 88 92">
+      <defs><linearGradient id={gradientId} x1="8" x2="58" y1="5" y2="66" gradientUnits="userSpaceOnUse"><stop stopColor="#fff"/><stop offset=".48" stopColor="#d4faff"/><stop offset="1" stopColor="#70eaff"/></linearGradient></defs>
+      <path className="admin-brand-orbit-track" d="M-10 60C8 39 31 44 52 34c10-5 18-12 25-23"/>
+      <path className="admin-brand-orbit" d="M-10 60C8 39 31 44 52 34c10-5 18-12 25-23" pathLength="100"/>
+      <path className="admin-brand-tooth-glow" d="M32 10C24 10 19 5 12 8 4 11 5 23 8 33c3 11 8 30 13 31 5 1 6-18 11-18s6 19 11 18c5-1 10-20 13-31 3-10 4-22-4-25-7-3-12 2-20 2Z"/>
+      <path className="admin-brand-tooth" d="M32 10C24 10 19 5 12 8 4 11 5 23 8 33c3 11 8 30 13 31 5 1 6-18 11-18s6 19 11 18c5-1 10-20 13-31 3-10 4-22-4-25-7-3-12 2-20 2Z" stroke={`url(#${gradientId})`}/>
+      <path className="admin-brand-highlight" d="M11 14c-4 7-2 15 1 23"/>
+    </svg>
+  </span>
+}
 
 function Sidebar({ close, compact = false, collapsed = false, toggleCollapse }: { close?: () => void; compact?: boolean; collapsed?: boolean; toggleCollapse?: () => void }) {
   const { user } = useAuth()
@@ -33,9 +52,9 @@ function Sidebar({ close, compact = false, collapsed = false, toggleCollapse }: 
     <div className={`admin-sidebar flex h-full min-h-0 flex-col py-7 ${compact ? 'admin-sidebar-compact px-2' : 'px-4'}`}>
       <div className="admin-sidebar-scroll min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto">
       <div className={`flex shrink-0 items-center border-b border-sky-200/15 pb-7 ${compact ? 'justify-center' : 'gap-3 px-2'}`}>
-        <span aria-hidden="true" className="admin-brand-mark grid size-11 shrink-0 place-items-center rounded-[14px]"><svg viewBox="0 0 64 72" fill="none" className="h-7 w-6"><path d="M32 10C24 10 19 5 12 8 4 11 5 23 8 33c3 11 8 30 13 31 5 1 6-18 11-18s6 19 11 18c5-1 10-20 13-31 3-10 4-22-4-25-7-3-12 2-20 2Z" stroke="currentColor" strokeWidth="5" strokeLinecap="round" strokeLinejoin="round"/></svg></span>
+        <BrandEmblem/>
         {!compact ? <div className="min-w-0">
-          <p className="truncate text-[15px] font-bold tracking-tight text-white">Clínica Dental</p>
+          <p className="admin-brand-name truncate text-[15px] font-bold tracking-tight text-white">Clínica Dental</p>
           <p className="mt-0.5 text-[11px] tracking-wide text-sky-200/80">Historial clínico odontológico</p>
         </div> : null}
         {close ? (
@@ -45,11 +64,11 @@ function Sidebar({ close, compact = false, collapsed = false, toggleCollapse }: 
         ) : null}
       </div>
 
-      {toggleCollapse ? <button aria-controls="desktop-sidebar-navigation" aria-expanded={!collapsed} aria-label={collapsed ? 'Expandir menú lateral' : 'Contraer menú lateral'} className={`admin-interactive mt-4 flex min-h-11 items-center rounded-lg text-sky-100 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${compact ? 'justify-center' : 'gap-3 px-3'}`} data-sidebar-toggle="true" onClick={toggleCollapse} title={collapsed ? 'Expandir menú lateral' : 'Contraer menú lateral'} type="button">{collapsed ? <PanelLeftOpen aria-hidden="true" size={18}/> : <PanelLeftClose aria-hidden="true" size={18}/>} {!compact ? <span className="text-xs font-medium">{collapsed ? 'Expandir menú' : 'Contraer menú'}</span> : null}</button> : null}
+      {toggleCollapse ? <button aria-controls="desktop-sidebar-navigation" aria-expanded={!collapsed} aria-label={collapsed ? 'Expandir menú lateral' : 'Contraer menú lateral'} className={`admin-interactive mt-4 flex min-h-11 items-center rounded-lg text-sky-100 hover:bg-white/10 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${compact ? 'justify-center' : 'gap-3 px-3'}`} data-sidebar-toggle="true" onClick={toggleCollapse} title={collapsed ? 'Expandir menú lateral' : 'Contraer menú lateral'} type="button"><span aria-hidden="true" className="admin-nav-icon admin-nav-icon-blue admin-nav-icon-toggle">{collapsed ? <PanelLeftOpen size={18}/> : <PanelLeftClose size={18}/>}</span>{!compact ? <span className="text-xs font-medium">{collapsed ? 'Expandir menú' : 'Contraer menú'}</span> : null}</button> : null}
 
       {!compact ? <p aria-hidden="true" className="mb-3 mt-8 px-3 text-[10px] font-bold uppercase tracking-[0.2em] text-sky-200/65">Espacio de trabajo</p> : <span aria-hidden="true" className="mt-4"/>}
       <nav aria-label="Navegación principal" className="space-y-1" id={toggleCollapse ? 'desktop-sidebar-navigation' : undefined}>
-        {visibleItems.map(({ to, label, icon: Icon }) => (
+        {visibleItems.map(({ to, label, icon: Icon, tone }) => (
           <NavLink
             className={({ isActive }) => `admin-nav-link flex min-h-11 items-center rounded-[10px] text-[13px] font-medium focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-white ${compact ? 'justify-center px-2' : 'gap-3 px-3'} ${isActive ? 'font-semibold' : 'text-sky-100/75 hover:bg-white/8 hover:text-white'}`}
             end={to === '/'}
@@ -59,7 +78,7 @@ function Sidebar({ close, compact = false, collapsed = false, toggleCollapse }: 
             title={compact ? label : undefined}
             to={to}
           >
-            <Icon aria-hidden="true" className="shrink-0" size={18} strokeWidth={1.7}/><span className={compact ? 'sr-only' : undefined}>{label}</span>
+            <span aria-hidden="true" className={`admin-nav-icon admin-nav-icon-${tone}`}><Icon size={19} strokeWidth={1.8}/></span><span className={compact ? 'sr-only' : undefined}>{label}</span>
           </NavLink>
         ))}
       </nav>
@@ -159,7 +178,7 @@ export function AppLayout() {
 
   return (
     <div className={`admin-shell min-h-screen lg:grid ${sidebarCollapsed ? 'lg:grid-cols-[72px_minmax(0,1fr)]' : 'lg:grid-cols-[272px_minmax(0,1fr)]'} ${dashboard ? 'dashboard-shell' : ''} ${sidebarCollapsed ? 'admin-sidebar-collapsed' : ''}`}>
-      <aside className={`fixed inset-y-0 left-0 z-30 hidden lg:block ${sidebarCompact ? 'admin-sidebar-compact-width w-[72px]' : dashboard ? 'w-[190px]' : 'w-[272px]'} motion-safe:transition-[width] motion-safe:duration-200`} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setSidebarFocused(false) }} onFocus={(event) => { if (!(event.target instanceof HTMLElement) || event.target.dataset.sidebarToggle !== 'true') setSidebarFocused(true) }} onMouseEnter={() => setSidebarHovered(true)} onMouseLeave={() => { setSidebarHovered(false); setSidebarHoverSuppressed(false) }} onMouseMove={() => setSidebarHoverSuppressed(false)}><Sidebar collapsed={sidebarCollapsed} compact={sidebarCompact} toggleCollapse={() => { setSidebarCollapsed((value) => !value); setSidebarFocused(false); setSidebarHoverSuppressed(true) }}/></aside>
+      <aside className={`fixed inset-y-0 left-0 z-30 hidden lg:block ${sidebarCompact ? 'admin-sidebar-compact-width w-[72px]' : 'w-[272px]'} motion-safe:transition-[width] motion-safe:duration-200`} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget)) setSidebarFocused(false) }} onFocus={(event) => { if (!(event.target instanceof HTMLElement) || event.target.dataset.sidebarToggle !== 'true') setSidebarFocused(true) }} onMouseEnter={() => setSidebarHovered(true)} onMouseLeave={() => { setSidebarHovered(false); setSidebarHoverSuppressed(false) }} onMouseMove={() => setSidebarHoverSuppressed(false)}><Sidebar collapsed={sidebarCollapsed} compact={sidebarCompact} toggleCollapse={() => { setSidebarCollapsed((value) => !value); setSidebarFocused(false); setSidebarHoverSuppressed(true) }}/></aside>
       {open ? (
         <div aria-label="Menú de navegación" aria-modal="true" className="fixed inset-0 z-40 lg:hidden" ref={drawerRef} role="dialog">
           <button aria-label="Cerrar navegación" className="admin-drawer-backdrop absolute inset-0 bg-[#04112c]/65" onClick={closeMenu} tabIndex={-1} type="button"/>

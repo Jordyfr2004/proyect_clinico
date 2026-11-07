@@ -36,8 +36,12 @@ function errorMessage(error: unknown): string {
   return 'No fue posible cargar esta información.'
 }
 
+function DentalTooth({ size = 19, strokeWidth = 1.9 }: { size?: number; strokeWidth?: number }) {
+  return <svg fill="none" height={size} viewBox="0 0 64 72" width={size} aria-hidden="true"><path d="M32 10C24 10 19 5 12 8 4 11 5 23 8 33c3 11 8 30 13 31 5 1 6-18 11-18s6 19 11 18c5-1 10-20 13-31 3-10 4-22-4-25-7-3-12 2-20 2Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth * 2.3}/></svg>
+}
+
 function MetricCard({ icon: Icon, tone, tag, label, detail, state, value, to, children, onRetry }: {
-  icon: LucideIcon
+  icon: LucideIcon | typeof DentalTooth
   tone: 'blue' | 'cyan' | 'green' | 'violet'
   tag: string
   label: string
@@ -50,8 +54,9 @@ function MetricCard({ icon: Icon, tone, tag, label, detail, state, value, to, ch
 }) {
   return <section aria-label={label} className="dashboard-metric admin-surface min-w-0 rounded-2xl p-4">
     <Link aria-label={`Abrir ${label}`} className="dashboard-metric-link" to={to}/>
-    <div className="flex items-start justify-between gap-2"><span aria-hidden="true" className={`dashboard-metric-icon dashboard-tone-${tone}`}><Icon size={19} strokeWidth={1.9}/></span><span className={`dashboard-metric-tag dashboard-tone-${tone}`}>{tag}</span></div>
-    {state.kind === 'loading' ? <p className="dashboard-metric-value" role="status">Cargando…</p> : state.kind === 'error' ? <div className="mt-4"><p className="text-sm text-red-700" role="alert">{state.message}</p><button className="dashboard-retry" onClick={onRetry} type="button">Reintentar</button></div> : <><p className="dashboard-metric-value">{value}</p><p className="dashboard-metric-label">{label}</p>{detail ? <p className="dashboard-metric-detail">{detail}</p> : null}{children}{state.refreshError ? <p className="mt-2 text-xs text-red-700" role="alert">No fue posible actualizar. <button className="dashboard-retry" onClick={onRetry} type="button">Reintentar</button></p> : null}</>}
+    <span aria-hidden="true" className={`dashboard-metric-icon dashboard-tone-${tone}`}><Icon size={25} strokeWidth={1.9}/></span>
+    <span className={`dashboard-metric-tag dashboard-tone-${tone}`}>{tag}</span>
+    <div className="dashboard-metric-copy">{state.kind === 'loading' ? <p className="dashboard-metric-value" role="status">Cargando…</p> : state.kind === 'error' ? <div><p className="text-sm text-red-700" role="alert">{state.message}</p><button className="dashboard-retry" onClick={onRetry} type="button">Reintentar</button></div> : <><p className="dashboard-metric-value">{value}</p><p className="dashboard-metric-label">{label}</p>{detail ? <p className="dashboard-metric-detail">{detail}</p> : null}{children}{state.refreshError ? <p className="mt-2 text-xs text-red-700" role="alert">No fue posible actualizar. <button className="dashboard-retry" onClick={onRetry} type="button">Reintentar</button></p> : null}</>}</div>
   </section>
 }
 
@@ -102,13 +107,15 @@ export function DashboardPage() {
   ] as const
 
   return <div className="dashboard-screen admin-reveal">
-    <div className="dashboard-intro"><p className="dashboard-eyebrow">Panel clínico</p><h1>Resumen de gestión</h1><p>Consulta la actividad del consultorio y las tareas pendientes.</p></div>
+    <div className="dashboard-hero">
+      <div className="dashboard-intro"><p className="dashboard-eyebrow">Panel clínico</p><h1>Resumen de gestión</h1><p>Consulta la actividad del consultorio y las tareas pendientes.</p></div>
 
-    <div className="dashboard-metrics">
-      {canViewAgenda ? <MetricCard detail="Citas programadas para hoy" icon={CalendarDays} label="Citas médicas" onRetry={() => { void (canViewCash ? reportQuery : agendaQuery).refetch() }} state={canViewCash ? data.report : data.agenda} tag="Hoy" to="/citas-medicas" tone="blue" value={canViewCash ? data.report.kind === 'ready' ? String(data.report.data.citas.hoy) : '' : data.agenda.kind === 'ready' ? String(appointments.length) : ''}/> : null}
-      {canViewPatients ? <MetricCard detail="Pacientes registrados en el sistema" icon={UsersRound} label="Pacientes registrados" onRetry={() => { void (canViewCash ? reportQuery : patientsQuery).refetch() }} state={canViewCash ? data.report : data.patients} tag="Total" to="/pacientes" tone="cyan" value={canViewCash ? data.report.kind === 'ready' ? String(data.report.data.pacientes.total) : '' : data.patients.kind === 'ready' ? String(data.patients.data.total) : ''}/> : null}
-      {canViewCash ? <MetricCard detail="" icon={Wallet} label="Ingresos y egresos" onRetry={() => { void reportQuery.refetch() }} state={data.report} tag="Este mes" to="/caja" tone="green" value={data.report.kind === 'ready' ? formatCurrency(data.report.data.mes_actual.saldo) : ''}>{data.report.kind === 'ready' ? <p className="dashboard-metric-detail dashboard-money-line">Ingresos: {formatCurrency(data.report.data.mes_actual.ingresos)} <span aria-hidden="true">|</span> Egresos: {formatCurrency(data.report.data.mes_actual.egresos)}</p> : null}</MetricCard> : null}
-      {canViewActivities ? <MetricCard detail="Actividades registradas en el mes actual" icon={ClipboardList} label="Actividades" onRetry={() => { void activitiesQuery.refetch() }} state={data.activities} tag="Este mes" to="/actividades" tone="violet" value={data.activities.kind === 'ready' ? String(data.activities.data.length) : ''}/> : null}
+      <div className="dashboard-metrics">
+        {canViewAgenda ? <MetricCard detail="Citas programadas para hoy" icon={CalendarDays} label="Citas médicas" onRetry={() => { void (canViewCash ? reportQuery : agendaQuery).refetch() }} state={canViewCash ? data.report : data.agenda} tag="Hoy" to="/citas-medicas" tone="blue" value={canViewCash ? data.report.kind === 'ready' ? String(data.report.data.citas.hoy) : '' : data.agenda.kind === 'ready' ? String(appointments.length) : ''}/> : null}
+        {canViewPatients ? <MetricCard detail="Pacientes registrados en el sistema" icon={DentalTooth} label="Pacientes registrados" onRetry={() => { void (canViewCash ? reportQuery : patientsQuery).refetch() }} state={canViewCash ? data.report : data.patients} tag="Total" to="/pacientes" tone="cyan" value={canViewCash ? data.report.kind === 'ready' ? String(data.report.data.pacientes.total) : '' : data.patients.kind === 'ready' ? String(data.patients.data.total) : ''}/> : null}
+        {canViewCash ? <MetricCard detail="" icon={Wallet} label="Ingresos y egresos" onRetry={() => { void reportQuery.refetch() }} state={data.report} tag="Este mes" to="/caja" tone="green" value={data.report.kind === 'ready' ? formatCurrency(data.report.data.mes_actual.saldo) : ''}>{data.report.kind === 'ready' ? <p className="dashboard-metric-detail dashboard-money-line">Ingresos: {formatCurrency(data.report.data.mes_actual.ingresos)} <span aria-hidden="true">|</span> Egresos: {formatCurrency(data.report.data.mes_actual.egresos)}</p> : null}</MetricCard> : null}
+        {canViewActivities ? <MetricCard detail="Actividades registradas en el mes actual" icon={ClipboardList} label="Actividades" onRetry={() => { void activitiesQuery.refetch() }} state={data.activities} tag="Este mes" to="/actividades" tone="violet" value={data.activities.kind === 'ready' ? String(data.activities.data.length) : ''}/> : null}
+      </div>
     </div>
 
     <div className={`dashboard-content ${canViewAgenda ? '' : 'dashboard-content-single'}`}>

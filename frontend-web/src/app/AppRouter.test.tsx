@@ -75,9 +75,30 @@ describe('AppRouter', () => {
     expect(getPatientEvidence).toHaveBeenCalledWith('patient-id', expect.any(AbortSignal))
     expect(screen.queryByRole('button', { name: /Subir|Eliminar evidencia/ })).not.toBeInTheDocument()
   })
-  it('redirects unauthenticated users from protected pages to login', () => {
+  it('redirects unauthenticated users from protected pages to the presentation', () => {
     renderRouter('guest', '/pacientes')
-    expect(screen.getByRole('heading', { name: 'Bienvenido de nuevo' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Tu salud dental merece una atención cercana.' })).toBeInTheDocument()
+  })
+
+  it('shows the public clinic page at the root before the staff login', () => {
+    renderRouter('guest', '/')
+    expect(screen.getByRole('heading', { name: 'Tu salud dental merece una atención cercana.' })).toBeInTheDocument()
+    expect(within(screen.getByRole('navigation', { name: 'Navegación pública' })).getByRole('link', { name: /Portal del personal/ })).toHaveAttribute('href', '/login')
+    expect(screen.getByRole('link', { name: 'Contactar por WhatsApp' })).toHaveAttribute('href', expect.stringContaining('wa.me/593979141915'))
+    expect(screen.getByText(/Jordy Rosado, Jereny Vera, Andrés Garcías, Willian Cabrera y Luis/)).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Bienvenido de nuevo' })).not.toBeInTheDocument()
+  })
+
+  it('lets staff return from login to the public presentation', () => {
+    renderRouter('guest', '/login')
+    fireEvent.click(screen.getByRole('link', { name: 'Volver a la presentación' }))
+    expect(screen.getByRole('heading', { name: 'Tu salud dental merece una atención cercana.' })).toBeInTheDocument()
+  })
+
+  it('keeps the public presentation accessible separately from the dashboard', () => {
+    renderRouter('authenticated', '/inicio')
+    expect(screen.getByRole('heading', { name: 'Tu salud dental merece una atención cercana.' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Resumen de gestión' })).not.toBeInTheDocument()
   })
 
   it('holds protected content while authentication is loading', () => {
