@@ -6,6 +6,7 @@ import { cancelAppointment, completeAppointment, createMedicalAppointment, creat
 vi.mock('../agenda/agendaService', () => ({ getAgendaMonth: vi.fn(), getPendingRequests: vi.fn(), createMedicalAppointment: vi.fn(), createPersonalEntry: vi.fn(), programRequest: vi.fn(), updateAgendaEntry: vi.fn(), cancelAppointment: vi.fn(), completeAppointment: vi.fn(), deleteAgendaEntry: vi.fn(), registerClinicalData: vi.fn() }))
 const personal = { id: 'personal-1', paciente_id: null, fecha: '2026-10-05', hora_inicio: '08:00', hora_fin: '09:00', tipo: 'personal' as const, descripcion: 'Reunión personal', estado: null, diagnostico: null, tratamiento: null, observacion: null, paciente: null }
 const medical = { ...personal, id: 'medical-1', paciente_id: 'patient-1', tipo: 'cita_medica' as const, descripcion: 'Control recibido', estado: 'programada' as const, paciente: { codigo_paciente: '001', nombres: 'Paciente recibido' }, hora_inicio: '10:00', hora_fin: '11:00' }
+const readyMedical = { ...medical, diagnostico: 'Diagnóstico previo', tratamiento: 'Tratamiento previo' }
 const pending = { ...medical, id: 'request-1', fecha: null, hora_inicio: null, hora_fin: null, descripcion: null, estado: 'pendiente' as const }
 
 beforeEach(() => { vi.resetAllMocks(); vi.mocked(getAgendaMonth).mockResolvedValue([personal, medical]); vi.mocked(getPendingRequests).mockResolvedValue([pending]) })
@@ -13,7 +14,7 @@ beforeEach(() => { vi.resetAllMocks(); vi.mocked(getAgendaMonth).mockResolvedVal
 async function renderOctober() {
   render(<MedicalAppointmentsPage/>)
   fireEvent.change(screen.getByLabelText('Mes'), { target: { value: '2026-10' } })
-  await screen.findAllByText('Control recibido')
+  await screen.findAllByRole('button', { name: 'Ver detalles' })
 }
 
 describe('MedicalAppointmentsPage', () => {
@@ -39,7 +40,8 @@ describe('MedicalAppointmentsPage', () => {
     const calls = vi.mocked(getAgendaMonth).mock.calls.length
     fireEvent.change(screen.getByLabelText('Estado'), { target: { value: 'cancelada' } })
     expect(screen.getByText('Citas encontradas: 1')).toBeInTheDocument()
-    expect(screen.getByText('Cita cancelada')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Ver detalles' }))
+    expect(within(screen.getByRole('region', { name: 'Detalles de la cita' })).getByText('Cita cancelada')).toBeInTheDocument()
     expect(screen.queryByText('Control recibido')).not.toBeInTheDocument()
     expect(getAgendaMonth).toHaveBeenCalledTimes(calls)
   })
@@ -166,10 +168,11 @@ describe('MedicalAppointmentsPage', () => {
     await renderOctober()
     fireEvent.click(screen.getByRole('button', { name: 'Opciones de cita para Paciente recibido' }))
     fireEvent.click(screen.getByRole('button', { name: 'Editar cita' }))
-    const dialog = screen.getByRole('dialog', { name: 'Editar registro' })
-    fireEvent.change(within(dialog).getByLabelText('Fecha'), { target: { value: '2026-10-06' } })
+    const dialog = screen.getByRole('dialog', { name: 'Editar cita médica' })
+    expect(within(dialog).getByRole('button', { name: /Seleccionar 5 de octubre de 2026/ })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(within(dialog).getByRole('button', { name: /Seleccionar 6 de octubre de 2026/ }))
     fireEvent.change(within(dialog).getByLabelText('Descripción'), { target: { value: 'Cambio' } })
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar cambios' }))
     await waitFor(() => expect(updateAgendaEntry).toHaveBeenCalledExactlyOnceWith('medical-1', { fecha: '2026-10-06', hora_inicio: '10:00', hora_fin: '11:00', descripcion: 'Cambio' }))
   })
 
@@ -181,7 +184,7 @@ describe('MedicalAppointmentsPage', () => {
     await renderOctober()
     const calls = vi.mocked(getAgendaMonth).mock.calls.length
     if (action === 'Eliminar') fireEvent.click(screen.getByRole('button', { name: 'Opciones de cita para Paciente recibido' }))
-    else fireEvent.click(screen.getByText('Ver detalles'))
+    else fireEvent.click(screen.getByRole('button', { name: 'Ver detalles' }))
     fireEvent.click(screen.getByRole('button', { name: action }))
     expect(mutation).not.toHaveBeenCalled()
     const dialog = screen.getByRole('dialog', { name: title })
@@ -192,8 +195,10 @@ describe('MedicalAppointmentsPage', () => {
 
   it('asks for an activity and price, then completes the appointment with one request', async () => {
     vi.mocked(completeAppointment).mockResolvedValue('Cita marcada como completada.')
+    vi.mocked(getAgendaMonth).mockResolvedValue([readyMedical])
     await renderOctober()
     const calls = vi.mocked(getAgendaMonth).mock.calls.length
+    fireEvent.click(screen.getByRole('button', { name: 'Ver detalles' }))
     fireEvent.click(screen.getByRole('button', { name: 'Completar cita' }))
     const dialog = screen.getByRole('dialog', { name: 'Completar cita médica' })
     expect(within(dialog).getByText(/Actividades/)).toBeInTheDocument()
@@ -206,7 +211,9 @@ describe('MedicalAppointmentsPage', () => {
   })
 
   it('requires a valid activity and price before completing', async () => {
+    vi.mocked(getAgendaMonth).mockResolvedValue([readyMedical])
     await renderOctober()
+    fireEvent.click(screen.getByRole('button', { name: 'Ver detalles' }))
     fireEvent.click(screen.getByRole('button', { name: 'Completar cita' }))
     const dialog = screen.getByRole('dialog', { name: 'Completar cita médica' })
     const complete = within(dialog).getByRole('button', { name: 'Completar cita' })
@@ -221,7 +228,9 @@ describe('MedicalAppointmentsPage', () => {
 
   it('blocks a second completion while the first request is pending', async () => {
     vi.mocked(completeAppointment).mockReturnValue(new Promise(() => {}))
+    vi.mocked(getAgendaMonth).mockResolvedValue([readyMedical])
     await renderOctober()
+    fireEvent.click(screen.getByRole('button', { name: 'Ver detalles' }))
     fireEvent.click(screen.getByRole('button', { name: 'Completar cita' }))
     const dialog = screen.getByRole('dialog', { name: 'Completar cita médica' })
     fireEvent.change(within(dialog).getByLabelText('Actividad realizada'), { target: { value: 'Limpieza dental' } })
@@ -250,15 +259,16 @@ describe('MedicalAppointmentsPage', () => {
     vi.mocked(getAgendaMonth).mockResolvedValueOnce([medical]).mockResolvedValueOnce([{ ...medical, diagnostico: 'Diagnóstico recibido', tratamiento: 'Tratamiento recibido' }])
     vi.mocked(registerClinicalData).mockResolvedValue('Datos clínicos registrados correctamente.')
     await renderOctober()
+    fireEvent.click(screen.getByRole('button', { name: 'Ver detalles' }))
     fireEvent.click(screen.getByRole('button', { name: 'Registrar datos clínicos' }))
     const dialog = screen.getByRole('dialog', { name: 'Registrar datos clínicos' })
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar cambios' }))
     expect(within(dialog).getByRole('alert')).toHaveTextContent('El diagnóstico y el tratamiento son obligatorios.')
-    fireEvent.change(within(dialog).getByLabelText('Diagnóstico *'), { target: { value: 'Diagnóstico recibido' } })
-    fireEvent.change(within(dialog).getByLabelText('Tratamiento *'), { target: { value: 'Tratamiento recibido' } })
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }))
+    fireEvent.change(within(dialog).getByLabelText('Diagnóstico * (obligatorio)'), { target: { value: 'Diagnóstico recibido' } })
+    fireEvent.change(within(dialog).getByLabelText('Tratamiento * (obligatorio)'), { target: { value: 'Tratamiento recibido' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar cambios' }))
     await waitFor(() => expect(registerClinicalData).toHaveBeenCalledExactlyOnceWith('medical-1', { diagnostico: 'Diagnóstico recibido', tratamiento: 'Tratamiento recibido', observacion: null }))
-    expect(await screen.findByText('Editar datos clínicos')).toBeInTheDocument()
+    expect(await screen.findByRole('button', { name: 'Completar cita' })).toBeInTheDocument()
     expect(screen.getByText(/Diagnóstico recibido/)).toBeInTheDocument()
     expect(screen.getByText(/Tratamiento recibido/)).toBeInTheDocument()
   })
@@ -266,11 +276,57 @@ describe('MedicalAppointmentsPage', () => {
   it('preloads existing clinical fields for a completed appointment', async () => {
     vi.mocked(getAgendaMonth).mockResolvedValue([{ ...medical, estado: 'completada', diagnostico: 'Diagnóstico previo', tratamiento: 'Tratamiento previo', observacion: 'Observación previa' }])
     await renderOctober()
+    fireEvent.click(screen.getByRole('button', { name: 'Ver detalles' }))
     fireEvent.click(screen.getByRole('button', { name: 'Editar datos clínicos' }))
     const dialog = screen.getByRole('dialog', { name: 'Editar datos clínicos' })
-    expect(within(dialog).getByLabelText('Diagnóstico *')).toHaveValue('Diagnóstico previo')
-    expect(within(dialog).getByLabelText('Tratamiento *')).toHaveValue('Tratamiento previo')
-    expect(within(dialog).getByLabelText('Observación')).toHaveValue('Observación previa')
+    expect(within(dialog).getByLabelText('Diagnóstico * (obligatorio)')).toHaveValue('Diagnóstico previo')
+    expect(within(dialog).getByLabelText('Tratamiento * (obligatorio)')).toHaveValue('Tratamiento previo')
+    expect(within(dialog).getByLabelText('Observación (opcional)')).toHaveValue('Observación previa')
+  })
+
+  it('opens a focused details panel with explicit missing fields and restores focus on close', async () => {
+    await renderOctober()
+    const trigger = screen.getByRole('button', { name: 'Ver detalles' })
+    fireEvent.click(trigger)
+    const panel = screen.getByRole('region', { name: 'Detalles de la cita' })
+    expect(within(panel).getByText('Paciente recibido')).toBeInTheDocument()
+    expect(within(panel).getByText('Código: 001')).toBeInTheDocument()
+    expect(within(panel).getByText('Control recibido')).toBeInTheDocument()
+    expect(within(panel).getAllByText('Sin datos registrados')).toHaveLength(3)
+    expect(within(panel).getByRole('button', { name: 'Registrar datos clínicos' })).toBeInTheDocument()
+    expect(within(panel).queryByRole('button', { name: 'Completar cita' })).not.toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: 'Cerrar detalles' })).toHaveFocus()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('region', { name: 'Detalles de la cita' })).not.toBeInTheDocument()
+    expect(trigger).toHaveFocus()
+  })
+
+  it('shows the permitted primary action for complete clinical data and completed appointments', async () => {
+    vi.mocked(getAgendaMonth).mockResolvedValue([readyMedical, { ...readyMedical, id: 'completed-1', estado: 'completada' }])
+    await renderOctober()
+    const triggers = screen.getAllByRole('button', { name: 'Ver detalles' })
+    fireEvent.click(triggers[0])
+    expect(within(screen.getByRole('region', { name: 'Detalles de la cita' })).getByRole('button', { name: 'Completar cita' })).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Detalles de la cita' })).getByRole('button', { name: 'Editar datos clínicos' })).toBeInTheDocument()
+    fireEvent.click(triggers[1])
+    const panel = screen.getByRole('region', { name: 'Detalles de la cita' })
+    expect(within(panel).getByRole('button', { name: 'Editar datos clínicos' })).toBeInTheDocument()
+    expect(within(panel).queryByRole('button', { name: 'Cancelar cita' })).not.toBeInTheDocument()
+  })
+
+  it('keeps the patient context and preloaded values in the clinical form', async () => {
+    vi.mocked(getAgendaMonth).mockResolvedValue([{ ...readyMedical, estado: 'completada' }])
+    await renderOctober()
+    fireEvent.click(screen.getByRole('button', { name: 'Ver detalles' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Editar datos clínicos' }))
+    const dialog = screen.getByRole('dialog', { name: 'Editar datos clínicos' })
+    expect(within(dialog).getByText('Paciente recibido')).toBeInTheDocument()
+    expect(within(dialog).getByText(/Código: 001/)).toBeInTheDocument()
+    expect(within(dialog).getByText(/5 de octubre de 2026/)).toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Diagnóstico * (obligatorio)')).toHaveValue('Diagnóstico previo')
+    expect(within(dialog).getByLabelText('Tratamiento * (obligatorio)')).toHaveValue('Tratamiento previo')
+    expect(within(dialog).getByRole('button', { name: 'Guardar cambios' })).toBeInTheDocument()
+    expect(within(dialog).getByRole('button', { name: 'Cancelar' })).toBeInTheDocument()
   })
 
   it('does not offer clinical changes for cancelled appointments', async () => {
@@ -283,7 +339,9 @@ describe('MedicalAppointmentsPage', () => {
 
   it('shows backend 409 when completion lacks clinical data', async () => {
     vi.mocked(completeAppointment).mockRejectedValue({ isAxiosError: true, response: { status: 409, data: { message: 'Debes registrar el diagnóstico y tratamiento antes de completar la cita.' } } })
+    vi.mocked(getAgendaMonth).mockResolvedValue([readyMedical])
     await renderOctober()
+    fireEvent.click(screen.getByRole('button', { name: 'Ver detalles' }))
     fireEvent.click(screen.getByRole('button', { name: 'Completar cita' }))
     const dialog = screen.getByRole('dialog', { name: 'Completar cita médica' })
     fireEvent.change(within(dialog).getByLabelText('Actividad realizada'), { target: { value: 'Limpieza dental' } })
@@ -294,7 +352,9 @@ describe('MedicalAppointmentsPage', () => {
 
   it('keeps the completion form open when Laravel rejects the activity or price', async () => {
     vi.mocked(completeAppointment).mockRejectedValue({ isAxiosError: true, response: { status: 422, data: { message: 'El precio no es válido.' } } })
+    vi.mocked(getAgendaMonth).mockResolvedValue([readyMedical])
     await renderOctober()
+    fireEvent.click(screen.getByRole('button', { name: 'Ver detalles' }))
     fireEvent.click(screen.getByRole('button', { name: 'Completar cita' }))
     const dialog = screen.getByRole('dialog', { name: 'Completar cita médica' })
     fireEvent.change(within(dialog).getByLabelText('Actividad realizada'), { target: { value: 'Control' } })
@@ -308,22 +368,24 @@ describe('MedicalAppointmentsPage', () => {
   it.each([[404, 'Cita no encontrada.'], [409, 'La cita todavía no ha sido programada.'], [422, 'Los datos clínicos no son válidos.']] as const)('shows backend %i from clinical registration', async (status, message) => {
     vi.mocked(registerClinicalData).mockRejectedValueOnce({ isAxiosError: true, response: { status, data: { message } } })
     await renderOctober()
+    fireEvent.click(screen.getByRole('button', { name: 'Ver detalles' }))
     fireEvent.click(screen.getByRole('button', { name: 'Registrar datos clínicos' }))
     const dialog = screen.getByRole('dialog', { name: 'Registrar datos clínicos' })
-    fireEvent.change(within(dialog).getByLabelText('Diagnóstico *'), { target: { value: 'Diagnóstico' } })
-    fireEvent.change(within(dialog).getByLabelText('Tratamiento *'), { target: { value: 'Tratamiento' } })
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }))
+    fireEvent.change(within(dialog).getByLabelText('Diagnóstico * (obligatorio)'), { target: { value: 'Diagnóstico' } })
+    fireEvent.change(within(dialog).getByLabelText('Tratamiento * (obligatorio)'), { target: { value: 'Tratamiento' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar cambios' }))
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(message)
   })
 
   it.each([[{ isAxiosError: true }, 'No fue posible comunicarse con el servidor.'], [new Error('Respuesta inválida'), 'No fue posible completar la operación. Inténtalo de nuevo.']] as const)('keeps the clinical form open on %s', async (cause, message) => {
     vi.mocked(registerClinicalData).mockRejectedValueOnce(cause)
     await renderOctober()
+    fireEvent.click(screen.getByRole('button', { name: 'Ver detalles' }))
     fireEvent.click(screen.getByRole('button', { name: 'Registrar datos clínicos' }))
     const dialog = screen.getByRole('dialog', { name: 'Registrar datos clínicos' })
-    fireEvent.change(within(dialog).getByLabelText('Diagnóstico *'), { target: { value: 'Diagnóstico' } })
-    fireEvent.change(within(dialog).getByLabelText('Tratamiento *'), { target: { value: 'Tratamiento' } })
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar' }))
+    fireEvent.change(within(dialog).getByLabelText('Diagnóstico * (obligatorio)'), { target: { value: 'Diagnóstico' } })
+    fireEvent.change(within(dialog).getByLabelText('Tratamiento * (obligatorio)'), { target: { value: 'Tratamiento' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar cambios' }))
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(message)
     expect(dialog).toBeInTheDocument()
   })
@@ -332,10 +394,11 @@ describe('MedicalAppointmentsPage', () => {
     let resolveMutation: (message: string) => void = () => {}
     vi.mocked(registerClinicalData).mockImplementation(() => new Promise((resolve) => { resolveMutation = resolve }))
     await renderOctober()
+    fireEvent.click(screen.getByRole('button', { name: 'Ver detalles' }))
     fireEvent.click(screen.getByRole('button', { name: 'Registrar datos clínicos' }))
     const dialog = screen.getByRole('dialog', { name: 'Registrar datos clínicos' })
-    fireEvent.change(within(dialog).getByLabelText('Diagnóstico *'), { target: { value: 'Diagnóstico' } })
-    fireEvent.change(within(dialog).getByLabelText('Tratamiento *'), { target: { value: 'Tratamiento' } })
+    fireEvent.change(within(dialog).getByLabelText('Diagnóstico * (obligatorio)'), { target: { value: 'Diagnóstico' } })
+    fireEvent.change(within(dialog).getByLabelText('Tratamiento * (obligatorio)'), { target: { value: 'Tratamiento' } })
     const form = within(dialog).getByRole('form', { name: 'Datos clínicos de la cita' })
     fireEvent.submit(form)
     fireEvent.submit(form)

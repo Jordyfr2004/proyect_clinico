@@ -1,11 +1,11 @@
 import { isAxiosError } from 'axios'
-import { useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
+import { useCallback, useEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { EmptyState } from '../../components/states/EmptyState'
 import { ErrorState } from '../../components/states/ErrorState'
 import { LoadingState } from '../../components/states/LoadingState'
 import { AccessibleDialog } from '../../components/ui/AccessibleDialog'
 import { formatDate } from '../../utils/displayFormat'
-import { CalendarDays, ChevronLeft, ChevronRight, MoreVertical, Search } from 'lucide-react'
+import { CalendarDays, ChevronLeft, ChevronRight, MoreVertical, Search, X } from 'lucide-react'
 import { cancelAppointment, completeAppointment, deleteAgendaEntry, getAgendaMonth, getPendingRequests, programRequest, registerClinicalData, updateAgendaEntry, type AgendaEntry, type AgendaSlot, type ClinicalDataPayload, type CompleteAppointmentPayload } from '../agenda/agendaService'
 import { markClinicalQueriesStale, useClinicalQuery } from '../../services/clinicalQuery'
 import { useClinicalViewState } from '../../services/clinicalViewState'
@@ -24,10 +24,16 @@ const statusClasses: Record<NonNullable<AgendaEntry['estado']>, string> = {
   cancelada: 'admin-pill-cancelled', completada: 'admin-pill-completed',
 }
 const dialogTitles: Record<DialogKind, string> = {
-  program: 'Programar solicitud', edit: 'Editar registro', clinical: 'Datos clínicos',
+  program: 'Programar solicitud', edit: 'Editar cita médica', clinical: 'Datos clínicos',
   cancel: 'Cancelar cita médica', complete: 'Completar cita médica', delete: 'Eliminar registro',
 }
-const clinicalActionLabel = (entry: AgendaEntry) => entry.diagnostico || entry.tratamiento || entry.observacion ? 'Editar datos clínicos' : 'Registrar datos clínicos'
+const hasClinicalData = (entry: AgendaEntry) => Boolean(entry.diagnostico?.trim() && entry.tratamiento?.trim())
+const clinicalActionLabel = (entry: AgendaEntry) => entry.estado === 'completada' || hasClinicalData(entry) ? 'Editar datos clínicos' : 'Registrar datos clínicos'
+const primaryAction = (entry: AgendaEntry): 'clinical' | 'complete' | null => {
+  if (entry.estado === 'completada') return 'clinical'
+  if (entry.estado !== 'programada') return null
+  return hasClinicalData(entry) ? 'complete' : 'clinical'
+}
 const two = (value: number) => String(value).padStart(2, '0')
 const dateKey = (date: Date) => `${date.getFullYear()}-${two(date.getMonth() + 1)}-${two(date.getDate())}`
 
@@ -42,7 +48,7 @@ function errorMessage(error: unknown): string {
   return 'No fue posible completar la operación. Inténtalo de nuevo.'
 }
 
-function ProgramRequestCalendar({ value, onChange }: { value: string; onChange: (date: string) => void }) {
+function ProgramRequestCalendar({ value, onChange, compact = false }: { value: string; onChange: (date: string) => void; compact?: boolean }) {
   const today = new Date()
   const initial = value ? new Date(`${value}T12:00:00`) : today
   const [visibleMonth, setVisibleMonth] = useState({ year: initial.getFullYear(), month: initial.getMonth() + 1 })
@@ -82,14 +88,14 @@ function ProgramRequestCalendar({ value, onChange }: { value: string; onChange: 
 
   return <div aria-label="Fecha" className="sm:col-span-2" ref={calendarRef} role="group">
     <p className="text-sm font-medium text-ink-950">Fecha</p>
-    <div className="mt-1 rounded-xl border border-[#dbe6f2] bg-[#fbfdff] p-3 sm:p-4">
-      <div className="mb-3 flex items-center justify-between gap-2"><button aria-label="Mes anterior" className="admin-secondary grid size-10 place-items-center rounded-lg" onClick={() => shiftMonth(-1)} type="button"><ChevronLeft aria-hidden="true" size={18}/></button><p aria-live="polite" className="text-sm font-bold capitalize text-ink-950">{monthLabel}</p><button aria-label="Mes siguiente" className="admin-secondary grid size-10 place-items-center rounded-lg" onClick={() => shiftMonth(1)} type="button"><ChevronRight aria-hidden="true" size={18}/></button></div>
+    <div className={`mt-1 rounded-xl border border-[#dbe6f2] bg-[#fbfdff] p-3 ${compact ? '' : 'sm:p-4'}`}>
+      <div className={`${compact ? 'mb-2' : 'mb-3'} flex items-center justify-between gap-2`}><button aria-label="Mes anterior" className="admin-secondary grid size-10 place-items-center rounded-lg" onClick={() => shiftMonth(-1)} type="button"><ChevronLeft aria-hidden="true" size={18}/></button><p aria-live="polite" className="text-sm font-bold capitalize text-ink-950">{monthLabel}</p><button aria-label="Mes siguiente" className="admin-secondary grid size-10 place-items-center rounded-lg" onClick={() => shiftMonth(1)} type="button"><ChevronRight aria-hidden="true" size={18}/></button></div>
       <div className="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-[#526a87]">{['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((label, index) => <span aria-hidden="true" key={index}>{label}</span>)}{Array.from({ length: offset }, (_, index) => <span aria-hidden="true" key={`empty-${index}`}/>)}{Array.from({ length: dayCount }, (_, index) => {
         const day = index + 1
         const key = `${monthPrefix}-${two(day)}`
         const selected = value === key
         const isToday = dateKey(today) === key
-        return <button aria-current={isToday ? 'date' : undefined} aria-label={`Seleccionar ${day} de ${monthLabel}`} aria-pressed={selected} className={`min-h-10 rounded-lg border text-sm font-semibold transition-colors sm:min-h-11 ${selected ? 'border-clinic-600 bg-clinic-50 text-clinic-700 ring-1 ring-clinic-600' : isToday ? 'border-sky-400 bg-sky-50 text-ink-950 hover:bg-sky-100' : 'border-[#dbe6f2] bg-white text-ink-950 hover:bg-[#f3f8fe]'}`} data-calendar-day={key} data-dialog-initial={key === tabStop ? true : undefined} key={key} onClick={() => { setFocusedDate(key); onChange(key) }} onKeyDown={(event) => moveFocus(event, day)} tabIndex={key === tabStop ? 0 : -1} type="button">{day}</button>
+        return <button aria-current={isToday ? 'date' : undefined} aria-label={`Seleccionar ${day} de ${monthLabel}`} aria-pressed={selected} className={`min-h-10 rounded-lg border text-sm font-semibold transition-colors ${compact ? '' : 'sm:min-h-11'} ${selected ? 'border-clinic-600 bg-clinic-50 text-clinic-700 ring-1 ring-clinic-600' : isToday ? 'border-sky-400 bg-sky-50 text-ink-950 hover:bg-sky-100' : 'border-[#dbe6f2] bg-white text-ink-950 hover:bg-[#f3f8fe]'}`} data-calendar-day={key} data-dialog-initial={key === tabStop ? true : undefined} key={key} onClick={() => { setFocusedDate(key); onChange(key) }} onKeyDown={(event) => moveFocus(event, day)} tabIndex={key === tabStop ? 0 : -1} type="button">{day}</button>
       })}</div>
     </div>
     <p className="admin-muted mt-2 text-xs">{value ? `Fecha seleccionada: ${formatDate(value)}` : 'Selecciona un día para programar la solicitud.'}</p>
@@ -119,13 +125,13 @@ function AppointmentDialogForm({ dialog, busy, error, onSave, onCancel }: {
   }
   return <form aria-label={dialog.kind === 'program' ? 'Programar solicitud' : 'Datos de agenda'} noValidate onSubmit={submit}>
     {confirmation ? <p className="admin-body text-sm">{dialog.kind === 'delete' ? '¿Eliminar este registro de agenda?' : '¿Cancelar esta cita médica?'}</p> : <div className="grid gap-4 sm:grid-cols-2">
-      {dialog.kind === 'program' ? <ProgramRequestCalendar onChange={setFecha} value={fecha}/> : <label className="text-sm font-medium text-ink-950">Fecha<input className={inputClass} data-dialog-initial onChange={(event) => setFecha(event.target.value)} required type="date" value={fecha}/></label>}
+      <ProgramRequestCalendar compact={dialog.kind === 'edit'} onChange={setFecha} value={fecha}/>
       <label className="text-sm font-medium text-ink-950">Hora de inicio<input className={inputClass} onChange={(event) => setInicio(event.target.value)} required type="time" value={inicio}/></label>
       <label className="text-sm font-medium text-ink-950">Hora de fin<input className={inputClass} onChange={(event) => setFin(event.target.value)} required type="time" value={fin}/></label>
       {dialog.kind === 'edit' ? <label className="text-sm font-medium text-ink-950 sm:col-span-2">Descripción<textarea className={inputClass} onChange={(event) => setDescripcion(event.target.value)} rows={3} value={descripcion}/></label> : null}
     </div>}
     {validation || error ? <p className="mt-4 text-sm text-red-700" role="alert">{validation ?? error}</p> : null}
-    <div className="mt-6 flex flex-wrap gap-3"><button className="admin-primary min-h-11 rounded-[10px] px-5 text-sm font-semibold disabled:opacity-60" disabled={busy} type="submit">{busy ? 'Guardando…' : confirmation ? 'Confirmar' : 'Guardar'}</button><button className="admin-secondary min-h-11 rounded-[10px] px-5 text-sm font-semibold disabled:opacity-60" disabled={busy} onClick={onCancel} type="button">Volver</button></div>
+    <div className={`sticky bottom-0 z-10 flex flex-wrap justify-end gap-3 border-t border-[#e3ecf6] bg-white ${dialog.kind === 'edit' ? 'mt-4 pt-3' : 'mt-6 pt-5'}`}><button className="admin-secondary min-h-11 rounded-[10px] px-5 text-sm font-semibold disabled:opacity-60" disabled={busy} onClick={onCancel} type="button">Cancelar</button><button className="admin-primary min-h-11 rounded-[10px] px-5 text-sm font-semibold disabled:opacity-60" disabled={busy} type="submit">{busy ? 'Guardando…' : confirmation ? 'Confirmar' : dialog.kind === 'edit' ? 'Guardar cambios' : 'Guardar'}</button></div>
   </form>
 }
 
@@ -178,14 +184,59 @@ function ClinicalDataForm({ entry, busy, error, onSave, onCancel }: {
     void onSave({ diagnostico: diagnostico.trim(), tratamiento: tratamiento.trim(), observacion: observacion.trim() || null })
   }
   return <form aria-label="Datos clínicos de la cita" noValidate onSubmit={submit}>
+    <div className="mb-5 rounded-xl border border-[#dbe6f2] bg-[#f5f9fe] px-4 py-3">
+      <p className="font-semibold text-ink-950">{entry.paciente?.nombres ?? 'Paciente no disponible'}</p>
+      <p className="admin-muted mt-1 text-sm">Código: {entry.paciente?.codigo_paciente ?? 'No disponible'} <span aria-hidden="true">·</span> {entry.fecha ? formatDate(entry.fecha) : 'Fecha no disponible'}</p>
+    </div>
     <div className="grid gap-4">
-      <label className="text-sm font-medium text-ink-950">Diagnóstico *<textarea aria-describedby={validation && !diagnostico.trim() ? 'clinical-data-error' : undefined} aria-invalid={Boolean(validation && !diagnostico.trim())} className={inputClass} data-dialog-initial onChange={(event) => { setDiagnostico(event.target.value); setValidation(null) }} required rows={3} value={diagnostico}/></label>
-      <label className="text-sm font-medium text-ink-950">Tratamiento *<textarea aria-describedby={validation && !tratamiento.trim() ? 'clinical-data-error' : undefined} aria-invalid={Boolean(validation && !tratamiento.trim())} className={inputClass} onChange={(event) => { setTratamiento(event.target.value); setValidation(null) }} required rows={3} value={tratamiento}/></label>
-      <label className="text-sm font-medium text-ink-950">Observación<textarea className={inputClass} onChange={(event) => setObservacion(event.target.value)} rows={3} value={observacion}/></label>
+      <label className="text-sm font-medium text-ink-950">Diagnóstico * <span className="admin-muted font-normal">(obligatorio)</span><textarea aria-describedby={validation && !diagnostico.trim() ? 'clinical-data-error' : undefined} aria-invalid={Boolean(validation && !diagnostico.trim())} className={inputClass} data-dialog-initial onChange={(event) => { setDiagnostico(event.target.value); setValidation(null) }} required rows={3} value={diagnostico}/></label>
+      <label className="text-sm font-medium text-ink-950">Tratamiento * <span className="admin-muted font-normal">(obligatorio)</span><textarea aria-describedby={validation && !tratamiento.trim() ? 'clinical-data-error' : undefined} aria-invalid={Boolean(validation && !tratamiento.trim())} className={inputClass} onChange={(event) => { setTratamiento(event.target.value); setValidation(null) }} required rows={3} value={tratamiento}/></label>
+      <label className="text-sm font-medium text-ink-950">Observación <span className="admin-muted font-normal">(opcional)</span><textarea className={inputClass} onChange={(event) => setObservacion(event.target.value)} rows={3} value={observacion}/></label>
     </div>
     {validation || error ? <p className="mt-4 text-sm text-red-700" id={validation ? 'clinical-data-error' : undefined} role="alert">{validation ?? error}</p> : null}
-    <div className="mt-6 flex flex-wrap gap-3"><button className="admin-primary min-h-11 rounded-[10px] px-5 text-sm font-semibold disabled:opacity-60" disabled={busy} type="submit">{busy ? 'Guardando…' : 'Guardar'}</button><button className="admin-secondary min-h-11 rounded-[10px] px-5 text-sm font-semibold disabled:opacity-60" disabled={busy} onClick={onCancel} type="button">Volver</button></div>
+    <div className="mt-6 flex flex-wrap justify-end gap-3 border-t border-[#e3ecf6] pt-5"><button className="admin-secondary min-h-11 rounded-[10px] px-5 text-sm font-semibold disabled:opacity-60" disabled={busy} onClick={onCancel} type="button">Cancelar</button><button className="admin-primary min-h-11 rounded-[10px] px-5 text-sm font-semibold disabled:opacity-60" disabled={busy} type="submit">{busy ? 'Guardando…' : 'Guardar cambios'}</button></div>
   </form>
+}
+
+function AppointmentDetails({ entry, onClose, onAction }: {
+  entry: AgendaEntry; onClose: () => void; onAction: (kind: DialogKind, trigger: HTMLElement) => void
+}) {
+  const panelRef = useRef<HTMLElement>(null)
+  const action = primaryAction(entry)
+  useEffect(() => {
+    panelRef.current?.querySelector<HTMLElement>('[data-detail-initial]')?.focus()
+    const mobile = window.matchMedia?.('(max-width: 1023px)').matches ?? false
+    const previousOverflow = document.body.style.overflow
+    if (mobile) document.body.style.overflow = 'hidden'
+    const onEscape = (event: globalThis.KeyboardEvent) => {
+      if (document.querySelector('[aria-modal="true"]')) return
+      if (event.key === 'Escape') { event.preventDefault(); onClose() }
+      if (event.key !== 'Tab' || !mobile || !panelRef.current) return
+      const controls = [...panelRef.current.querySelectorAll<HTMLElement>('button:not(:disabled)')]
+      if (!controls.length) return
+      if (event.shiftKey && document.activeElement === controls[0]) { event.preventDefault(); controls.at(-1)?.focus() }
+      else if (!event.shiftKey && document.activeElement === controls.at(-1)) { event.preventDefault(); controls[0].focus() }
+    }
+    document.addEventListener('keydown', onEscape)
+    return () => { document.removeEventListener('keydown', onEscape); if (mobile) document.body.style.overflow = previousOverflow }
+  }, [entry.id, onClose])
+
+  return <>
+    <button aria-label="Cerrar detalles de la cita" className="fixed inset-0 z-30 bg-[#061e3c]/45 lg:hidden" onClick={onClose} tabIndex={-1} type="button"/>
+    <aside aria-label="Detalles de la cita" className="fixed inset-y-0 right-0 z-40 flex w-full max-w-[460px] flex-col overflow-y-auto border-l border-[#dbe6f2] bg-white shadow-[-16px_0_44px_rgba(16,51,93,.14)] lg:relative lg:inset-auto lg:z-auto lg:max-h-[65vh] lg:w-auto lg:max-w-none lg:rounded-2xl lg:border lg:shadow-[0_6px_24px_rgba(19,55,108,.07)] xl:max-h-[calc(100dvh-520px)]" ref={panelRef} role="region">
+      <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-[#e3ecf6] bg-[#f6faff] px-5 py-4"><div><p className="admin-kicker">Expediente de la cita</p><h3 className="mt-1 text-lg font-bold text-ink-950">Detalles de la cita</h3></div><button aria-label="Cerrar detalles" className="admin-secondary grid size-10 shrink-0 place-items-center rounded-lg" data-detail-initial onClick={onClose} type="button"><X aria-hidden="true" size={18}/></button></div>
+      <div className="space-y-5 p-5">
+        <div className="rounded-xl bg-[#f3f8fe] p-4"><p className="break-words text-lg font-bold text-ink-950">{entry.paciente?.nombres ?? 'Paciente no disponible'}</p><p className="admin-muted mt-1 text-sm">Código: {entry.paciente?.codigo_paciente ?? 'No disponible'}</p></div>
+        <dl className="grid grid-cols-2 gap-x-4 gap-y-4 text-sm"><div><dt className="admin-muted">Fecha</dt><dd className="mt-1 font-semibold text-ink-950">{entry.fecha ? formatDate(entry.fecha) : 'No disponible'}</dd></div><div><dt className="admin-muted">Horario</dt><dd className="mt-1 font-semibold text-ink-950">{entry.hora_inicio && entry.hora_fin ? `${entry.hora_inicio.slice(0, 5)}–${entry.hora_fin.slice(0, 5)}` : 'No disponible'}</dd></div><div className="col-span-2"><dt className="admin-muted">Estado</dt><dd className="mt-1">{entry.estado ? <span className={`admin-pill ${statusClasses[entry.estado]}`}>{statusLabels[entry.estado]}</span> : 'No disponible'}</dd></div></dl>
+        <div className="space-y-4 border-t border-[#e3ecf6] pt-5">{([['Descripción', entry.descripcion], ['Diagnóstico', entry.diagnostico], ['Tratamiento', entry.tratamiento], ['Observación', entry.observacion]] as const).map(([label, value]) => <div key={label}><h4 className="text-sm font-semibold text-ink-950">{label}</h4><p className={`mt-1 whitespace-pre-wrap break-words text-sm ${value?.trim() ? 'text-[#526a87]' : 'italic text-[#7890ae]'}`}>{value?.trim() || 'Sin datos registrados'}</p></div>)}</div>
+      </div>
+      <div className="sticky bottom-0 z-10 mt-auto space-y-2 border-t border-[#e3ecf6] bg-white p-5 shadow-[0_-8px_20px_rgba(19,55,108,.05)]">
+        {action ? <button className="admin-primary min-h-11 w-full rounded-xl px-4 text-sm font-semibold" onClick={(event) => onAction(action, event.currentTarget)} type="button">{action === 'complete' ? 'Completar cita' : clinicalActionLabel(entry)}</button> : null}
+        {action === 'complete' ? <button className="admin-secondary min-h-11 w-full rounded-xl px-4 text-sm font-semibold" onClick={(event) => onAction('clinical', event.currentTarget)} type="button">Editar datos clínicos</button> : null}
+        {entry.estado === 'programada' ? <button className="admin-secondary min-h-11 w-full rounded-xl px-4 text-sm font-semibold" onClick={(event) => onAction('cancel', event.currentTarget)} type="button">Cancelar cita</button> : null}
+      </div>
+    </aside>
+  </>
 }
 
 export function MedicalAppointmentsPage() {
@@ -201,7 +252,9 @@ export function MedicalAppointmentsPage() {
   const [success, setSuccess] = useState<string | null>(null)
   const [busy, setBusy] = useState(false)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [selectedEntryId, setSelectedEntryId] = useState<string | null>(null)
   const pendingMutation = useRef(false)
+  const detailTrigger = useRef<HTMLElement | null>(null)
   const dialogTrigger = useRef<HTMLElement | null>(null)
   const pageHeading = useRef<HTMLHeadingElement>(null)
   const agendaQuery = useClinicalQuery(['agenda', month.value, month.year], (signal) => getAgendaMonth(month.value, month.year, signal))
@@ -216,6 +269,7 @@ export function MedicalAppointmentsPage() {
 
   const openDialog = (next: DialogState, trigger: HTMLElement) => { dialogTrigger.current = trigger; setActionError(null); setDialog(next) }
   const closeDialog = () => { if (pendingMutation.current) return; setDialog(null); setActionError(null); dialogTrigger.current?.focus() }
+  const closeDetails = useCallback(() => { setSelectedEntryId(null); detailTrigger.current?.focus() }, [])
   const save = async (values?: AppointmentValues, completion?: CompleteAppointmentPayload) => {
     if (!dialog || pendingMutation.current) return
     pendingMutation.current = true; setBusy(true); setActionError(null)
@@ -263,6 +317,7 @@ export function MedicalAppointmentsPage() {
     && (dayFilter === 'todos' || entry.fecha?.slice(0, 10) === dayFilter)
     && matchesPatient(entry),
   )
+  const selectedEntry = appointments.find((entry) => entry.id === selectedEntryId)
   const pendingRequests = state.kind === 'ready' ? state.pending.filter(matchesPatient) : []
   const clearFilters = () => { const today = new Date(); setMonth({ year: today.getFullYear(), value: today.getMonth() + 1 }); setDayFilter('todos'); setStatusFilter('todos'); setPatientSearch('') }
   const moveTab = (event: KeyboardEvent<HTMLDivElement>) => {
@@ -275,7 +330,7 @@ export function MedicalAppointmentsPage() {
     tabs[next].click()
   }
   const monthLabel = new Intl.DateTimeFormat('es-EC', { month: 'long', year: 'numeric' }).format(new Date(month.year, month.value - 1, 1))
-  return <div className="admin-reveal max-w-[1390px] space-y-6">
+  return <div className="max-w-[1390px] space-y-6">
     <header><p className="admin-kicker">Organización clínica</p><h1 className="admin-page-title mt-2 focus-visible:outline-2 focus-visible:outline-offset-2" ref={pageHeading} tabIndex={-1}>Citas médicas</h1><p className="admin-body mt-2">Consulta y gestión de las citas registradas en el período seleccionado.</p></header>
     {success ? <p className="admin-success rounded-xl p-4 text-sm" role="status">{success}</p> : null}
     {state.kind === 'ready' && (agendaQuery.isFetching || pendingQuery.isFetching) ? <p className="admin-muted text-sm" role="status">Actualizando citas…</p> : null}
@@ -292,17 +347,17 @@ export function MedicalAppointmentsPage() {
     {state.kind === 'loading' ? <LoadingState/> : state.kind === 'error' ? <ErrorState description={state.message} onRetry={() => { void load() }}/> : <section aria-label="Gestión de citas médicas" className="admin-surface min-w-0 rounded-[20px] p-4 sm:p-5">
       <div aria-label="Vistas de citas médicas" className="flex flex-wrap gap-2 border-b border-[#e3ecf6] pb-3" onKeyDown={moveTab} role="tablist">
         <button aria-controls="appointments-panel" aria-selected={activeTab === 'appointments'} className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600 ${activeTab === 'appointments' ? 'bg-clinic-600 text-white' : 'text-[#526a87] hover:bg-clinic-50 hover:text-clinic-700'}`} id="appointments-tab" onClick={() => { setActiveTab('appointments'); setOpenMenuId(null) }} role="tab" tabIndex={activeTab === 'appointments' ? 0 : -1} type="button">Citas registradas <span className={`ml-2 rounded-full px-2 py-0.5 text-xs ${activeTab === 'appointments' ? 'bg-white/20 text-white' : 'bg-clinic-50 text-clinic-700'}`}>{monthlyAppointments.length}</span></button>
-        <button aria-controls="pending-panel" aria-selected={activeTab === 'pending'} className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600 ${activeTab === 'pending' ? 'bg-clinic-600 text-white' : 'text-[#526a87] hover:bg-clinic-50 hover:text-clinic-700'}`} id="pending-tab" onClick={() => { setActiveTab('pending'); setOpenMenuId(null) }} role="tab" tabIndex={activeTab === 'pending' ? 0 : -1} type="button">Solicitudes pendientes <span className={`ml-2 rounded-full px-2 py-0.5 text-xs ${activeTab === 'pending' ? 'bg-white/20 text-white' : 'bg-clinic-50 text-clinic-700'}`}>{state.pending.length}</span></button>
+        <button aria-controls="pending-panel" aria-selected={activeTab === 'pending'} className={`rounded-xl px-4 py-2.5 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600 ${activeTab === 'pending' ? 'bg-clinic-600 text-white' : 'text-[#526a87] hover:bg-clinic-50 hover:text-clinic-700'}`} id="pending-tab" onClick={() => { setActiveTab('pending'); setOpenMenuId(null); setSelectedEntryId(null) }} role="tab" tabIndex={activeTab === 'pending' ? 0 : -1} type="button">Solicitudes pendientes <span className={`ml-2 rounded-full px-2 py-0.5 text-xs ${activeTab === 'pending' ? 'bg-white/20 text-white' : 'bg-clinic-50 text-clinic-700'}`}>{state.pending.length}</span></button>
       </div>
-      {activeTab === 'appointments' ? <div aria-labelledby="appointments-tab" id="appointments-panel" role="tabpanel"><section aria-label="Citas registradas" className="flex min-h-0 min-w-0 flex-col pt-4 md:max-h-[65vh] md:min-h-[320px] xl:max-h-[calc(100dvh-520px)] xl:min-h-[240px]" role="region"><div className="flex shrink-0 flex-wrap items-end justify-between gap-2 pb-3"><div><p className="admin-kicker capitalize">{monthLabel}</p><h2 className="mt-1 text-lg font-semibold text-ink-950" id="appointments-title">{dayFilter === 'todos' ? 'Citas registradas' : `Citas del ${formatDate(dayFilter)}`}</h2></div><p className="admin-muted text-sm">Citas encontradas: {appointments.length}</p></div>
+      {activeTab === 'appointments' ? <div aria-labelledby="appointments-tab" id="appointments-panel" role="tabpanel"><div className={`grid min-w-0 gap-4 ${selectedEntry ? 'lg:grid-cols-[minmax(0,1fr)_minmax(300px,35%)]' : ''}`}><section aria-label="Citas registradas" className="flex min-h-0 min-w-0 flex-col pt-4 md:max-h-[65vh] md:min-h-[320px] xl:max-h-[calc(100dvh-520px)] xl:min-h-[240px]" role="region"><div className="flex shrink-0 flex-wrap items-end justify-between gap-2 pb-3"><div><p className="admin-kicker capitalize">{monthLabel}</p><h2 className="mt-1 text-lg font-semibold text-ink-950" id="appointments-title">{dayFilter === 'todos' ? 'Citas registradas' : `Citas del ${formatDate(dayFilter)}`}</h2></div><p className="admin-muted text-sm">Citas encontradas: {appointments.length}</p></div>
         {appointments.length === 0 ? <EmptyState description={dayFilter === 'todos' ? 'No hay citas médicas que coincidan con los filtros seleccionados.' : `No hay citas médicas para el ${formatDate(dayFilter)} con los filtros seleccionados.`} icon={CalendarDays} title="Sin citas en esta vista"/> : <ul aria-label="Listado de citas" className="min-h-0 flex-1 space-y-2.5 overflow-y-auto overscroll-contain pb-2 pr-1 sm:pr-2" data-appointment-list tabIndex={0}>{appointments.map((entry) => <li className="min-w-0 rounded-2xl border border-[#dbe6f2] bg-white p-3.5 shadow-[0_3px_12px_rgba(19,55,108,0.035)] transition-colors hover:border-[#bcd2eb] sm:p-4" key={entry.id}>
           <div className="flex min-w-0 flex-wrap items-start gap-3 sm:flex-nowrap"><div className="min-w-0 flex-1"><div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1"><p className="min-w-0 break-words text-base font-bold text-ink-950">{entry.paciente?.nombres ?? 'Paciente no disponible'}</p>{entry.paciente?.codigo_paciente ? <span className="rounded-md bg-[#f0f5fb] px-2 py-0.5 text-xs font-semibold text-[#526a87]">Código: {entry.paciente.codigo_paciente}</span> : null}</div><p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-[#526a87]"><CalendarDays aria-hidden="true" className="text-clinic-600" size={16}/>{entry.fecha ? formatDate(entry.fecha) : 'Fecha pendiente'}{entry.hora_inicio && entry.hora_fin ? <span className="font-semibold text-ink-950">· {entry.hora_inicio.slice(0, 5)}–{entry.hora_fin.slice(0, 5)}</span> : null}</p></div><div className="flex shrink-0 items-start gap-2">{entry.estado ? <span className={`admin-pill ${statusClasses[entry.estado]}`}>{statusLabels[entry.estado]}</span> : null}<div className="relative"><button aria-expanded={openMenuId === entry.id} aria-label={`Opciones de cita para ${entry.paciente?.nombres ?? 'paciente'}`} className="admin-secondary grid size-10 place-items-center rounded-lg" onClick={(event) => { const button = event.currentTarget; const bottom = button.closest('[data-appointment-list]')?.getBoundingClientRect().bottom ?? window.innerHeight; setMenuAbove(bottom - button.getBoundingClientRect().bottom < 115); setOpenMenuId((current) => current === entry.id ? null : entry.id) }} type="button"><MoreVertical aria-hidden="true" size={18}/></button>{openMenuId === entry.id ? <div className={`absolute right-0 z-20 min-w-40 rounded-xl border border-[#dbe6f2] bg-white p-1 shadow-lg ${menuAbove ? 'bottom-full mb-1' : 'top-full mt-1'}`}>{entry.estado !== 'pendiente' ? <button className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-ink-950 hover:bg-sky-50" onClick={(event) => { setOpenMenuId(null); openDialog({ kind: 'edit', entry }, event.currentTarget) }} type="button">Editar cita</button> : null}<button className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-red-700 hover:bg-red-50" onClick={(event) => { setOpenMenuId(null); openDialog({ kind: 'delete', entry }, event.currentTarget) }} type="button">Eliminar</button></div> : null}</div></div></div>
-          <details className="mt-3 border-t border-[#e8eef6] pt-2"><summary className="w-fit cursor-pointer text-xs font-semibold text-clinic-700 hover:text-clinic-800">Ver detalles</summary><div className="admin-body mt-3 space-y-2 text-sm">{entry.descripcion ? <p><strong className="text-ink-950">Descripción:</strong> {entry.descripcion}</p> : null}{entry.diagnostico ? <p><strong className="text-ink-950">Diagnóstico:</strong> {entry.diagnostico}</p> : null}{entry.tratamiento ? <p><strong className="text-ink-950">Tratamiento:</strong> {entry.tratamiento}</p> : null}{entry.observacion ? <p><strong className="text-ink-950">Observación:</strong> {entry.observacion}</p> : null}{!entry.descripcion && !entry.diagnostico && !entry.tratamiento && !entry.observacion ? <p className="admin-muted">Aún no hay detalles clínicos registrados.</p> : null}<div className="flex flex-wrap gap-2 pt-1">{entry.estado === 'programada' || entry.estado === 'completada' ? <button className="admin-secondary min-h-9 rounded-lg px-3 text-xs font-semibold" onClick={(event) => openDialog({ kind: 'clinical', entry }, event.currentTarget)} type="button">{clinicalActionLabel(entry)}</button> : null}{entry.estado === 'programada' ? <><button className="admin-secondary min-h-9 rounded-lg px-3 text-xs font-semibold" onClick={(event) => openDialog({ kind: 'cancel', entry }, event.currentTarget)} type="button">Cancelar cita</button><button className="admin-secondary min-h-9 rounded-lg px-3 text-xs font-semibold" onClick={(event) => openDialog({ kind: 'complete', entry }, event.currentTarget)} type="button">Completar cita</button></> : null}</div></div></details>
+          <button aria-expanded={selectedEntryId === entry.id} className="mt-3 border-t border-[#e8eef6] pt-2 text-xs font-semibold text-clinic-700 hover:text-clinic-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" onClick={(event) => { detailTrigger.current = event.currentTarget; setSelectedEntryId(entry.id); setOpenMenuId(null) }} type="button">Ver detalles</button>
         </li>)}</ul>}
-      </section></div> : <div aria-labelledby="pending-tab" id="pending-panel" role="tabpanel"><section aria-labelledby="pending-requests-title" className="flex min-h-0 min-w-0 flex-col pt-4 md:max-h-[65vh] md:min-h-[320px] xl:max-h-[calc(100dvh-520px)] xl:min-h-[240px]"><div className="flex shrink-0 flex-wrap items-end justify-between gap-2 pb-3"><div><p className="admin-kicker">Gestión de solicitudes</p><h2 className="mt-1 text-lg font-semibold text-ink-950" id="pending-requests-title">Solicitudes pendientes</h2></div><p className="admin-muted text-sm">Solicitudes encontradas: {pendingRequests.length}</p></div>
+      </section>{selectedEntry ? <div className="min-w-0 pt-4"><AppointmentDetails entry={selectedEntry} onAction={(kind, trigger) => openDialog({ kind, entry: selectedEntry }, trigger)} onClose={closeDetails}/></div> : null}</div></div> : <div aria-labelledby="pending-tab" id="pending-panel" role="tabpanel"><section aria-labelledby="pending-requests-title" className="flex min-h-0 min-w-0 flex-col pt-4 md:max-h-[65vh] md:min-h-[320px] xl:max-h-[calc(100dvh-520px)] xl:min-h-[240px]"><div className="flex shrink-0 flex-wrap items-end justify-between gap-2 pb-3"><div><p className="admin-kicker">Gestión de solicitudes</p><h2 className="mt-1 text-lg font-semibold text-ink-950" id="pending-requests-title">Solicitudes pendientes</h2></div><p className="admin-muted text-sm">Solicitudes encontradas: {pendingRequests.length}</p></div>
         {pendingQuery.isError ? <ErrorState description={errorMessage(pendingQuery.error)} onRetry={() => { void pendingQuery.refetch() }}/> : pendingQuery.isPending ? <LoadingState/> : pendingRequests.length === 0 ? <EmptyState description={searchTerm ? 'No hay solicitudes para este paciente.' : 'No hay solicitudes de citas pendientes.'} icon={CalendarDays} title="Sin solicitudes pendientes"/> : <ul aria-label="Lista de solicitudes pendientes" className="min-h-0 flex-1 space-y-2.5 overflow-y-auto overscroll-contain pr-1 sm:pr-2" tabIndex={0}>{pendingRequests.map((entry) => <li className="flex min-w-0 flex-wrap items-center justify-between gap-3 rounded-2xl border border-[#dbe6f2] bg-white p-3.5 sm:p-4" key={entry.id}><div className="min-w-0"><p className="break-words font-bold text-ink-950">{entry.paciente?.nombres ?? 'Paciente no disponible'}</p>{entry.paciente?.codigo_paciente ? <p className="admin-muted mt-1 text-sm">Código: {entry.paciente.codigo_paciente}</p> : null}</div><button className="admin-primary min-h-11 rounded-lg px-4 text-sm font-semibold" onClick={(event) => openDialog({ kind: 'program', entry }, event.currentTarget)} type="button">Programar</button></li>)}</ul>}
       </section></div>}
     </section>}
-    {dialog ? <AccessibleDialog busy={busy} onClose={closeDialog} title={dialog.kind === 'clinical' ? clinicalActionLabel(dialog.entry) : dialogTitles[dialog.kind]} titleId="appointment-dialog-title">{dialog.kind === 'clinical' ? <ClinicalDataForm busy={busy} entry={dialog.entry} error={actionError} key={dialog.entry.id} onCancel={closeDialog} onSave={saveClinical}/> : dialog.kind === 'complete' ? <CompleteAppointmentForm busy={busy} error={actionError} key={dialog.entry.id} onCancel={closeDialog} onSave={(values) => save(undefined, values)}/> : <AppointmentDialogForm busy={busy} dialog={dialog} error={actionError} key={`${dialog.kind}-${dialog.entry.id}`} onCancel={closeDialog} onSave={save}/>}</AccessibleDialog> : null}
+    {dialog ? <AccessibleDialog busy={busy} onClose={closeDialog} title={dialog.kind === 'clinical' ? dialog.entry.estado === 'completada' ? 'Editar datos clínicos' : clinicalActionLabel(dialog.entry) : dialogTitles[dialog.kind]} titleId="appointment-dialog-title">{dialog.kind === 'clinical' ? <ClinicalDataForm busy={busy} entry={dialog.entry} error={actionError} key={dialog.entry.id} onCancel={closeDialog} onSave={saveClinical}/> : dialog.kind === 'complete' ? <CompleteAppointmentForm busy={busy} error={actionError} key={dialog.entry.id} onCancel={closeDialog} onSave={(values) => save(undefined, values)}/> : <AppointmentDialogForm busy={busy} dialog={dialog} error={actionError} key={`${dialog.kind}-${dialog.entry.id}`} onCancel={closeDialog} onSave={save}/>}</AccessibleDialog> : null}
   </div>
 }
