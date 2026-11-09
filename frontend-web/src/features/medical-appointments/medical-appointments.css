@@ -1,0 +1,22 @@
+@keyframes medical-panel-enter {
+  from { opacity: .85; transform: translateX(18px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes medical-backdrop-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.medical-appointment-panel { animation: medical-panel-enter 220ms ease-out both; }
+.medical-appointment-backdrop { animation: medical-backdrop-enter 220ms ease-out both; }
+
+.admin-dialog-panel:has(.medical-appointment-edit),
+.admin-dialog-panel:has(.medical-appointment-clinical) { max-width: 550px; }
+
+.medical-appointment-form-actions > button { flex: 1 1 170px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .medical-appointment-panel,
+  .medical-appointment-backdrop { animation: none; }
+}
