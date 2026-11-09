@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MedicalAppointmentsPage } from './MedicalAppointmentsPage'
 import { cancelAppointment, completeAppointment, createMedicalAppointment, createPersonalEntry, deleteAgendaEntry, getAgendaMonth, getPendingRequests, programRequest, registerClinicalData, updateAgendaEntry } from '../agenda/agendaService'
 
@@ -10,6 +10,7 @@ const readyMedical = { ...medical, diagnostico: 'Diagnóstico previo', tratamien
 const pending = { ...medical, id: 'request-1', fecha: null, hora_inicio: null, hora_fin: null, descripcion: null, estado: 'pendiente' as const }
 
 beforeEach(() => { vi.resetAllMocks(); vi.mocked(getAgendaMonth).mockResolvedValue([personal, medical]); vi.mocked(getPendingRequests).mockResolvedValue([pending]) })
+afterEach(() => { vi.unstubAllGlobals() })
 
 async function renderOctober() {
   render(<MedicalAppointmentsPage/>)
@@ -303,6 +304,58 @@ describe('MedicalAppointmentsPage', () => {
     fireEvent.keyDown(document, { key: 'Escape' })
     expect(screen.queryByRole('region', { name: 'Detalles de la cita' })).not.toBeInTheDocument()
     expect(trigger).toHaveFocus()
+  })
+
+  it('keeps the panel visible during its exit transition before restoring focus', async () => {
+    vi.stubGlobal('matchMedia', () => ({ matches: false }))
+    await renderOctober()
+    const trigger = screen.getByRole('button', { name: 'Ver detalles' })
+    fireEvent.click(trigger)
+    fireEvent.click(within(screen.getByRole('region', { name: 'Detalles de la cita' })).getByRole('button', { name: 'Cerrar detalles' }))
+    expect(screen.getByRole('region', { name: 'Detalles de la cita' })).toHaveAttribute('data-exiting', 'true')
+    expect(trigger).not.toHaveFocus()
+    await waitFor(() => expect(screen.queryByRole('region', { name: 'Detalles de la cita' })).not.toBeInTheDocument())
+    expect(trigger).toHaveFocus()
+  })
+
+  it('keeps the selected panel and list position after saving clinical data', async () => {
+    vi.mocked(getAgendaMonth).mockResolvedValueOnce([medical]).mockResolvedValueOnce([{ ...medical, diagnostico: 'Nuevo diagnóstico', tratamiento: 'Nuevo tratamiento' }])
+    vi.mocked(registerClinicalData).mockResolvedValue('Datos clínicos guardados.')
+    await renderOctober()
+    const list = screen.getByRole('list', { name: 'Listado de citas' })
+    list.scrollTop = 120
+    fireEvent.click(screen.getByRole('button', { name: 'Ver detalles' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar datos clínicos' }))
+    const dialog = screen.getByRole('dialog', { name: 'Registrar datos clínicos' })
+    fireEvent.change(within(dialog).getByLabelText('Diagnóstico * (obligatorio)'), { target: { value: 'Nuevo diagnóstico' } })
+    fireEvent.change(within(dialog).getByLabelText('Tratamiento * (obligatorio)'), { target: { value: 'Nuevo tratamiento' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar cambios' }))
+    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+    const panel = screen.getByRole('region', { name: 'Detalles de la cita' })
+    expect(within(panel).getByText('Nuevo diagnóstico')).toBeInTheDocument()
+    expect(within(panel).getByRole('button', { name: 'Cerrar detalles' })).toHaveFocus()
+    expect(screen.getByRole('list', { name: 'Listado de citas' })).toBe(list)
+    expect(list.scrollTop).toBe(120)
+  })
+
+  it('keeps the panel and restores its action focus after cancelling an edit', async () => {
+    await renderOctober()
+    fireEvent.click(screen.getByRole('button', { name: 'Ver detalles' }))
+    const action = screen.getByRole('button', { name: 'Registrar datos clínicos' })
+    fireEvent.click(action)
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Registrar datos clínicos' })).getByRole('button', { name: 'Cancelar' }))
+    expect(screen.getByRole('region', { name: 'Detalles de la cita' })).toBeInTheDocument()
+    expect(action).toHaveFocus()
+  })
+
+  it('returns focus to the card when cancelling an edit opened from its menu', async () => {
+    await renderOctober()
+    const menuButton = screen.getByRole('button', { name: 'Opciones de cita para Paciente recibido' })
+    fireEvent.click(menuButton)
+    fireEvent.click(screen.getByRole('button', { name: 'Editar cita' }))
+    fireEvent.click(within(screen.getByRole('dialog', { name: 'Editar cita médica' })).getByRole('button', { name: 'Cancelar' }))
+    expect(menuButton).toHaveFocus()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
 
   it('shows the permitted primary action for complete clinical data and completed appointments', async () => {
