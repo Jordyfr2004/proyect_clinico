@@ -1,10 +1,12 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { MemoryRouter } from 'react-router-dom'
 import { AgendaPage } from './AgendaPage'
 import { createMedicalAppointment, createPersonalEntry, getAgendaMonth, getPendingRequests, updateAgendaEntry } from './agendaService'
 import { AuthContext } from '../auth/authContext'
 import { getPatients } from '../patients/patientService'
 import type { UserRole } from '../auth/authService'
+import * as clinicalQuery from '../../services/clinicalQuery'
 
 vi.mock('./agendaService', () => ({ getAgendaMonth: vi.fn(), getPendingRequests: vi.fn(), createMedicalAppointment: vi.fn(), createPersonalEntry: vi.fn(), updateAgendaEntry: vi.fn() }))
 vi.mock('../patients/patientService', () => ({ getPatients: vi.fn() }))
@@ -12,8 +14,8 @@ const personal = { id: 'personal-1', paciente_id: null, fecha: '2026-10-05', hor
 const medical = { ...personal, id: 'medical-1', tipo: 'cita_medica' as const, estado: 'programada' as const, descripcion: 'Control recibido', paciente_id: 'patient-1', paciente: { codigo_paciente: '001', nombres: 'Paciente recibido' } }
 beforeEach(() => { vi.resetAllMocks(); vi.mocked(getAgendaMonth).mockResolvedValue([personal, medical]); vi.mocked(getPatients).mockResolvedValue({ data: [{ id: 'patient-1', codigo_paciente: '001', nombres: 'Paciente recibido', cedula: '0912345678', telefono: null, direccion: null, fecha_nacimiento: null }], current_page: 1, last_page: 1, per_page: 20, total: 1, next_page_url: null, prev_page_url: null }) })
 
-function renderAgenda(role: UserRole = 'doctora') {
-  render(<AuthContext.Provider value={{ status: 'authenticated', user: { id: 'staff-1', name: 'Personal', username: 'personal', role, paciente_id: null, activo: true }, sessionError: null, login: async () => {}, logout: async () => {} }}><AgendaPage/></AuthContext.Provider>)
+function renderAgenda(role: UserRole = 'doctora', dashboardAction?: string) {
+  render(<AuthContext.Provider value={{ status: 'authenticated', user: { id: 'staff-1', name: 'Personal', username: 'personal', role, paciente_id: null, activo: true }, sessionError: null, login: async () => {}, logout: async () => {} }}><MemoryRouter initialEntries={[{ pathname: '/agenda', state: dashboardAction ? { dashboardAction } : null }]}><AgendaPage/></MemoryRouter></AuthContext.Provider>)
 }
 
 function selectOctober() {
@@ -26,6 +28,35 @@ async function choosePatient(form: HTMLElement, search = 'Paciente', option = /P
 }
 
 describe('AgendaPage consultation', () => {
+  it('invalidates the Dashboard total after editing a medical appointment', async () => {
+    const stale = vi.spyOn(clinicalQuery, 'markClinicalQueriesStale')
+    vi.mocked(updateAgendaEntry).mockResolvedValue('Cita actualizada')
+    renderAgenda()
+    selectOctober()
+    const bookings = screen.getByRole('region', { name: 'Registros agendados' })
+    expect(await within(bookings).findByText('Control recibido')).toBeInTheDocument()
+    fireEvent.click(within(bookings).getByRole('button', { name: /Más opciones para Control recibido/ }))
+    fireEvent.click(within(bookings).getByRole('button', { name: 'Editar' }))
+    fireEvent.submit(screen.getByRole('form', { name: 'Editar registro de agenda' }))
+    await waitFor(() => expect(updateAgendaEntry).toHaveBeenCalledOnce())
+    expect(stale).toHaveBeenCalledWith(['dashboard-report'])
+    stale.mockRestore()
+  })
+
+  it('opens a medical appointment for today from the Dashboard action', async () => {
+    renderAgenda('doctora', 'programar-cita')
+    const form = await screen.findByRole('form', { name: 'Agendar cita médica' })
+    const now = new Date()
+    const today = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+    expect(within(form).getByText(new Intl.DateTimeFormat('es-EC', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(`${today}T12:00:00`)))).toBeInTheDocument()
+  })
+
+  it('ignores a booking action for an assistant', async () => {
+    renderAgenda('asistente', 'programar-cita')
+    expect(await screen.findByRole('heading', { name: /Agendado en/ })).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
   it('lists booked entries for the month and opens booking directly from a calendar day', async () => {
     renderAgenda()
     selectOctober()

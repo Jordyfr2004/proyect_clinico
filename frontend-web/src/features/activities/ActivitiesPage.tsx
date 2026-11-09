@@ -1,6 +1,7 @@
 import { isAxiosError } from 'axios'
 import { ClipboardList, Plus } from 'lucide-react'
-import { useRef, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { EmptyState } from '../../components/states/EmptyState'
 import { ErrorState } from '../../components/states/ErrorState'
 import { LoadingState } from '../../components/states/LoadingState'
@@ -72,6 +73,8 @@ function ActivityForm({ record, busy, error, onSave, onCancel }: { record?: Acti
 }
 
 export function ActivitiesPage() {
+  const location = useLocation()
+  const navigate = useNavigate()
   const { user } = useAuth()
   const doctor = user?.role === 'doctora'
   const now = new Date()
@@ -81,12 +84,16 @@ export function ActivitiesPage() {
   const [year, setYear] = useClinicalViewState('activities.year', () => String(now.getFullYear()))
   const [code, setCode] = useClinicalViewState('activities.code', () => '')
   const [query, setQuery] = useClinicalViewState('activities.query', () => periodParams('mes', date, month, year, ''))
-  const [dialog, setDialog] = useState<Dialog | null>(null)
+  const [dialog, setDialog] = useState<Dialog | null>(() => doctor && location.state?.dashboardAction === 'registrar-actividad' ? { kind: 'create' } : null)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const pendingMutation = useRef(false)
   const trigger = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    if (location.state?.dashboardAction !== 'registrar-actividad' || !doctor) return
+    navigate(location.pathname, { replace: true, state: null })
+  }, [doctor, location.pathname, location.state, navigate])
   const recordsQuery = useClinicalQuery(['activities', query.list], (signal) => getActivities(query.list, signal))
   const totalQuery = useClinicalQuery(['activities-total', query.total], (signal) => getActivityTotal(query.total, signal))
   const load = async (): Promise<boolean> => {

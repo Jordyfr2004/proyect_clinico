@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { MemoryRouter } from 'react-router-dom'
 import { CashPage } from './CashPage'
 import { clearClinicalQueries } from '../../services/clinicalQuery'
 import { createExpense, deleteExpense, getCashSummary, updateExpense, type CashMovement, type CashSummary } from './cashService'
@@ -11,8 +12,13 @@ const summary: CashSummary = { periodo: 'dia', ingresos: '25.00', egresos: '15.0
 beforeEach(() => { clearClinicalQueries(); vi.resetAllMocks(); vi.mocked(getCashSummary).mockResolvedValue(summary) })
 
 describe('CashPage', () => {
+  it('opens expense registration from the Dashboard action', async () => {
+    render(<MemoryRouter initialEntries={[{ pathname: '/caja', state: { dashboardAction: 'registrar-egreso' } }]}><CashPage/></MemoryRouter>)
+    expect(await screen.findByRole('form', { name: 'Datos del egreso' })).toBeInTheDocument()
+  })
+
   it('uses only the current date, week, month and year and shows backend movements', async () => {
-    render(<CashPage/>)
+    render(<MemoryRouter><CashPage/></MemoryRouter>)
     expect(await screen.findByText('Limpieza dental')).toBeInTheDocument()
     expect(screen.getByText('Compra de guantes')).toBeInTheDocument()
     expect(screen.getByText('$10.00')).toBeInTheDocument()
@@ -36,7 +42,7 @@ describe('CashPage', () => {
   it('creates an expense with the current date at submit and refreshes totals and movements', async () => {
     vi.mocked(createExpense).mockResolvedValue('Egreso registrado.')
     vi.mocked(getCashSummary).mockResolvedValueOnce(summary).mockResolvedValue({ ...summary, egresos: '20.00', saldo: '5.00', movimientos: [...summary.movimientos, { ...expense, id: 'expense-2' }] })
-    render(<CashPage/>)
+    render(<MemoryRouter><CashPage/></MemoryRouter>)
     await screen.findByText('Limpieza dental')
     fireEvent.click(screen.getByRole('button', { name: 'Registrar egreso' }))
     const form = screen.getByRole('form', { name: 'Datos del egreso' })
@@ -56,7 +62,7 @@ describe('CashPage', () => {
   it('edits only concept and amount, keeps the original date, and confirms deletion', async () => {
     vi.mocked(updateExpense).mockResolvedValue('Egreso actualizado.')
     vi.mocked(deleteExpense).mockResolvedValue('Egreso eliminado.')
-    render(<CashPage/>)
+    render(<MemoryRouter><CashPage/></MemoryRouter>)
     await screen.findByText('Compra de guantes')
     fireEvent.click(screen.getByRole('button', { name: 'Editar Compra de guantes' }))
     const form = screen.getByRole('form', { name: 'Datos del egreso' })
@@ -77,7 +83,7 @@ describe('CashPage', () => {
   it('shows a write error and prevents duplicate submissions', async () => {
     let rejectSave: (reason: Error) => void = () => {}
     vi.mocked(createExpense).mockImplementation(() => new Promise((_resolve, reject) => { rejectSave = reject }))
-    render(<CashPage/>)
+    render(<MemoryRouter><CashPage/></MemoryRouter>)
     await screen.findByText('Limpieza dental')
     fireEvent.click(screen.getByRole('button', { name: 'Registrar egreso' }))
     const form = screen.getByRole('form', { name: 'Datos del egreso' })
@@ -93,12 +99,12 @@ describe('CashPage', () => {
 
   it('handles empty and failed reports', async () => {
     vi.mocked(getCashSummary).mockResolvedValueOnce({ ...summary, movimientos: [] })
-    const view = render(<CashPage/>)
+    const view = render(<MemoryRouter><CashPage/></MemoryRouter>)
     expect(await screen.findByText('Sin movimientos')).toBeInTheDocument()
     view.unmount()
     clearClinicalQueries()
     vi.mocked(getCashSummary).mockRejectedValue(new Error('network'))
-    render(<CashPage/>)
+    render(<MemoryRouter><CashPage/></MemoryRouter>)
     expect(await screen.findByText(/No fue posible completar la operación/)).toBeInTheDocument()
   })
 })

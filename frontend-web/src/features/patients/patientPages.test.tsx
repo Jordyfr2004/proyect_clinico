@@ -28,6 +28,12 @@ function renderDetail(path = '/pacientes/patient-id/historial', role: UserRole =
 }
 
 describe('patient views', () => {
+  it('opens registration from the Dashboard action', async () => {
+    vi.mocked(getPatients).mockResolvedValue(pageOf([]))
+    render(<MemoryRouter initialEntries={[{ pathname: '/pacientes', state: { dashboardAction: 'registrar-paciente' } }]}><PatientsPage/></MemoryRouter>)
+    expect(await screen.findByRole('form', { name: 'Datos del nuevo paciente' })).toBeInTheDocument()
+  })
+
   it('restores the search and its fresh server result without another GET on return', async () => {
     vi.mocked(getPatients).mockImplementation(async (params) => pageOf(params?.buscar ? [patient] : []))
     const first = render(<MemoryRouter><PatientsPage/></MemoryRouter>)

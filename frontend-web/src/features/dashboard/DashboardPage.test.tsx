@@ -7,6 +7,7 @@ import { getActivities } from '../activities/activityService'
 import { getAgendaMonth, getPendingRequests, type AgendaEntry } from '../agenda/agendaService'
 import { getPatients } from '../patients/patientService'
 import { getDashboardReport } from '../reports/reportService'
+import { invalidateClinicalQueries, markClinicalQueriesStale } from '../../services/clinicalQuery'
 import { DashboardPage } from './DashboardPage'
 
 vi.mock('../agenda/agendaService', () => ({ getAgendaMonth: vi.fn(), getPendingRequests: vi.fn() }))
@@ -45,19 +46,19 @@ function renderDashboard(role: UserRole) {
 
 function LocationProbe() {
   const location = useLocation()
-  return <output data-testid="dashboard-location">{location.pathname}</output>
+  return <output data-testid="dashboard-location">{location.pathname}:{location.state?.dashboardAction ?? ''}</output>
 }
 
 describe('DashboardPage', () => {
   it.each([
-    ['Citas médicas', '/citas-medicas'],
+    ['Citas programadas', '/citas-medicas'],
     ['Pacientes registrados', '/pacientes'],
-    ['Ingresos y egresos', '/caja'],
+    ['Saldo del mes', '/caja'],
     ['Actividades', '/actividades'],
   ])('navigates from the entire %s metric card to %s even when its value is zero', async (label, path) => {
     renderDashboard('doctora')
     const card = screen.getByRole('region', { name: label })
-    expect(await within(card).findByText(label === 'Ingresos y egresos' ? '$0.00' : '0')).toBeInTheDocument()
+    expect(await within(card).findByText(label === 'Saldo del mes' ? '$0.00' : '0')).toBeInTheDocument()
     const link = within(card).getByRole('link', { name: `Abrir ${label}` })
     expect(link).toHaveAttribute('href', path)
     fireEvent.click(link)
@@ -76,10 +77,11 @@ describe('DashboardPage', () => {
     vi.mocked(getActivities).mockResolvedValue([activity, { ...activity, id: 'activity-2' }])
     renderDashboard('doctora')
 
-    expect(await within(screen.getByRole('region', { name: 'Citas médicas' })).findByText('1')).toBeInTheDocument()
+    expect(await within(screen.getByRole('region', { name: 'Citas programadas' })).findByText('1')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Citas programadas' })).getByText('Para hoy · 1 completada')).toBeInTheDocument()
     expect(within(screen.getByRole('region', { name: 'Pacientes registrados' })).getByText('2')).toBeInTheDocument()
-    expect(within(screen.getByRole('region', { name: 'Ingresos y egresos' })).getByText('$100.00')).toBeInTheDocument()
-    expect(within(screen.getByRole('region', { name: 'Ingresos y egresos' })).getByText(/Ingresos: \$125.00/)).toHaveTextContent('Egresos: $25.00')
+    expect(within(screen.getByRole('region', { name: 'Saldo del mes' })).getByText('$100.00')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Saldo del mes' })).getByText(/Ingresos: \$125.00/)).toHaveTextContent('Egresos: $25.00')
     expect(within(screen.getByRole('region', { name: 'Actividades' })).getByText('2')).toBeInTheDocument()
     const agenda = screen.getByRole('region', { name: 'Agenda de hoy' })
     const rows = within(agenda).getAllByRole('listitem')
@@ -102,16 +104,45 @@ describe('DashboardPage', () => {
     expect(getAgendaMonth).not.toHaveBeenCalled()
     expect(getPendingRequests).not.toHaveBeenCalled()
     expect(getDashboardReport).not.toHaveBeenCalled()
-    expect(screen.queryByRole('region', { name: 'Ingresos y egresos' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Abrir Ingresos y egresos' })).not.toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Bienvenido al consultorio' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Saldo del mes' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Abrir Saldo del mes' })).not.toBeInTheDocument()
     expect(screen.queryByRole('region', { name: 'Agenda de hoy' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: /Citas médicasConsulta y gestión/ })).not.toBeInTheDocument()
+    const quick = screen.getByRole('region', { name: 'Accesos rápidos' })
+    expect(within(quick).getByRole('link', { name: 'Registrar paciente' })).toHaveAttribute('href', '/pacientes')
+    expect(within(quick).queryByRole('link', { name: 'Registrar actividad' })).not.toBeInTheDocument()
+    expect(within(quick).queryByRole('link', { name: 'Programar cita' })).not.toBeInTheDocument()
+    expect(within(quick).queryByRole('link', { name: 'Registrar egreso' })).not.toBeInTheDocument()
+  })
+
+  it('places four permitted quick actions before pending requests with working routes', () => {
+    renderDashboard('doctora')
+    const quick = screen.getByRole('region', { name: 'Accesos rápidos' })
+    const actions = within(quick).getAllByRole('link')
+    expect(actions.map((link) => [link.textContent, link.getAttribute('href')])).toEqual([
+      ['Registrar paciente', '/pacientes'],
+      ['Programar cita', '/agenda'],
+      ['Registrar actividad', '/actividades'],
+      ['Registrar egreso', '/caja'],
+    ])
+    expect(quick.compareDocumentPosition(screen.getByRole('region', { name: 'Solicitudes pendientes' })) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it.each([
+    ['Registrar paciente', '/pacientes'],
+    ['Programar cita', '/agenda'],
+    ['Registrar actividad', '/actividades'],
+    ['Registrar egreso', '/caja'],
+  ])('navigates from %s and requests its existing form', (label, path) => {
+    renderDashboard('doctora')
+    fireEvent.click(within(screen.getByRole('region', { name: 'Accesos rápidos' })).getByRole('link', { name: label }))
+    expect(screen.getByTestId('dashboard-location')).toHaveTextContent(`${path}:${({ 'Registrar paciente': 'registrar-paciente', 'Programar cita': 'programar-cita', 'Registrar actividad': 'registrar-actividad', 'Registrar egreso': 'registrar-egreso' } as Record<string, string>)[label]}`)
   })
 
   it('keeps loading distinct from a real empty response', async () => {
     vi.mocked(getAgendaMonth).mockReturnValue(new Promise(() => {}))
     renderDashboard('doctora')
-    expect(within(screen.getByRole('region', { name: 'Citas médicas' })).getByRole('status')).toHaveTextContent('Cargando')
+    expect(within(screen.getByRole('region', { name: 'Citas programadas' })).getByRole('status')).toHaveTextContent('Cargando')
     expect(within(screen.getByRole('region', { name: 'Agenda de hoy' })).getByRole('status')).toHaveTextContent('Cargando')
     expect(screen.queryByText('No hay citas médicas registradas para hoy.')).not.toBeInTheDocument()
   })
@@ -120,7 +151,7 @@ describe('DashboardPage', () => {
     renderDashboard('doctora')
     expect(await screen.findByText('No hay citas médicas registradas para hoy.')).toBeInTheDocument()
     expect(await screen.findByText('No hay solicitudes de citas pendientes.')).toBeInTheDocument()
-    expect(within(screen.getByRole('region', { name: 'Citas médicas' })).getByText('0')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Citas programadas' })).getByText('0')).toBeInTheDocument()
   })
 
   it('shows a safe error and retries a failed request', async () => {
@@ -146,5 +177,38 @@ describe('DashboardPage', () => {
     expect(getAgendaMonth).toHaveBeenCalledTimes(1)
     expect(getPendingRequests).toHaveBeenCalledTimes(1)
     expect(getDashboardReport).toHaveBeenCalledTimes(1)
+  })
+
+  it('refreshes Laravel-backed cards and today agenda after related writes', async () => {
+    vi.mocked(getAgendaMonth).mockResolvedValue([appointment])
+    vi.mocked(getDashboardReport).mockResolvedValue({ ...report, citas: { ...report.citas, hoy: 1 } })
+    const view = render(<MemoryRouter><AuthContext.Provider value={{
+      status: 'authenticated', user: { id: 'user-1', name: 'Personal', username: 'personal', role: 'doctora', paciente_id: null, activo: true },
+      sessionError: null, login: async () => {}, logout: async () => {},
+    }}><DashboardPage/></AuthContext.Provider></MemoryRouter>)
+    expect(await screen.findByText('Paciente recibido')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Citas programadas' })).getByText('1')).toBeInTheDocument()
+    view.unmount()
+
+    vi.mocked(getAgendaMonth).mockResolvedValue([])
+    vi.mocked(getDashboardReport).mockResolvedValue({ ...report, pacientes: { total: 2 }, mes_actual: { ingresos: '25.00', egresos: '5.00', saldo: '20.00' } })
+    vi.mocked(getActivities).mockResolvedValue([activity])
+    await Promise.all([markClinicalQueriesStale(['agenda']), markClinicalQueriesStale(['dashboard-report']), markClinicalQueriesStale(['activities'])])
+    renderDashboard('doctora')
+    expect(await screen.findByText('No hay citas médicas registradas para hoy.')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Citas programadas' })).getByText('0')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Pacientes registrados' })).getByText('2')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Saldo del mes' })).getByText('$20.00')).toBeInTheDocument()
+    expect(within(screen.getByRole('region', { name: 'Actividades' })).getByText('1')).toBeInTheDocument()
+  })
+
+  it('shows a connection error when a populated pending list fails to refresh', async () => {
+    vi.mocked(getPendingRequests).mockResolvedValueOnce([{ ...appointment, id: 'request-1', estado: 'pendiente' }]).mockRejectedValueOnce(new Error('offline'))
+    renderDashboard('doctora')
+    const panel = screen.getByRole('region', { name: 'Solicitudes pendientes' })
+    expect(await within(panel).findByText('Paciente recibido')).toBeInTheDocument()
+    await invalidateClinicalQueries(['agenda', 'pending'])
+    expect(await within(panel).findByRole('alert')).toHaveTextContent('No fue posible actualizar las solicitudes.')
+    expect(within(panel).getByText('Paciente recibido')).toBeInTheDocument()
   })
 })

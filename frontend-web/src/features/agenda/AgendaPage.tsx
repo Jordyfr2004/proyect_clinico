@@ -1,6 +1,7 @@
 import { isAxiosError } from 'axios'
 import { CalendarDays, ChevronLeft, ChevronRight, MoreVertical } from 'lucide-react'
 import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { ErrorState } from '../../components/states/ErrorState'
 import { LoadingState } from '../../components/states/LoadingState'
 import { AccessibleDialog } from '../../components/ui/AccessibleDialog'
@@ -86,6 +87,8 @@ function AgendaForm({ date, busy, error, onCancel, onSave, onKindChange }: { dat
 }
 
 export function AgendaPage() {
+  const location = useLocation()
+  const navigate = useNavigate()
   const { user } = useAuth()
   const now = new Date()
   const [month, setMonth] = useClinicalViewState('agenda.month', () => ({ year: now.getFullYear(), value: now.getMonth() + 1 }))
@@ -104,6 +107,20 @@ export function AgendaPage() {
   const [calendarHeight, setCalendarHeight] = useState<number | null>(null)
   const appointmentPending = useRef(false)
   const appointmentTrigger = useRef<HTMLButtonElement | null>(null)
+  useEffect(() => {
+    if (location.state?.dashboardAction !== 'programar-cita' || user?.role !== 'doctora') return
+    const timer = window.setTimeout(() => {
+      const today = new Date()
+      setMonth({ year: today.getFullYear(), value: today.getMonth() + 1 })
+      setSelectedDate(dateKey(today.getFullYear(), today.getMonth() + 1, today.getDate()))
+      setDaySelected(true)
+      setAppointmentKind('medical')
+      setAppointmentError(null)
+      setAppointmentOpen(true)
+      navigate(location.pathname, { replace: true, state: null })
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [location.pathname, location.state, navigate, setDaySelected, setMonth, setSelectedDate, user?.role])
   const query = useClinicalQuery(['agenda', month.value, month.year], (signal) => getAgendaMonth(month.value, month.year, signal))
   useEffect(() => {
     const element = calendarCard.current
@@ -164,6 +181,10 @@ export function AgendaPage() {
       const message = entryDialog.kind === 'edit'
         ? await updateAgendaEntry(entryDialog.entry.id, values!)
         : await deleteAgendaEntry(entryDialog.entry.id)
+      if (entryDialog.entry.tipo === 'cita_medica') {
+        void markClinicalQueriesStale(['dashboard-report'])
+        void markClinicalQueriesStale(['reports'])
+      }
       const refreshed = await load()
       setAppointmentSuccess(refreshed ? message : `${message} No fue posible actualizar el calendario; vuelve a cargarlo.`)
       setEntryDialog(null)

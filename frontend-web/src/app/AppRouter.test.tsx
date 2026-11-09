@@ -55,7 +55,7 @@ function authenticatedUser(role: UserRole): AuthUser {
 
 function openHeaderPhotoDialog() {
   fireEvent.click(screen.getByRole('button', { name: 'Abrir menú de perfil' }))
-  fireEvent.click(within(screen.getByRole('menu', { name: 'Opciones de usuario' })).getByRole('menuitem', { name: 'Mi perfil / Cambiar fotografía' }))
+  fireEvent.click(within(screen.getByRole('menu', { name: 'Opciones de usuario' })).getByRole('menuitem', { name: /Cambiar fotografía/ }))
   return screen.getByRole('dialog', { name: 'Fotografía de perfil' })
 }
 
@@ -83,22 +83,24 @@ describe('AppRouter', () => {
   it('shows the public clinic page at the root before the staff login', () => {
     renderRouter('guest', '/')
     expect(screen.getByRole('heading', { name: 'Tu salud dental merece una atención cercana.' })).toBeInTheDocument()
-    expect(within(screen.getByRole('navigation', { name: 'Navegación pública' })).getByRole('link', { name: /Portal del personal/ })).toHaveAttribute('href', '/login')
+    expect(within(screen.getByRole('navigation', { name: 'Navegación pública' })).getByRole('link', { name: /Portal del personal/ })).toHaveAttribute('href', '/acceso')
     expect(screen.getByRole('link', { name: 'Contactar por WhatsApp' })).toHaveAttribute('href', expect.stringContaining('wa.me/593979141915'))
     expect(screen.getByText(/Jordy Rosado, Jereny Vera, Andrés Garcías, Willian Cabrera y Luis/)).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Bienvenido de nuevo' })).not.toBeInTheDocument()
   })
 
-  it('lets staff return from login to the public presentation', () => {
+  it('shows the presentation first even from the old login address, then opens staff access', () => {
     renderRouter('guest', '/login')
-    fireEvent.click(screen.getByRole('link', { name: 'Volver a la presentación' }))
     expect(screen.getByRole('heading', { name: 'Tu salud dental merece una atención cercana.' })).toBeInTheDocument()
+    fireEvent.click(within(screen.getByRole('navigation', { name: 'Navegación pública' })).getByRole('link', { name: /Portal del personal/ }))
+    expect(screen.getByRole('heading', { name: 'Bienvenido de nuevo' })).toBeInTheDocument()
+    expect(screen.queryByRole('link', { name: 'Volver a la presentación' })).not.toBeInTheDocument()
   })
 
   it('keeps the public presentation accessible separately from the dashboard', () => {
     renderRouter('authenticated', '/inicio')
     expect(screen.getByRole('heading', { name: 'Tu salud dental merece una atención cercana.' })).toBeInTheDocument()
-    expect(screen.queryByRole('heading', { name: 'Resumen de gestión' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Bienvenida, Doctora' })).not.toBeInTheDocument()
   })
 
   it('holds protected content while authentication is loading', () => {
@@ -107,9 +109,9 @@ describe('AppRouter', () => {
     expect(screen.queryByRole('heading', { name: 'Pacientes' })).not.toBeInTheDocument()
   })
 
-  it.each(['/login', '/registro', '/mi-perfil'])('does not expose patient account flows at %s', (path) => {
+  it.each(['/login', '/registro', '/mi-perfil'])('shows the presentation without patient account flows at %s', (path) => {
     renderRouter('guest', path)
-    expect(screen.getByRole('heading', { name: 'Bienvenido de nuevo' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Tu salud dental merece una atención cercana.' })).toBeInTheDocument()
     expect(screen.queryByRole('link', { name: 'Crear cuenta' })).not.toBeInTheDocument()
     expect(screen.queryByRole('form', { name: 'Registro de paciente' })).not.toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Mi perfil' })).not.toBeInTheDocument()
@@ -136,7 +138,7 @@ describe('AppRouter', () => {
   it('redirects authenticated users away from password recovery', async () => {
     renderRouter('authenticated', '/recuperar-contrasena', undefined, authenticatedUser('doctora'))
 
-    expect(await screen.findByRole('heading', { name: 'Resumen de gestión' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Bienvenida, Doctora' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Recupera tu acceso' })).not.toBeInTheDocument()
   })
 
@@ -149,7 +151,7 @@ describe('AppRouter', () => {
 
   it('sends username and password and shows a backend 422 message', async () => {
     const login = vi.fn().mockRejectedValue({ isAxiosError: true, response: { status: 422, data: { message: 'Credenciales incorrectas.' } } })
-    renderRouter('guest', '/login', login)
+    renderRouter('guest', '/acceso', login)
 
     fireEvent.change(screen.getByLabelText('Usuario o cédula'), { target: { value: '1234567890' } })
     fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'valid-password-123' } })
@@ -164,7 +166,7 @@ describe('AppRouter', () => {
 
   it('shows a safe message when the login request cannot reach the server', async () => {
     const login = vi.fn().mockRejectedValue({ isAxiosError: true })
-    renderRouter('guest', '/login', login)
+    renderRouter('guest', '/acceso', login)
 
     fireEvent.change(screen.getByLabelText('Usuario o cédula'), { target: { value: '1234567890' } })
     fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'valid-password-123' } })
@@ -175,7 +177,7 @@ describe('AppRouter', () => {
 
   it('shows the backend rate-limit message for login HTTP 429', async () => {
     const login = vi.fn().mockRejectedValue({ isAxiosError: true, response: { status: 429, data: { message: 'Demasiados intentos.' } } })
-    renderRouter('guest', '/login', login)
+    renderRouter('guest', '/acceso', login)
     fireEvent.change(screen.getByLabelText('Usuario o cédula'), { target: { value: 'doctora' } })
     fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'valid-password-123' } })
     fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
@@ -185,22 +187,22 @@ describe('AppRouter', () => {
   it('shows the real dashboard sections without claiming there are no records before loading', async () => {
     renderRouter('authenticated')
 
-    expect(await screen.findByRole('heading', { name: 'Resumen de gestión' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Bienvenida, Doctora' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Agenda de hoy' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Accesos rápidos' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: 'Solicitudes pendientes' })).toBeInTheDocument()
   })
 
-  it.each(['doctora', 'asistente'] as const)('offers Citas médicas from the dashboard only to %s when authorized', async (role) => {
+  it.each(['doctora', 'asistente'] as const)('offers medical appointment access from the dashboard only to %s when authorized', async (role) => {
     renderRouter('authenticated', '/', undefined, authenticatedUser(role))
-    await screen.findByRole('heading', { name: 'Accesos rápidos' })
+    await screen.findByRole('heading', { name: role === 'doctora' ? 'Bienvenida, Doctora' : 'Bienvenido al consultorio' })
     const main = within(screen.getByRole('main'))
     if (role === 'doctora') {
       expect(main.getByRole('link', { name: /Ver agenda completa/ })).toHaveAttribute('href', '/agenda')
-      expect(main.getByRole('link', { name: /Citas médicasConsulta y gestión/ })).toHaveAttribute('href', '/citas-medicas')
+      expect(main.getByRole('link', { name: 'Abrir Citas programadas' })).toHaveAttribute('href', '/citas-medicas')
     } else {
       expect(main.queryByRole('link', { name: /Ver agenda completa/ })).not.toBeInTheDocument()
-      expect(main.queryByRole('link', { name: /Citas médicasConsulta y gestión/ })).not.toBeInTheDocument()
+      expect(main.queryByRole('link', { name: 'Abrir Citas programadas' })).not.toBeInTheDocument()
     }
   })
 
@@ -225,10 +227,10 @@ describe('AppRouter', () => {
     act(() => window.dispatchEvent(new Event(AUTH_FORBIDDEN_EVENT)))
 
     expect(screen.getByRole('heading', { name: 'Acceso no autorizado' })).toBeInTheDocument()
-    expect(await screen.findByRole('heading', { name: 'Resumen de gestión' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Bienvenida, Doctora' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar aviso' }))
     expect(screen.queryByRole('heading', { name: 'Acceso no autorizado' })).not.toBeInTheDocument()
-    expect(screen.getByRole('heading', { name: 'Resumen de gestión' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Bienvenida, Doctora' })).toBeInTheDocument()
   })
 
   it('opens and closes the mobile navigation with Escape', () => {
@@ -273,7 +275,7 @@ describe('AppRouter', () => {
     fireEvent.click(trigger)
     expect(trigger).toHaveAttribute('aria-expanded', 'true')
     const menu = screen.getByRole('menu', { name: 'Opciones de usuario' })
-    expect(within(menu).getByRole('menuitem', { name: 'Mi perfil / Cambiar fotografía' })).toHaveFocus()
+    expect(within(menu).getByRole('menuitem', { name: 'Mi perfil' })).toHaveFocus()
     expect(within(menu).getByRole('menuitem', { name: 'Cerrar sesión' })).toBeInTheDocument()
     fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
     expect(trigger).toHaveFocus()
@@ -283,11 +285,11 @@ describe('AppRouter', () => {
     expect(panel).toHaveAttribute('aria-modal', 'true')
     expect(panel).toHaveClass('max-w-[420px]')
     expect(within(panel).getByText('Nombre de sesión')).toBeInTheDocument()
-    expect(within(panel).getByText('Doctora')).toBeInTheDocument()
+    expect(within(panel).getByText('Personal clínico')).toBeInTheDocument()
     expect(within(panel).getByLabelText('Seleccionar foto')).toBeInTheDocument()
     expect(within(panel).queryByRole('button', { name: 'Cerrar sesión' })).not.toBeInTheDocument()
     expect(within(panel).getByRole('button', { name: 'Volver' })).toBeInTheDocument()
-    expect(within(panel).queryByText('Mi perfil')).not.toBeInTheDocument()
+    expect(within(panel).getByRole('heading', { name: 'Fotografía de perfil' })).toBeInTheDocument()
     expect(within(panel).getByRole('button', { name: 'Cerrar' })).toHaveFocus()
     fireEvent.keyDown(document.activeElement!, { key: 'Escape' })
     expect(trigger).toHaveFocus()
@@ -368,7 +370,7 @@ describe('AppRouter', () => {
 
   it('returns old profile links to the dashboard instead of mounting a separate page', async () => {
     renderRouter('authenticated', '/mi-perfil')
-    expect(await screen.findByRole('heading', { name: 'Resumen de gestión' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Bienvenida, Doctora' })).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Mi perfil' })).not.toBeInTheDocument()
   })
 
@@ -407,9 +409,9 @@ describe('AppRouter', () => {
     expect(Boolean(navigation.queryByRole('link', { name: 'Usuarios' }))).toBe(seesUsers)
     expect(Boolean(navigation.queryByRole('link', { name: 'Pacientes' }))).toBe(seesPatients)
     expect(navigation.queryByRole('link', { name: 'Mi perfil' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('link', { name: 'Registrar paciente' })).not.toBeInTheDocument()
-    await screen.findByRole('heading', { name: 'Resumen de gestión' })
-    expect(screen.queryAllByRole('link', { name: /PacientesListado y registro/ })).toHaveLength(seesPatients ? 1 : 0)
+    expect(screen.getByRole('link', { name: 'Registrar paciente' })).toHaveAttribute('href', '/pacientes')
+    await screen.findByRole('heading', { name: role === 'doctora' ? 'Bienvenida, Doctora' : 'Bienvenido al consultorio' })
+    expect(screen.queryAllByRole('link', { name: /PacientesListado y registro/ })).toHaveLength(0)
     expect(Boolean(navigation.queryByRole('link', { name: 'Agenda' }))).toBe(role === 'doctora')
     expect(Boolean(navigation.queryByRole('link', { name: 'Citas médicas' }))).toBe(role === 'doctora')
     expect(Boolean(navigation.queryByRole('link', { name: 'Caja' }))).toBe(role === 'doctora')
@@ -457,7 +459,7 @@ describe('AppRouter', () => {
       const back = screen.getByRole('link', { name: 'Volver al Dashboard' })
       expect(back).toHaveAttribute('href', '/')
       fireEvent.click(back)
-      expect(await screen.findByRole('heading', { name: 'Resumen de gestión' })).toBeInTheDocument()
+      expect(await screen.findByRole('heading', { name: 'Bienvenido al consultorio' })).toBeInTheDocument()
     }
   })
 

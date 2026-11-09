@@ -1,6 +1,6 @@
 import { isAxiosError } from 'axios'
-import { ArrowRight, CalendarDays, ClipboardList, FileClock, MoreHorizontal, UsersRound, Wallet, type LucideIcon } from 'lucide-react'
-import { useMemo, useState, type ReactNode } from 'react'
+import { ArrowRight, CalendarDays, CalendarPlus, ClipboardList, ClipboardPlus, MoreHorizontal, ReceiptText, UserPlus, Wallet, type LucideIcon } from 'lucide-react'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useClinicalQuery } from '../../services/clinicalQuery'
 import { formatCurrency, formatDate } from '../../utils/displayFormat'
@@ -81,39 +81,44 @@ export function DashboardPage() {
   const canViewAgenda = canAccessArea(user?.role, 'agenda')
   const canViewActivities = canAccessArea(user?.role, 'actividades')
   const canViewCash = canAccessArea(user?.role, 'caja')
-  const [today] = useState(() => new Date())
+  const [today, setToday] = useState(() => new Date())
+  useEffect(() => {
+    const updateDay = () => setToday((current) => todayKey(current) === todayKey(new Date()) ? current : new Date())
+    const interval = window.setInterval(updateDay, 60_000)
+    window.addEventListener('focus', updateDay)
+    return () => { window.clearInterval(interval); window.removeEventListener('focus', updateDay) }
+  }, [])
   const month = today.getMonth() + 1
   const year = today.getFullYear()
-  const agendaQuery = useClinicalQuery(['agenda', month, year], (signal) => getAgendaMonth(month, year, signal), { enabled: canViewAgenda })
+  const agendaQuery = useClinicalQuery(['agenda', month, year, todayKey(today)], (signal) => getAgendaMonth(month, year, signal), { enabled: canViewAgenda })
   const pendingQuery = useClinicalQuery(['agenda', 'pending'], getPendingRequests, { enabled: canViewAgenda })
   const patientsQuery = useClinicalQuery(['patients', '', 1], (signal) => getPatients({}, signal), { enabled: canViewPatients && !canViewCash })
-  const reportQuery = useClinicalQuery(['dashboard-report'], getDashboardReport, { enabled: canViewCash })
+  const reportQuery = useClinicalQuery(['dashboard-report', todayKey(today)], getDashboardReport, { enabled: canViewCash })
   const activitiesQuery = useClinicalQuery(['activities', { mes: month, anio: year }], (signal) => getActivities({ mes: month, anio: year }, signal), { enabled: canViewActivities })
   const data = { agenda: toState(agendaQuery), pending: toState(pendingQuery), patients: toState(patientsQuery), report: toState(reportQuery), activities: toState(activitiesQuery) }
 
   const appointments = useMemo(() => agendaQuery.data
     ? agendaQuery.data.filter((entry) => entry.tipo === 'cita_medica' && entry.fecha?.slice(0, 10) === todayKey(today)).sort((a, b) => (a.hora_inicio ?? '').localeCompare(b.hora_inicio ?? ''))
     : [], [agendaQuery.data, today])
+  const completedToday = appointments.filter((entry) => entry.estado === 'completada').length
   const pendingRequests = useMemo(() => pendingQuery.data
     ? pendingQuery.data.filter((entry) => entry.tipo === 'cita_medica' && entry.estado === 'pendiente')
     : [], [pendingQuery.data])
   const quickLinks = [
-    ...(canViewPatients ? [
-      { to: '/pacientes', label: 'Pacientes', detail: 'Listado y registro', icon: UsersRound, tone: 'blue' },
-      { to: '/pacientes', label: 'Historial clínico', detail: 'Desde el expediente', icon: FileClock, tone: 'green' },
-    ] : []),
-    ...(canViewAgenda ? [{ to: '/citas-medicas', label: 'Citas médicas', detail: 'Consulta y gestión', icon: CalendarDays, tone: 'cyan' }] : []),
-    ...(canViewActivities ? [{ to: '/actividades', label: 'Actividades', detail: 'Registros del consultorio', icon: ClipboardList, tone: 'violet' }] : []),
+    ...(canViewPatients ? [{ to: '/pacientes', action: 'registrar-paciente', label: 'Registrar paciente', icon: UserPlus, tone: 'blue' }] : []),
+    ...(canViewAgenda ? [{ to: '/agenda', action: 'programar-cita', label: 'Programar cita', icon: CalendarPlus, tone: 'cyan' }] : []),
+    ...(user?.role === 'doctora' && canViewActivities ? [{ to: '/actividades', action: 'registrar-actividad', label: 'Registrar actividad', icon: ClipboardPlus, tone: 'violet' }] : []),
+    ...(canViewCash ? [{ to: '/caja', action: 'registrar-egreso', label: 'Registrar egreso', icon: ReceiptText, tone: 'green' }] : []),
   ] as const
 
   return <div className="dashboard-screen admin-reveal">
     <div className="dashboard-hero">
-      <div className="dashboard-intro"><p className="dashboard-eyebrow">Panel clínico</p><h1>Resumen de gestión</h1><p>Consulta la actividad del consultorio y las tareas pendientes.</p></div>
+      <div className="dashboard-intro"><p className="dashboard-eyebrow">Panel clínico</p><h1>{user?.role === 'doctora' ? 'Bienvenida, Doctora' : 'Bienvenido al consultorio'}</h1><p>Consulta las citas de hoy y el estado general del consultorio.</p></div>
 
       <div className="dashboard-metrics">
-        {canViewAgenda ? <MetricCard detail="Citas programadas para hoy" icon={CalendarDays} label="Citas médicas" onRetry={() => { void (canViewCash ? reportQuery : agendaQuery).refetch() }} state={canViewCash ? data.report : data.agenda} tag="Hoy" to="/citas-medicas" tone="blue" value={canViewCash ? data.report.kind === 'ready' ? String(data.report.data.citas.hoy) : '' : data.agenda.kind === 'ready' ? String(appointments.length) : ''}/> : null}
+        {canViewAgenda ? <MetricCard detail={data.agenda.kind === 'ready' ? `Para hoy · ${completedToday} ${completedToday === 1 ? 'completada' : 'completadas'}` : 'Para hoy'} icon={CalendarDays} label="Citas programadas" onRetry={() => { void (canViewCash ? reportQuery : agendaQuery).refetch() }} state={canViewCash ? data.report : data.agenda} tag="Hoy" to="/citas-medicas" tone="blue" value={canViewCash ? data.report.kind === 'ready' ? String(data.report.data.citas.hoy) : '' : data.agenda.kind === 'ready' ? String(appointments.filter((entry) => entry.estado === 'programada').length) : ''}/> : null}
         {canViewPatients ? <MetricCard detail="Pacientes registrados en el sistema" icon={DentalTooth} label="Pacientes registrados" onRetry={() => { void (canViewCash ? reportQuery : patientsQuery).refetch() }} state={canViewCash ? data.report : data.patients} tag="Total" to="/pacientes" tone="cyan" value={canViewCash ? data.report.kind === 'ready' ? String(data.report.data.pacientes.total) : '' : data.patients.kind === 'ready' ? String(data.patients.data.total) : ''}/> : null}
-        {canViewCash ? <MetricCard detail="" icon={Wallet} label="Ingresos y egresos" onRetry={() => { void reportQuery.refetch() }} state={data.report} tag="Este mes" to="/caja" tone="green" value={data.report.kind === 'ready' ? formatCurrency(data.report.data.mes_actual.saldo) : ''}>{data.report.kind === 'ready' ? <p className="dashboard-metric-detail dashboard-money-line">Ingresos: {formatCurrency(data.report.data.mes_actual.ingresos)} <span aria-hidden="true">|</span> Egresos: {formatCurrency(data.report.data.mes_actual.egresos)}</p> : null}</MetricCard> : null}
+        {canViewCash ? <MetricCard detail="" icon={Wallet} label="Saldo del mes" onRetry={() => { void reportQuery.refetch() }} state={data.report} tag="Este mes" to="/caja" tone="green" value={data.report.kind === 'ready' ? formatCurrency(data.report.data.mes_actual.saldo) : ''}>{data.report.kind === 'ready' ? <p className="dashboard-metric-detail dashboard-money-line">Ingresos: {formatCurrency(data.report.data.mes_actual.ingresos)} <span aria-hidden="true">|</span> Egresos: {formatCurrency(data.report.data.mes_actual.egresos)}</p> : null}</MetricCard> : null}
         {canViewActivities ? <MetricCard detail="Actividades registradas en el mes actual" icon={ClipboardList} label="Actividades" onRetry={() => { void activitiesQuery.refetch() }} state={data.activities} tag="Este mes" to="/actividades" tone="violet" value={data.activities.kind === 'ready' ? String(data.activities.data.length) : ''}/> : null}
       </div>
     </div>
@@ -121,12 +126,12 @@ export function DashboardPage() {
     <div className={`dashboard-content ${canViewAgenda ? '' : 'dashboard-content-single'}`}>
       {canViewAgenda ? <section aria-labelledby="dashboard-agenda-title" className="dashboard-panel dashboard-agenda admin-surface">
         <div className="dashboard-panel-head"><div><h2 id="dashboard-agenda-title">Agenda de hoy</h2><p>{formatDate(todayKey(today))}</p></div><Link className="dashboard-panel-link" to="/agenda">Ver agenda completa <ArrowRight aria-hidden="true" size={14}/></Link></div>
-        {data.agenda.kind === 'ready' && appointments.length ? <div className="dashboard-agenda-list"><div aria-hidden="true" className="dashboard-agenda-labels"><span>Paciente</span><span>Hora</span><span>Motivo / descripción</span><span>Estado</span><span>Acción</span></div><ul>{appointments.map((entry) => <li className="dashboard-agenda-row" key={entry.id}><div className="dashboard-agenda-patient"><span aria-hidden="true" className="dashboard-patient-avatar">{patientInitials(entry.paciente?.nombres)}</span><span className="min-w-0"><strong>{entry.paciente?.nombres ?? 'Paciente no disponible'}</strong>{entry.paciente?.codigo_paciente ? <small>{entry.paciente.codigo_paciente}</small> : null}</span></div><time>{entry.hora_inicio?.slice(0, 5) ?? 'Sin hora'}</time><p className="dashboard-agenda-description">{entry.descripcion ?? 'Sin descripción'}</p><span>{entry.estado ? <span className={`admin-pill ${statusClasses[entry.estado]}`}>{statusLabels[entry.estado]}</span> : 'Sin estado'}</span><Link aria-label={`Ver cita de ${entry.paciente?.nombres ?? 'paciente no disponible'}`} className="dashboard-row-action" to="/citas-medicas"><MoreHorizontal aria-hidden="true" size={17}/></Link></li>)}</ul></div> : <PanelState empty="No hay citas médicas registradas para hoy." onRetry={() => { void agendaQuery.refetch() }} state={data.agenda}/>}
+        {data.agenda.kind === 'ready' && appointments.length ? <div className="dashboard-agenda-list">{data.agenda.refreshError ? <p className="dashboard-refresh-error" role="alert">No fue posible actualizar las citas. <button className="dashboard-retry" onClick={() => { void agendaQuery.refetch() }} type="button">Reintentar</button></p> : null}<div aria-hidden="true" className="dashboard-agenda-labels"><span>Paciente</span><span>Hora</span><span>Motivo / descripción</span><span>Estado</span><span>Acción</span></div><ul>{appointments.map((entry) => <li className="dashboard-agenda-row" key={entry.id}><div className="dashboard-agenda-patient"><span aria-hidden="true" className="dashboard-patient-avatar">{patientInitials(entry.paciente?.nombres)}</span><span className="min-w-0"><strong>{entry.paciente?.nombres ?? 'Paciente no disponible'}</strong>{entry.paciente?.codigo_paciente ? <small>{entry.paciente.codigo_paciente}</small> : null}</span></div><time>{entry.hora_inicio?.slice(0, 5) ?? 'Sin hora'}</time><p className="dashboard-agenda-description">{entry.descripcion ?? 'Sin descripción'}</p><span>{entry.estado ? <span className={`admin-pill ${statusClasses[entry.estado]}`}>{statusLabels[entry.estado]}</span> : 'Sin estado'}</span><Link aria-label={`Ver cita de ${entry.paciente?.nombres ?? 'paciente no disponible'}`} className="dashboard-row-action" to="/citas-medicas"><MoreHorizontal aria-hidden="true" size={17}/></Link></li>)}</ul></div> : <PanelState empty="No hay citas médicas registradas para hoy." onRetry={() => { void agendaQuery.refetch() }} state={data.agenda}/>}
       </section> : null}
 
       <div className="dashboard-side">
-        <section aria-labelledby="dashboard-quick-title" className="dashboard-panel dashboard-quick admin-surface"><div className="dashboard-panel-head"><h2 id="dashboard-quick-title">Accesos rápidos</h2></div><div className="dashboard-quick-grid">{quickLinks.map(({ to, label, detail, icon: Icon, tone }) => <Link className="dashboard-quick-link" key={label} to={to}><span aria-hidden="true" className={`dashboard-quick-icon dashboard-tone-${tone}`}><Icon size={18} strokeWidth={1.8}/></span><strong>{label}</strong><small>{detail}</small></Link>)}</div></section>
-        {canViewAgenda ? <section aria-labelledby="dashboard-pending-title" className="dashboard-panel dashboard-requests admin-surface"><div className="dashboard-panel-head"><h2 id="dashboard-pending-title">Solicitudes pendientes</h2><Link className="dashboard-panel-link" to="/citas-medicas">Ver citas médicas <ArrowRight aria-hidden="true" size={14}/></Link></div>{data.pending.kind === 'ready' && pendingRequests.length ? <ul className="dashboard-request-list">{pendingRequests.map((entry) => <li key={entry.id}><span className="dashboard-request-name">{entry.paciente?.nombres ?? 'Paciente no disponible'}</span>{entry.paciente?.codigo_paciente ? <small>{entry.paciente.codigo_paciente}</small> : null}<span className="admin-pill admin-pill-pending">Pendiente</span></li>)}</ul> : <PanelState empty="No hay solicitudes de citas pendientes." onRetry={() => { void pendingQuery.refetch() }} state={data.pending}/>}</section> : null}
+        <section aria-labelledby="dashboard-quick-title" className="dashboard-panel dashboard-quick admin-surface"><div className="dashboard-panel-head"><h2 id="dashboard-quick-title">Accesos rápidos</h2></div><div className="dashboard-quick-grid">{quickLinks.map(({ to, action, label, icon: Icon, tone }) => <Link className="dashboard-quick-link" key={label} state={{ dashboardAction: action }} to={to}><span aria-hidden="true" className={`dashboard-quick-icon dashboard-tone-${tone}`}><Icon size={18} strokeWidth={1.8}/></span><strong>{label}</strong></Link>)}</div></section>
+        {canViewAgenda ? <section aria-labelledby="dashboard-pending-title" className="dashboard-panel dashboard-requests admin-surface"><div className="dashboard-panel-head"><h2 id="dashboard-pending-title">Solicitudes pendientes</h2><Link className="dashboard-panel-link" to="/citas-medicas">Ver citas médicas <ArrowRight aria-hidden="true" size={14}/></Link></div>{data.pending.kind === 'ready' && pendingRequests.length ? <>{data.pending.refreshError ? <p className="dashboard-refresh-error" role="alert">No fue posible actualizar las solicitudes. <button className="dashboard-retry" onClick={() => { void pendingQuery.refetch() }} type="button">Reintentar</button></p> : null}<ul className="dashboard-request-list">{pendingRequests.map((entry) => <li key={entry.id}><span className="dashboard-request-name">{entry.paciente?.nombres ?? 'Paciente no disponible'}</span>{entry.paciente?.codigo_paciente ? <small>{entry.paciente.codigo_paciente}</small> : null}<span className="admin-pill admin-pill-pending">Pendiente</span></li>)}</ul></> : <PanelState empty="No hay solicitudes de citas pendientes." onRetry={() => { void pendingQuery.refetch() }} state={data.pending}/>}</section> : null}
       </div>
     </div>
   </div>

@@ -1,4 +1,4 @@
-import { BarChart3, CalendarDays, Camera, ChevronDown, ClipboardList, Layers3, LayoutDashboard, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Settings, UserRound, UsersRound, Wallet, X, type LucideIcon } from 'lucide-react'
+import { BarChart3, CalendarDays, Camera, ChevronDown, ChevronRight, ClipboardList, Layers3, LayoutDashboard, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Settings, UserRound, UsersRound, Wallet, X, type LucideIcon } from 'lucide-react'
 import { useEffect, useId, useRef, useState, type SVGProps } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../features/auth/authContext'
@@ -95,6 +95,7 @@ export function AppLayout() {
   const [sidebarFocused, setSidebarFocused] = useState(false)
   const [sidebarHoverSuppressed, setSidebarHoverSuppressed] = useState(false)
   const [profileOpen, setProfileOpen] = useState(false)
+  const [profileView, setProfileView] = useState<'details' | 'photo'>('details')
   const [headerMenuOpen, setHeaderMenuOpen] = useState(false)
   const [photoBusy, setPhotoBusy] = useState(false)
   const [logoutBusy, setLogoutBusy] = useState(false)
@@ -104,6 +105,7 @@ export function AppLayout() {
   const headerProfileTrigger = useRef<HTMLButtonElement>(null)
   const headerMenuRoot = useRef<HTMLDivElement>(null)
   const headerMenuFirst = useRef<HTMLButtonElement>(null)
+  const headerMenuPhoto = useRef<HTMLButtonElement>(null)
   const headerMenuLast = useRef<HTMLButtonElement>(null)
   const headerMenuId = useId()
   const menuTriggerRef = useRef<HTMLButtonElement>(null)
@@ -133,8 +135,9 @@ export function AppLayout() {
     headerProfileTrigger.current?.focus()
   }
 
-  const openProfile = () => {
+  const openProfile = (view: 'details' | 'photo') => {
     if (photoBusy || logoutBusy) return
+    setProfileView(view)
     setProfileOpen(true)
   }
 
@@ -198,19 +201,33 @@ export function AppLayout() {
             <span aria-hidden="true" className="h-7 w-px bg-[#d5e3f0]"/>
             {user ? <div className="relative" onKeyDown={(event) => {
               if (event.key === 'Escape' && headerMenuOpen) { event.stopPropagation(); setHeaderMenuOpen(false); headerProfileTrigger.current?.focus() }
-              if (event.key === 'ArrowDown' && headerMenuOpen) { event.preventDefault(); (document.activeElement === headerMenuFirst.current ? headerMenuLast.current : headerMenuFirst.current)?.focus() }
-              if (event.key === 'ArrowUp' && headerMenuOpen) { event.preventDefault(); (document.activeElement === headerMenuLast.current ? headerMenuFirst.current : headerMenuLast.current)?.focus() }
+              const menuItems = [headerMenuFirst.current, headerMenuPhoto.current, headerMenuLast.current]
+              if (event.key === 'ArrowDown' && headerMenuOpen) { event.preventDefault(); menuItems[(menuItems.indexOf(document.activeElement as HTMLButtonElement) + 1) % menuItems.length]?.focus() }
+              if (event.key === 'ArrowUp' && headerMenuOpen) { event.preventDefault(); menuItems[(menuItems.indexOf(document.activeElement as HTMLButtonElement) + menuItems.length - 1) % menuItems.length]?.focus() }
             }} ref={headerMenuRoot}>
               <button aria-controls={headerMenuOpen ? headerMenuId : undefined} aria-expanded={headerMenuOpen} aria-haspopup="menu" aria-label="Abrir menú de perfil" className="admin-interactive flex min-h-11 items-center gap-2 rounded-lg px-1 text-slate-600 hover:bg-sky-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" onClick={() => setHeaderMenuOpen((value) => !value)} ref={headerProfileTrigger} type="button">
                 <ProtectedPhoto className="size-10 rounded-full text-sm font-semibold" key={`${user.id}-${photoRevision}`} name={user.name} photoUrl={photoUrl}/>
                 <span className="hidden min-w-0 flex-col text-left text-sm leading-tight sm:flex"><span className="max-w-[12rem] truncate font-medium text-ink-950" title={user.name}>{user.name}</span><span className="text-xs text-slate-500">{roleLabels[user.role]}</span></span><ChevronDown aria-hidden="true" size={16}/>
               </button>
-              {headerMenuOpen ? <div aria-label="Opciones de usuario" className="absolute right-0 top-full z-30 mt-2 w-60 max-w-[calc(100vw-2rem)] rounded-xl border border-[#dbe6f2] bg-white p-1.5 text-ink-950 shadow-xl" id={headerMenuId} role="menu">
-                <button className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-left text-sm hover:bg-sky-50 focus-visible:outline-2 focus-visible:outline-clinic-600" onClick={() => { setHeaderMenuOpen(false); openProfile() }} ref={headerMenuFirst} role="menuitem" type="button"><Camera aria-hidden="true" size={17}/>Mi perfil / Cambiar fotografía</button>
-                <button className="flex min-h-11 w-full items-center gap-2 rounded-lg px-3 text-left text-sm hover:bg-sky-50 focus-visible:outline-2 focus-visible:outline-clinic-600 disabled:opacity-60" disabled={logoutBusy} onClick={() => { void signOut() }} ref={headerMenuLast} role="menuitem" type="button"><LogOut aria-hidden="true" size={17}/>{logoutBusy ? 'Cerrando sesión…' : 'Cerrar sesión'}</button>
+              {headerMenuOpen ? <div aria-label="Opciones de usuario" className="absolute right-0 top-full z-30 mt-2 w-[360px] max-w-[calc(100vw-1rem)] overflow-hidden rounded-[22px] border border-[#dbe6f2] bg-white p-4 text-ink-950 shadow-[0_24px_60px_-18px_rgba(8,37,76,0.24)] sm:p-5" id={headerMenuId} role="menu">
+                <div className="flex items-start gap-4 border-b border-[#e6edf6] px-2 pb-5" role="presentation">
+                  <span aria-hidden="true" className="grid size-11 shrink-0 place-items-center text-[#315a87]"><UserRound size={22} strokeWidth={1.7}/></span>
+                  <div className="min-w-0 flex-1 leading-tight">
+                    <p className="truncate text-base font-semibold" title={user.name}>{user.name}</p>
+                    <p className="mt-1 text-sm text-slate-600">Personal clínico</p>
+                    <p className="mt-1 break-all text-xs text-slate-500">{user.email || 'Correo no registrado'}</p>
+                  </div>
+                </div>
+                <div className="py-3">
+                  <button aria-label="Mi perfil" className="flex min-h-[68px] w-full items-center gap-4 rounded-xl px-2 text-left hover:bg-sky-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" onClick={() => { setHeaderMenuOpen(false); openProfile('details') }} ref={headerMenuFirst} role="menuitem" type="button"><UserRound aria-hidden="true" className="shrink-0 text-[#315a87]" size={19}/><span className="min-w-0 flex-1"><span className="block text-sm font-semibold">Mi perfil</span><span className="mt-1 block text-xs text-slate-500">Consultar información de mi cuenta</span></span><ChevronRight aria-hidden="true" className="shrink-0 text-slate-500" size={17}/></button>
+                  <button aria-label="Cambiar fotografía" className="flex min-h-[68px] w-full items-center gap-4 rounded-xl px-2 text-left hover:bg-sky-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" onClick={() => { setHeaderMenuOpen(false); openProfile('photo') }} ref={headerMenuPhoto} role="menuitem" type="button"><Camera aria-hidden="true" className="shrink-0 text-[#315a87]" size={19}/><span className="min-w-0 flex-1"><span className="block text-sm font-semibold">Cambiar fotografía</span><span className="mt-1 block text-xs text-slate-500">Actualizar o eliminar imagen</span></span><ChevronRight aria-hidden="true" className="shrink-0 text-slate-500" size={17}/></button>
+                </div>
+                <div className="border-t border-[#e6edf6] pt-3" role="separator"/>
+                <button className="flex min-h-11 w-full items-center gap-4 rounded-xl px-2 text-left text-sm font-semibold text-red-700 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600 disabled:opacity-60" disabled={logoutBusy} onClick={() => { void signOut() }} ref={headerMenuLast} role="menuitem" type="button"><LogOut aria-hidden="true" size={19}/>{logoutBusy ? 'Cerrando sesión…' : 'Cerrar sesión'}</button>
               </div> : null}
-              {profileOpen ? <AccessibleDialog busy={photoBusy || logoutBusy} closeLabel="Cerrar" compact onClose={closeProfile} title="Fotografía de perfil" titleId="profile-photo-title">
-                <ProfilePhotoControl initialPhotoUrl={photoUrl} onBusyChange={setPhotoBusy}/>
+              {profileOpen ? <AccessibleDialog busy={photoBusy || logoutBusy} closeLabel="Cerrar" compact onClose={closeProfile} title={profileView === 'details' ? 'Mi perfil' : 'Fotografía de perfil'} titleId="profile-photo-title">
+                {profileView === 'photo' ? <ProfilePhotoControl initialPhotoUrl={photoUrl} onBusyChange={setPhotoBusy}/> : <div className="flex items-center gap-4 rounded-xl bg-[#f1f7fd] p-4"><ProtectedPhoto className="size-14 rounded-full text-base font-semibold" key={`${user.id}-${photoRevision}-details`} name={user.name} photoUrl={photoUrl}/><div className="min-w-0"><p className="truncate font-semibold text-ink-950" title={user.name}>{user.name}</p><p className="text-sm text-slate-600">Personal clínico</p></div></div>}
+                {profileView === 'details' ? <dl className="mt-4 rounded-xl border border-[#e6edf6] px-4 py-3 text-left text-sm"><div><dt className="text-xs font-medium text-slate-500">Correo</dt><dd className="mt-0.5 break-all font-medium text-ink-950">{user.email || 'Correo no registrado'}</dd></div><div className="mt-3"><dt className="text-xs font-medium text-slate-500">Usuario</dt><dd className="mt-0.5 break-all font-medium text-ink-950">{user.username}</dd></div></dl> : null}
                 <div className="mt-6 border-t border-[#e6edf6] pt-4"><button className="admin-secondary min-h-11 w-full rounded-lg text-sm font-semibold disabled:opacity-60" disabled={photoBusy} onClick={closeProfile} type="button">Volver</button></div>
               </AccessibleDialog> : null}
             </div> : null}

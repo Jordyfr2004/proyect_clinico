@@ -1,5 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { MemoryRouter } from 'react-router-dom'
 import { AuthContext } from '../auth/authContext'
 import type { UserRole } from '../auth/authService'
 import { ActivitiesPage } from './ActivitiesPage'
@@ -8,9 +9,20 @@ import { createActivity, deleteActivity, getActivities, getActivityTotal, lookup
 vi.mock('./activityService', () => ({ getActivities: vi.fn(), getActivityTotal: vi.fn(), lookupPatientByCode: vi.fn(), createActivity: vi.fn(), updateActivity: vi.fn(), deleteActivity: vi.fn() }))
 const record = { id: 'activity-id', paciente_id: 'patient-id', fecha: '2026-10-05', actividad: 'Consulta registrada', precio: '25.00', paciente: { codigo_paciente: '001', nombres: 'Paciente recibido' } }
 beforeEach(() => { vi.resetAllMocks(); vi.mocked(getActivities).mockResolvedValue([record]); vi.mocked(getActivityTotal).mockResolvedValue({ periodo: 'mes', total: '25.00' }); vi.mocked(lookupPatientByCode).mockResolvedValue(record.paciente) })
-function renderPage(role: UserRole) { render(<AuthContext.Provider value={{ status: 'authenticated', user: { id: 'user-id', name: 'Personal', username: 'personal', role, paciente_id: null, activo: true }, sessionError: null, login: async () => {}, logout: async () => {} }}><ActivitiesPage/></AuthContext.Provider>) }
+function renderPage(role: UserRole, dashboardAction?: string) { render(<AuthContext.Provider value={{ status: 'authenticated', user: { id: 'user-id', name: 'Personal', username: 'personal', role, paciente_id: null, activo: true }, sessionError: null, login: async () => {}, logout: async () => {} }}><MemoryRouter initialEntries={[{ pathname: '/actividades', state: dashboardAction ? { dashboardAction } : null }]}><ActivitiesPage/></MemoryRouter></AuthContext.Provider>) }
 
 describe('ActivitiesPage', () => {
+  it('opens registration from the Dashboard action only for a doctor', async () => {
+    renderPage('doctora', 'registrar-actividad')
+    expect(await screen.findByRole('dialog', { name: 'Registrar actividad' })).toBeInTheDocument()
+  })
+
+  it('ignores a registration action for an assistant', async () => {
+    renderPage('asistente', 'registrar-actividad')
+    expect(await screen.findByText('Consulta registrada')).toBeInTheDocument()
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
   it('keeps a large server result accessible without mounting every row at once', async () => {
     vi.mocked(getActivities).mockResolvedValue(Array.from({ length: 120 }, (_, index) => ({ ...record, id: `activity-${index}`, actividad: `Actividad ${index}` })))
     renderPage('asistente')

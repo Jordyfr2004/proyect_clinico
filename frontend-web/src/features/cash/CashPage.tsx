@@ -1,6 +1,7 @@
 import { isAxiosError } from 'axios'
 import { ArrowDownRight, ArrowUpRight, Wallet } from 'lucide-react'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { EmptyState } from '../../components/states/EmptyState'
 import { ErrorState } from '../../components/states/ErrorState'
 import { LoadingState } from '../../components/states/LoadingState'
@@ -68,14 +69,20 @@ function ExpenseForm({ movement, today, busy, error, onSave, onCancel }: {
 }
 
 export function CashPage() {
+  const location = useLocation()
+  const navigate = useNavigate()
   const [period, setPeriod] = useClinicalViewState<PeriodKind>('cash.period', () => 'dia')
   const [today, setToday] = useState(() => new Date())
-  const [dialog, setDialog] = useState<Dialog | null>(null)
+  const [dialog, setDialog] = useState<Dialog | null>(() => location.state?.dashboardAction === 'registrar-egreso' ? { kind: 'create' } : null)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const pending = useRef(false)
   const trigger = useRef<HTMLElement | null>(null)
+  useEffect(() => {
+    if (location.state?.dashboardAction !== 'registrar-egreso') return
+    navigate(location.pathname, { replace: true, state: null })
+  }, [location.pathname, location.state, navigate])
   const params = currentPeriod(period, today)
   const summaryQuery = useClinicalQuery(['cash', 'summary', params], (signal) => getCashSummary(params, signal))
   const summary = summaryQuery.data
