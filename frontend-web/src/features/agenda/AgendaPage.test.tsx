@@ -69,6 +69,38 @@ describe('AgendaPage consultation', () => {
     expect(screen.getByRole('form', { name: 'Agendar cita médica' })).toHaveTextContent('5 de octubre de 2026')
   })
 
+  it('keeps patient results closed on initial focus and opens them only on request', async () => {
+    renderAgenda()
+    selectOctober()
+    const calendar = screen.getByRole('region', { name: 'Calendario de octubre de 2026' })
+    expect(within(calendar).getByRole('button', { name: 'Mes anterior' })).toBeInTheDocument()
+    expect(within(calendar).getByLabelText('Mes')).toHaveValue('2026-10')
+    fireEvent.click(within(calendar).getByRole('button', { name: /Seleccionar 5 de octubre/ }))
+    const form = screen.getByRole('form', { name: 'Agendar cita médica' })
+    const search = within(form).getByRole('combobox', { name: 'Buscar paciente' })
+    expect(search).toHaveFocus()
+    expect(search).toHaveAttribute('aria-expanded', 'false')
+    expect(getPatients).not.toHaveBeenCalled()
+    expect(within(form).queryByRole('listbox')).not.toBeInTheDocument()
+    fireEvent.click(within(form).getByRole('button', { name: 'Desplegar pacientes' }))
+    expect(search).toHaveAttribute('aria-expanded', 'true')
+    expect(await within(form).findByRole('option', { name: /Paciente recibido.*001/ })).toBeInTheDocument()
+    expect(within(form).getByRole('button', { name: 'Guardar cita' })).toBeInTheDocument()
+    expect(within(form).getByRole('button', { name: 'Cancelar' })).toBeInTheDocument()
+  })
+
+  it('places the edit date above the paired time fields', async () => {
+    renderAgenda()
+    selectOctober()
+    const bookings = screen.getByRole('region', { name: 'Registros agendados' })
+    fireEvent.click(await within(bookings).findByRole('button', { name: /Más opciones para Control recibido/ }))
+    fireEvent.click(within(bookings).getByRole('button', { name: 'Editar' }))
+    const form = screen.getByRole('form', { name: 'Editar registro de agenda' })
+    expect(within(form).getByLabelText('Fecha').closest('label')).toHaveClass('sm:col-span-2')
+    expect(within(form).getByLabelText('Hora de inicio')).toHaveValue('10:00')
+    expect(within(form).getByLabelText('Hora de fin')).toHaveValue('11:00')
+  })
+
   it('orders the monthly list by date and excludes entries outside the selected month', async () => {
     vi.mocked(getAgendaMonth).mockResolvedValue([
       { ...personal, id: 'later', fecha: '2026-10-20', descripcion: 'Reunión posterior' },
@@ -220,6 +252,7 @@ describe('AgendaPage consultation', () => {
     fireEvent.click(screen.getByRole('button', { name: /Seleccionar 5 de octubre/ }))
     const form = screen.getByRole('form', { name: 'Agendar cita médica' })
     const search = within(form).getByRole('combobox', { name: 'Buscar paciente' })
+    fireEvent.click(within(form).getByRole('button', { name: 'Desplegar pacientes' }))
     await waitFor(() => expect(getPatients).toHaveBeenCalledWith({ page: 1 }, expect.any(AbortSignal)))
     fireEvent.change(search, { target: { value: 'María' } })
     expect(await within(form).findByRole('alert')).toHaveTextContent('No fue posible buscar pacientes')
@@ -252,7 +285,7 @@ describe('AgendaPage consultation', () => {
       fireEvent.change(search, { target: { value: 'Paciente' } })
       const list = await screen.findByRole('listbox')
       expect(await within(list).findAllByRole('option')).toHaveLength(20)
-      expect(list).toHaveClass('max-h-56', 'overflow-y-auto', 'overflow-x-hidden')
+      expect(list).toHaveClass('max-h-44', 'overflow-y-auto', 'overflow-x-hidden')
       for (let index = 0; index < 12; index += 1) fireEvent.keyDown(search, { key: 'ArrowDown' })
       const activeOption = within(list).getByRole('option', { name: /Paciente 12.*P12/ })
       expect(activeOption).toHaveAttribute('aria-selected', 'true')
