@@ -19,7 +19,13 @@ function renderAgenda(role: UserRole = 'doctora', dashboardAction?: string) {
 }
 
 function selectOctober() {
-  fireEvent.change(screen.getByLabelText('Mes'), { target: { value: '2026-10' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Seleccionar año y mes' }))
+  const year = new Date().getFullYear()
+  const page = Math.floor(year / 12) * 12
+  for (let current = page; current > 2026; current -= 12) fireEvent.click(screen.getByRole('button', { name: 'Años anteriores' }))
+  for (let current = page; current + 11 < 2026; current += 12) fireEvent.click(screen.getByRole('button', { name: 'Años siguientes' }))
+  fireEvent.click(screen.getByRole('button', { name: '2026' }))
+  fireEvent.click(screen.getByRole('button', { name: 'octubre' }))
 }
 
 async function choosePatient(form: HTMLElement, search = 'Paciente', option = /Paciente recibido.*001/) {
@@ -74,7 +80,7 @@ describe('AgendaPage consultation', () => {
     selectOctober()
     const calendar = screen.getByRole('region', { name: 'Calendario de octubre de 2026' })
     expect(within(calendar).getByRole('button', { name: 'Mes anterior' })).toBeInTheDocument()
-    expect(within(calendar).getByLabelText('Mes')).toHaveValue('2026-10')
+    expect(within(calendar).getByRole('button', { name: 'Seleccionar año y mes' })).toHaveTextContent('octubre de 2026')
     fireEvent.click(within(calendar).getByRole('button', { name: /Seleccionar 5 de octubre/ }))
     const form = screen.getByRole('form', { name: 'Agendar cita médica' })
     const search = within(form).getByRole('combobox', { name: 'Buscar paciente' })
@@ -133,10 +139,42 @@ describe('AgendaPage consultation', () => {
     expect(within(calendar).getByLabelText('Seleccionar mes')).toBeInTheDocument()
     fireEvent.click(within(calendar).getByRole('button', { name: 'marzo' }))
     expect(screen.getByRole('button', { name: /Seleccionar 1 de marzo de 2027/ })).toBeInTheDocument()
-    expect(screen.getByLabelText('Mes')).toHaveValue('2027-03')
+    expect(screen.getByRole('button', { name: 'Seleccionar año y mes' })).toHaveTextContent('marzo de 2027')
     await waitFor(() => expect(getAgendaMonth).toHaveBeenCalledWith(3, 2027, expect.any(AbortSignal)))
     fireEvent.click(screen.getByRole('button', { name: /Seleccionar 1 de marzo de 2027/ }))
     expect(screen.getByRole('dialog', { name: 'Agendar cita médica' })).toBeInTheDocument()
+  })
+
+  it('uses one visual date picker from the icon and title, with four borderless columns', () => {
+    renderAgenda()
+    selectOctober()
+    const calendar = screen.getByRole('region', { name: 'Calendario de octubre de 2026' })
+    expect(within(calendar).queryByRole('textbox', { name: 'Mes' })).not.toBeInTheDocument()
+    expect(calendar.querySelector('input[type="month"]')).toBeNull()
+    fireEvent.click(within(calendar).getByRole('button', { name: 'Abrir selector de año, mes y día' }))
+    const years = within(calendar).getByLabelText('Seleccionar año')
+    expect(years.querySelector('.grid-cols-4')).toBeInTheDocument()
+    expect(within(years).getByRole('button', { name: '2026' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(within(years).getByRole('button', { name: '2026' }))
+    const months = within(calendar).getByLabelText('Seleccionar mes')
+    expect(months.querySelector('.grid-cols-4')).toBeInTheDocument()
+    expect(within(months).getByRole('button', { name: 'octubre' })).toHaveAttribute('aria-pressed', 'true')
+    fireEvent.click(within(months).getByRole('button', { name: 'octubre' }))
+    expect(within(calendar).getByRole('button', { name: /Seleccionar 5 de octubre/ })).toBeInTheDocument()
+    fireEvent.click(within(calendar).getByRole('button', { name: 'Seleccionar año y mes' }))
+    expect(within(calendar).getByLabelText('Seleccionar año')).toBeInTheDocument()
+  })
+
+  it('explains record dots and returns to the current day without opening a booking', () => {
+    renderAgenda()
+    selectOctober()
+    expect(screen.getByText('Día con registros')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Ir a hoy' }))
+    const today = new Date()
+    const label = new Intl.DateTimeFormat('es-EC', { month: 'long', year: 'numeric' }).format(today)
+    expect(screen.getByRole('button', { name: 'Seleccionar año y mes' })).toHaveTextContent(label)
+    expect(screen.getByRole('button', { name: new RegExp(`Seleccionar ${today.getDate()} de ${label}`) })).toHaveAttribute('aria-pressed', 'true')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
   })
   it('creates a personal entry without patient data and refreshes the calendar', async () => {
     vi.mocked(createPersonalEntry).mockResolvedValue('Actividad personal registrada.')
@@ -350,7 +388,7 @@ describe('AgendaPage consultation', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
     fireEvent.click(screen.getByRole('button', { name: 'Mes siguiente' }))
     expect(screen.getByRole('button', { name: /Seleccionar 1 de noviembre/ })).toHaveAttribute('aria-pressed', 'false')
-    expect(screen.getByLabelText('Mes')).toHaveValue('2026-11')
+    expect(screen.getByRole('button', { name: 'Seleccionar año y mes' })).toHaveTextContent('noviembre de 2026')
     await waitFor(() => expect(getAgendaMonth).toHaveBeenCalledWith(11, 2026, expect.any(AbortSignal)))
   })
 

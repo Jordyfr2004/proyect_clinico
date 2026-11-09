@@ -1,6 +1,6 @@
 import { isAxiosError } from 'axios'
-import { CalendarDays, ChevronLeft, ChevronRight, MoreVertical } from 'lucide-react'
-import { useEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, MoreVertical } from 'lucide-react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
 import { useLocation, useNavigate } from 'react-router-dom'
 import { ErrorState } from '../../components/states/ErrorState'
 import { LoadingState } from '../../components/states/LoadingState'
@@ -12,6 +12,7 @@ import { markClinicalQueriesStale, useClinicalQuery } from '../../services/clini
 import { useClinicalViewState } from '../../services/clinicalViewState'
 import type { Patient } from '../patients/patientService'
 import { AgendaPatientSearch } from './AgendaPatientSearch'
+import './agenda.css'
 
 type AgendaState = { kind: 'loading' } | { kind: 'ready'; entries: AgendaEntry[] } | { kind: 'error'; message: string }
 const two = (value: number) => String(value).padStart(2, '0')
@@ -111,6 +112,7 @@ export function AgendaPage() {
   const calendarCard = useRef<HTMLElement | null>(null)
   const recordsCard = useRef<HTMLElement | null>(null)
   const recordsList = useRef<HTMLDivElement | null>(null)
+  const recordsContent = useRef<HTMLDivElement | null>(null)
   const appointmentPending = useRef(false)
   const appointmentTrigger = useRef<HTMLButtonElement | null>(null)
   useEffect(() => {
@@ -130,18 +132,28 @@ export function AgendaPage() {
   const query = useClinicalQuery(['agenda', month.value, month.year], (signal) => getAgendaMonth(month.value, month.year, signal))
   const state: AgendaState = query.data ? { kind: 'ready', entries: query.data }
     : query.isError ? { kind: 'error', message: 'No fue posible cargar la agenda. Inténtalo de nuevo.' } : { kind: 'loading' }
+  const recordsRevision = `${month.year}-${month.value}-${query.dataUpdatedAt}`
   useEffect(() => {
+    if (state.kind !== 'ready' || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+    const element = recordsContent.current
+    if (!element || typeof element.animate !== 'function') return
+    const animation = element.animate([{ opacity: .45 }, { opacity: 1 }], { duration: 180, easing: 'ease-out' })
+    return () => animation.cancel()
+  }, [recordsRevision, state.kind])
+  useLayoutEffect(() => {
     const measure = () => {
       if (!calendarCard.current || !recordsCard.current) return
-      const top = Math.max(0, recordsCard.current.getBoundingClientRect().top)
-      setPanelHeight(Math.ceil(Math.max(calendarCard.current.getBoundingClientRect().height, window.innerHeight - top - 24)))
+      const main = recordsCard.current.closest('main')
+      const bottomPadding = main ? parseFloat(window.getComputedStyle(main).paddingBottom) || 0 : 0
+      const top = recordsCard.current.getBoundingClientRect().top
+      setPanelHeight(Math.floor(Math.max(calendarCard.current.getBoundingClientRect().height, window.innerHeight - top - bottomPadding)))
     }
     measure()
     const observer = new ResizeObserver(measure)
     if (calendarCard.current) observer.observe(calendarCard.current)
     window.addEventListener('resize', measure)
     return () => { observer.disconnect(); window.removeEventListener('resize', measure) }
-  }, [pickerStep, appointmentSuccess, state.kind])
+  }, [pickerStep, appointmentSuccess, state.kind, query.isFetching, query.isError])
   const load = async (): Promise<boolean> => {
     await markClinicalQueriesStale(['agenda'])
     return (await query.refetch()).isSuccess
@@ -174,6 +186,15 @@ export function AgendaPage() {
     return groups
   }, [])
   const monthChip = new Intl.DateTimeFormat('es-EC', { month: 'short', year: 'numeric' }).format(new Date(month.year, month.value - 1, 1))
+  const openDatePicker = () => { setPickerYear(month.year); setYearPage(Math.floor(month.year / 12) * 12); setPickerStep('years') }
+  const goToToday = () => {
+    const today = new Date()
+    setMonth({ year: today.getFullYear(), value: today.getMonth() + 1 })
+    setSelectedDate(dateKey(today.getFullYear(), today.getMonth() + 1, today.getDate()))
+    setDaySelected(true)
+    setPickerStep('days')
+    setAppointmentSuccess(null)
+  }
   const closeAppointment = () => { if (appointmentPending.current) return; setAppointmentOpen(false); setAppointmentError(null); appointmentTrigger.current?.focus() }
   const saveAppointment = async (choice: EntryChoice) => {
     if (appointmentPending.current) return
@@ -219,11 +240,24 @@ export function AgendaPage() {
     {entryDialog ? <AccessibleDialog busy={entryBusy} onClose={() => { if (!entryBusy) { setEntryDialog(null); setEntryError(null) } }} title={entryDialog.kind === 'edit' ? 'Editar registro de agenda' : 'Eliminar registro'} titleId="agenda-entry-dialog-title"><AgendaEntryDialog busy={entryBusy} entry={entryDialog.entry} error={entryError} kind={entryDialog.kind} onCancel={() => { setEntryDialog(null); setEntryError(null) }} onSave={(values) => { void saveEntryAction(values) }}/></AccessibleDialog> : null}
     <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,400px)_minmax(0,1fr)]">
       <section aria-label={`Calendario de ${monthLabel}`} className="admin-surface w-full max-w-[420px] min-w-0 rounded-[22px] p-4 shadow-[0_12px_30px_rgba(19,55,108,0.06)] sm:p-5 xl:sticky xl:top-6 xl:max-w-none" ref={calendarCard}>
-        <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
-          <div className="flex min-w-0 items-center gap-3"><div className="relative shrink-0 rounded-lg text-clinic-600 focus-within:ring-2 focus-within:ring-clinic-600 focus-within:ring-offset-2"><CalendarDays aria-hidden="true" size={25}/><input aria-label="Mes" className="absolute inset-0 h-full w-full cursor-pointer opacity-0" id="agenda-month" onChange={(event) => { if (!event.target.value) return; const [year, value] = event.target.value.split('-').map(Number); selectMonth(year, value) }} title="Elegir mes y año" type="month" value={`${month.year}-${two(month.value)}`}/></div><h2 className="text-lg font-bold capitalize text-ink-950"><button aria-label="Seleccionar año y mes" className="rounded-lg text-left hover:text-clinic-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" onClick={() => { setPickerYear(month.year); setYearPage(Math.floor(month.year / 12) * 12); setPickerStep('years') }} type="button">{pickerStep === 'years' ? 'Seleccionar año' : pickerStep === 'months' ? `Meses de ${pickerYear}` : monthLabel}</button></h2></div>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-3"><button aria-label="Abrir selector de año, mes y día" className="shrink-0 rounded-lg text-clinic-600 hover:text-clinic-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" onClick={openDatePicker} type="button"><CalendarDays aria-hidden="true" size={25}/></button><div className="min-w-0"><h2 className="text-lg font-bold capitalize text-ink-950"><button aria-label="Seleccionar año y mes" className="inline-flex items-center gap-1 rounded-lg text-left hover:text-clinic-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" onClick={openDatePicker} type="button">{pickerStep === 'years' ? 'Seleccionar año' : pickerStep === 'months' ? `Meses de ${pickerYear}` : monthLabel}<ChevronDown aria-hidden="true" className="shrink-0 text-clinic-600" size={16}/></button></h2><p className="text-xs font-medium text-[#526a87]">Año → Mes → Días</p></div></div>
           <div className="flex shrink-0 items-center gap-2"><button aria-label="Mes anterior" className="admin-secondary grid size-10 place-items-center rounded-xl" onClick={() => shiftMonth(-1)} type="button"><ChevronLeft aria-hidden="true" size={19}/></button><button aria-label="Mes siguiente" className="admin-secondary grid size-10 place-items-center rounded-xl" onClick={() => shiftMonth(1)} type="button"><ChevronRight aria-hidden="true" size={19}/></button></div>
         </div>
-        {pickerStep === 'years' ? <div aria-label="Seleccionar año" className="space-y-4"><div className="flex items-center justify-between text-sm font-semibold text-[#526a87]"><button aria-label="Años anteriores" className="admin-secondary grid size-9 place-items-center rounded-lg" onClick={() => setYearPage((year) => year - 12)} type="button"><ChevronLeft aria-hidden="true" size={17}/></button><span>{yearPage}–{yearPage + 11}</span><button aria-label="Años siguientes" className="admin-secondary grid size-9 place-items-center rounded-lg" onClick={() => setYearPage((year) => year + 12)} type="button"><ChevronRight aria-hidden="true" size={17}/></button></div><div className="grid grid-cols-3 gap-2">{Array.from({ length: 12 }, (_, index) => yearPage + index).map((year) => <button aria-pressed={year === month.year} className={`min-h-12 rounded-xl border text-sm font-semibold transition-colors ${year === month.year ? 'border-clinic-600 bg-clinic-50 text-clinic-700' : 'border-[#dbe6f2] text-ink-950 hover:bg-sky-50'}`} key={year} onClick={() => { setPickerYear(year); setPickerStep('months') }} type="button">{year}</button>)}</div><button className="text-sm font-semibold text-clinic-700 hover:underline" onClick={() => setPickerStep('days')} type="button">Volver al calendario</button></div> : pickerStep === 'months' ? <div aria-label="Seleccionar mes" className="space-y-4"><div className="grid grid-cols-3 gap-2">{Array.from({ length: 12 }, (_, index) => index + 1).map((value) => <button aria-pressed={pickerYear === month.year && value === month.value} className={`min-h-12 rounded-xl border text-sm font-semibold capitalize transition-colors ${pickerYear === month.year && value === month.value ? 'border-clinic-600 bg-clinic-50 text-clinic-700' : 'border-[#dbe6f2] text-ink-950 hover:bg-sky-50'}`} key={value} onClick={() => selectMonth(pickerYear, value)} type="button">{new Intl.DateTimeFormat('es-EC', { month: 'long' }).format(new Date(pickerYear, value - 1, 1))}</button>)}</div><button className="text-sm font-semibold text-clinic-700 hover:underline" onClick={() => setPickerStep('years')} type="button">Volver a años</button></div> : <div className="grid grid-cols-7 gap-1.5 text-center text-xs font-bold text-[#526a87]">
+        {pickerStep === 'years' ? <div aria-label="Seleccionar año" className="agenda-view-enter space-y-4">
+          <div className="flex items-center justify-between text-sm font-semibold text-[#526a87]"><button aria-label="Años anteriores" className="admin-secondary grid size-9 place-items-center rounded-lg" onClick={() => setYearPage((year) => year - 12)} type="button"><ChevronLeft aria-hidden="true" size={17}/></button><span>{yearPage}–{yearPage + 11}</span><button aria-label="Años siguientes" className="admin-secondary grid size-9 place-items-center rounded-lg" onClick={() => setYearPage((year) => year + 12)} type="button"><ChevronRight aria-hidden="true" size={17}/></button></div>
+          <div className="grid grid-cols-4 gap-x-1 gap-y-3 py-1">{Array.from({ length: 12 }, (_, index) => yearPage + index).map((year) => <button aria-pressed={year === pickerYear} className="agenda-picker-choice grid min-h-16 place-items-center rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" key={year} onClick={() => { setPickerYear(year); setPickerStep('months') }} type="button"><span className={`grid size-16 place-items-center rounded-full text-sm font-semibold transition-colors ${year === pickerYear ? 'bg-clinic-600 text-white' : 'text-ink-950 hover:bg-clinic-50'}`}>{year}</span></button>)}</div>
+          <button className="text-sm font-semibold text-clinic-700 hover:underline" onClick={() => setPickerStep('days')} type="button">Volver al calendario</button>
+        </div> : pickerStep === 'months' ? <div aria-label="Seleccionar mes" className="agenda-view-enter space-y-4" key={`months-${pickerYear}`}>
+          <div className="grid grid-cols-4 gap-x-1 gap-y-3 py-1">{Array.from({ length: 12 }, (_, index) => index + 1).map((value) => {
+            const date = new Date(pickerYear, value - 1, 1)
+            const label = new Intl.DateTimeFormat('es-EC', { month: 'long' }).format(date)
+            const shortLabel = new Intl.DateTimeFormat('es-EC', { month: 'short' }).format(date).replace('.', '')
+            const active = pickerYear === month.year && value === month.value
+            return <button aria-label={label} aria-pressed={active} className="agenda-picker-choice grid min-h-16 place-items-center rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" key={value} onClick={() => selectMonth(pickerYear, value)} type="button"><span className={`grid size-16 place-items-center rounded-full text-sm font-semibold capitalize transition-colors ${active ? 'bg-clinic-600 text-white' : 'text-ink-950 hover:bg-clinic-50'}`}>{shortLabel}</span></button>
+          })}</div>
+          <button className="text-sm font-semibold text-clinic-700 hover:underline" onClick={() => setPickerStep('years')} type="button">Volver a años</button>
+        </div> : <div className="agenda-view-enter grid grid-cols-7 gap-1.5 text-center text-xs font-bold text-[#526a87]" key={`days-${month.year}-${month.value}`}>
           {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((label, index) => <span className="pb-1" key={index}>{label}</span>)}
           {Array.from({ length: offset }, (_, index) => <span aria-hidden="true" key={`empty-${index}`}/>)}
           {days.map((day) => {
@@ -231,14 +265,15 @@ export function AgendaPage() {
             const records = state.kind === 'ready' ? state.entries.filter((entry) => entry.fecha?.slice(0, 10) === key) : []
             const active = daySelected && selectedDate === key
             const today = key === dateKey(now.getFullYear(), now.getMonth() + 1, now.getDate())
-            return <button aria-label={`Seleccionar ${day} de ${monthLabel}${records.length ? `, ${records.length} ${records.length === 1 ? 'registro' : 'registros'}` : ''}`} aria-current={today ? 'date' : undefined} aria-pressed={active} className={`relative min-h-11 rounded-xl border p-1 text-center transition-colors sm:min-h-12 ${active ? 'border-clinic-600 bg-clinic-600 text-white shadow-[0_4px_12px_rgba(23,112,225,0.2)]' : today ? 'border-sky-400 bg-sky-50/70 hover:bg-sky-100' : 'border-[#dbe6f2] hover:bg-[#f3f8fe]'}`} key={key} onClick={(event) => { setSelectedDate(key); setDaySelected(true); setAppointmentSuccess(null); if (user?.role === 'doctora') { appointmentTrigger.current = event.currentTarget; setAppointmentError(null); setAppointmentKind('medical'); setAppointmentOpen(true) } }} type="button"><span className={`block text-sm font-bold ${active ? 'text-white' : 'text-ink-950'}`}>{day}</span>{records.length ? <span aria-hidden="true" className={`absolute bottom-1 left-1/2 size-1 -translate-x-1/2 rounded-full ${active ? 'bg-white' : 'bg-clinic-600'}`}/> : null}</button>
+            return <button aria-label={`Seleccionar ${day} de ${monthLabel}${records.length ? `, ${records.length} ${records.length === 1 ? 'registro' : 'registros'}` : ''}`} aria-current={today ? 'date' : undefined} aria-pressed={active} className={`agenda-day relative min-h-[47px] rounded-xl border p-1 text-center transition-colors ${active ? 'border-clinic-600 bg-clinic-600 text-white shadow-[0_4px_12px_rgba(23,112,225,0.2)]' : today ? 'border-sky-400 bg-sky-50/70 hover:bg-sky-100' : 'border-[#dbe6f2] hover:bg-[#f3f8fe]'}`} key={key} onClick={(event) => { setSelectedDate(key); setDaySelected(true); setAppointmentSuccess(null); if (user?.role === 'doctora') { appointmentTrigger.current = event.currentTarget; setAppointmentError(null); setAppointmentKind('medical'); setAppointmentOpen(true) } }} type="button"><span className={`block text-sm font-bold ${active ? 'text-white' : 'text-ink-950'}`}>{day}</span>{records.length ? <span aria-hidden="true" className={`absolute bottom-1 left-1/2 size-1 -translate-x-1/2 rounded-full ${active ? 'bg-white' : 'bg-clinic-600'}`}/> : null}</button>
           })}
         </div>}
+        {pickerStep === 'days' ? <div className="mt-2 flex items-center justify-between gap-2 border-t border-[#dbe6f2] pt-2 text-xs text-[#526a87]"><span className="flex items-center gap-2"><span aria-hidden="true" className="size-1.5 rounded-full bg-clinic-600"/>Día con registros</span><button className="rounded-lg px-2 py-1 font-semibold text-clinic-700 hover:bg-clinic-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" onClick={goToToday} type="button">Ir a hoy</button></div> : null}
       </section>
       <section aria-label="Registros agendados" className="admin-surface flex min-w-0 flex-col rounded-[22px] p-4 shadow-[0_12px_30px_rgba(19,55,108,0.06)] sm:p-5 xl:h-[var(--agenda-panel-height)] xl:overflow-hidden" ref={recordsCard} style={panelHeight === null ? undefined : { '--agenda-panel-height': `${panelHeight}px` } as CSSProperties}>
         <div className="flex shrink-0 flex-wrap items-start justify-between gap-3"><div><h2 className="text-xl font-bold text-ink-950 sm:text-2xl">Registros del mes</h2>{state.kind === 'ready' ? <p className="admin-muted mt-1 text-sm">{monthEntries.length} {monthEntries.length === 1 ? 'registro agendado' : 'registros agendados'}</p> : null}</div><span className="rounded-full bg-clinic-50 px-3 py-1.5 text-sm font-semibold capitalize text-clinic-700">{monthChip}</span></div>
         <div aria-label="Lista de registros del mes" className="min-h-0 xl:mt-4 xl:flex-1 xl:overflow-y-auto xl:overscroll-contain xl:pr-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" ref={recordsList} role="region" tabIndex={groupedEntries.length ? 0 : -1}>
-        {state.kind === 'loading' ? <LoadingState/> : state.kind === 'error' ? <div className="mt-5"><ErrorState description={state.message} onRetry={() => { void load() }}/></div> : <>
+        {state.kind === 'loading' ? <LoadingState/> : state.kind === 'error' ? <div className="mt-5"><ErrorState description={state.message} onRetry={() => { void load() }}/></div> : <div ref={recordsContent}>
           {groupedEntries.length === 0 ? <p className="admin-muted mt-6 text-sm">No hay registros agendados para este mes.</p> : <div className="mt-5 space-y-4">{groupedEntries.map((group) => <div key={group.date}>
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[#edf5ff] px-3 py-2"><h3 className="flex items-center gap-2 text-sm font-bold text-ink-950"><CalendarDays aria-hidden="true" className="text-clinic-600" size={17}/>{formatDate(group.date)}</h3><span className="admin-muted text-sm">{group.entries.length} {group.entries.length === 1 ? 'registro' : 'registros'}</span></div>
             <ul className="divide-y divide-[#dbe6f2] px-1">{group.entries.map((entry) => <li className="flex flex-wrap items-center gap-3 py-3 sm:gap-4" key={entry.id}>
@@ -248,7 +283,7 @@ export function AgendaPage() {
               {user?.role === 'doctora' ? <div className="relative ml-auto"><button aria-expanded={openMenuId === entry.id} aria-label={`Más opciones para ${entry.descripcion || entry.paciente?.nombres || 'registro'}`} className="admin-secondary grid size-10 place-items-center rounded-xl" onClick={(event) => { if (openMenuId === entry.id) { setOpenMenuId(null); return } const bottom = Math.min(recordsList.current?.getBoundingClientRect().bottom ?? window.innerHeight, window.innerHeight); setMenuAbove(bottom - event.currentTarget.getBoundingClientRect().bottom < 110); setOpenMenuId(entry.id) }} type="button"><MoreVertical aria-hidden="true" size={18}/></button>{openMenuId === entry.id ? <div className={`absolute right-0 z-10 min-w-36 rounded-xl border border-[#dbe6f2] bg-white p-1 shadow-lg ${menuAbove ? 'bottom-full mb-1' : 'top-full mt-1'}`}><button className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-ink-950 hover:bg-sky-50" onClick={() => { setOpenMenuId(null); setEntryError(null); setEntryDialog({ kind: 'edit', entry }) }} type="button">Editar</button><button className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-red-700 hover:bg-red-50" onClick={() => { setOpenMenuId(null); setEntryError(null); setEntryDialog({ kind: 'delete', entry }) }} type="button">Eliminar</button></div> : null}</div> : null}
             </li>)}</ul>
           </div>)}</div>}
-        </>}
+        </div>}
         </div>
       </section>
     </div>
