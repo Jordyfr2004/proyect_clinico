@@ -44,6 +44,37 @@ describe('MedicalAppointmentsPage', () => {
     expect(getAgendaMonth).toHaveBeenCalledTimes(calls)
   })
 
+  it('searches loaded patients by name or code and clears the local filters', async () => {
+    vi.mocked(getAgendaMonth).mockResolvedValue([medical, { ...medical, id: 'medical-2', descripcion: 'Otro control', paciente: { codigo_paciente: '002', nombres: 'María López' } }])
+    await renderOctober()
+    fireEvent.change(screen.getByLabelText('Buscar paciente'), { target: { value: '002' } })
+    expect(screen.getByText('Citas encontradas: 1')).toBeInTheDocument()
+    expect(screen.getByText('María López')).toBeInTheDocument()
+    expect(screen.queryByText('Paciente recibido')).not.toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Buscar paciente'), { target: { value: 'paciente recibido' } })
+    expect(screen.getByText('Paciente recibido')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Limpiar filtros' }))
+    expect(screen.getByLabelText('Buscar paciente')).toHaveValue('')
+    expect(screen.getByLabelText('Mes')).toHaveValue(`${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`)
+    expect(screen.getByLabelText('Estado')).toHaveValue('todos')
+    expect(screen.getByLabelText('Día')).toHaveValue('todos')
+  })
+
+  it('places real pending requests in a separate tab without duplicating them', async () => {
+    await renderOctober()
+    const registeredTab = screen.getByRole('tab', { name: /Citas registradas.*1/ })
+    expect(registeredTab).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('tab', { name: /Solicitudes pendientes.*1/ })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Programar' })).not.toBeInTheDocument()
+    registeredTab.focus()
+    fireEvent.keyDown(registeredTab, { key: 'ArrowRight' })
+    expect(screen.getByRole('tab', { name: /Solicitudes pendientes.*1/ })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByRole('button', { name: 'Programar' })).toBeInTheDocument()
+    expect(screen.queryByText('Control recibido')).not.toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Buscar paciente'), { target: { value: '999' } })
+    expect(screen.getByText('Sin solicitudes pendientes')).toBeInTheDocument()
+  })
+
   it('distinguishes the four confirmed appointment states visually and by text', async () => {
     vi.mocked(getAgendaMonth).mockResolvedValue([
       medical,
@@ -68,6 +99,7 @@ describe('MedicalAppointmentsPage', () => {
   it('programs a real pending request with a selected date and refetches both views', async () => {
     vi.mocked(programRequest).mockResolvedValue('Solicitud programada correctamente.')
     await renderOctober()
+    fireEvent.click(screen.getByRole('tab', { name: /Solicitudes pendientes/ }))
     const beforeMonth = vi.mocked(getAgendaMonth).mock.calls.length
     const beforePending = vi.mocked(getPendingRequests).mock.calls.length
     fireEvent.click(screen.getByRole('button', { name: 'Programar' }))
@@ -87,6 +119,7 @@ describe('MedicalAppointmentsPage', () => {
 
   it('moves calendar focus across months with the keyboard before selecting a date', async () => {
     await renderOctober()
+    fireEvent.click(screen.getByRole('tab', { name: /Solicitudes pendientes/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Programar' }))
     const dialog = screen.getByRole('dialog', { name: 'Programar solicitud' })
     const currentMonth = new Date()
@@ -103,6 +136,7 @@ describe('MedicalAppointmentsPage', () => {
 
   it('keeps date and time validation before programming a request', async () => {
     await renderOctober()
+    fireEvent.click(screen.getByRole('tab', { name: /Solicitudes pendientes/ }))
     fireEvent.click(screen.getByRole('button', { name: 'Programar' }))
     const dialog = screen.getByRole('dialog', { name: 'Programar solicitud' })
     fireEvent.change(within(dialog).getByLabelText('Hora de inicio'), { target: { value: '11:00' } })
@@ -115,6 +149,7 @@ describe('MedicalAppointmentsPage', () => {
   it('shows backend 422 from programming without optimistic insertion', async () => {
     vi.mocked(programRequest).mockRejectedValueOnce({ isAxiosError: true, response: { status: 422, data: { message: 'Horario inválido.' } } })
     await renderOctober()
+    fireEvent.click(screen.getByRole('tab', { name: /Solicitudes pendientes/ }))
     const calls = vi.mocked(getAgendaMonth).mock.calls.length
     fireEvent.click(screen.getByRole('button', { name: 'Programar' }))
     const dialog = screen.getByRole('dialog', { name: 'Programar solicitud' })
