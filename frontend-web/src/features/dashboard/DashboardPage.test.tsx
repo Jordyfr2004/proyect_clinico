@@ -144,6 +144,8 @@ describe('DashboardPage', () => {
     renderDashboard('doctora')
     expect(within(screen.getByRole('region', { name: 'Citas programadas' })).getByRole('status')).toHaveTextContent('Cargando')
     expect(within(screen.getByRole('region', { name: 'Agenda de hoy' })).getByRole('status')).toHaveTextContent('Cargando')
+    expect(screen.getByRole('region', { name: 'Citas programadas' }).querySelectorAll('.dashboard-skeleton-line')).toHaveLength(3)
+    expect(screen.getByRole('region', { name: 'Agenda de hoy' }).querySelectorAll('.dashboard-agenda-skeleton-row')).toHaveLength(2)
     expect(screen.queryByText('No hay citas médicas registradas para hoy.')).not.toBeInTheDocument()
   })
 
@@ -196,10 +198,10 @@ describe('DashboardPage', () => {
     await Promise.all([markClinicalQueriesStale(['agenda']), markClinicalQueriesStale(['dashboard-report']), markClinicalQueriesStale(['activities'])])
     renderDashboard('doctora')
     expect(await screen.findByText('No hay citas médicas registradas para hoy.')).toBeInTheDocument()
-    expect(within(screen.getByRole('region', { name: 'Citas programadas' })).getByText('0')).toBeInTheDocument()
-    expect(within(screen.getByRole('region', { name: 'Pacientes registrados' })).getByText('2')).toBeInTheDocument()
-    expect(within(screen.getByRole('region', { name: 'Saldo del mes' })).getByText('$20.00')).toBeInTheDocument()
-    expect(within(screen.getByRole('region', { name: 'Actividades' })).getByText('1')).toBeInTheDocument()
+    expect(await within(screen.getByRole('region', { name: 'Citas programadas' })).findByText('0')).toBeInTheDocument()
+    expect(await within(screen.getByRole('region', { name: 'Pacientes registrados' })).findByText('2')).toBeInTheDocument()
+    expect(await within(screen.getByRole('region', { name: 'Saldo del mes' })).findByText('$20.00')).toBeInTheDocument()
+    expect(await within(screen.getByRole('region', { name: 'Actividades' })).findByText('1')).toBeInTheDocument()
   })
 
   it('shows a connection error when a populated pending list fails to refresh', async () => {
@@ -210,5 +212,36 @@ describe('DashboardPage', () => {
     await invalidateClinicalQueries(['agenda', 'pending'])
     expect(await within(panel).findByRole('alert')).toHaveTextContent('No fue posible actualizar las solicitudes.')
     expect(within(panel).getByText('Paciente recibido')).toBeInTheDocument()
+  })
+
+  it('animates a changed KPI from its last real value without introducing a zero', async () => {
+    vi.mocked(getDashboardReport).mockResolvedValueOnce({ ...report, pacientes: { total: 5 } })
+      .mockResolvedValueOnce({ ...report, pacientes: { total: 8 } })
+    renderDashboard('doctora')
+    const card = screen.getByRole('region', { name: 'Pacientes registrados' })
+    expect(await within(card).findByText('5')).toBeInTheDocument()
+    await invalidateClinicalQueries(['dashboard-report'])
+    await waitFor(() => expect(getDashboardReport).toHaveBeenCalledTimes(2))
+    expect(within(card).queryByText('0')).not.toBeInTheDocument()
+    expect(await within(card).findByText('8')).toBeInTheDocument()
+  })
+
+  it('keeps the agenda ordered and unique while fading in changed entries', async () => {
+    vi.mocked(getAgendaMonth).mockResolvedValueOnce([appointment])
+      .mockResolvedValueOnce([
+        { ...appointment, id: 'appointment-2', hora_inicio: '08:00:00', paciente: { codigo_paciente: 'P-2', nombres: 'Otro paciente' } },
+        { ...appointment, descripcion: 'Control actualizado' },
+      ])
+    renderDashboard('doctora')
+    const agenda = screen.getByRole('region', { name: 'Agenda de hoy' })
+    expect(await within(agenda).findByText('Paciente recibido')).toBeInTheDocument()
+    const previousList = within(agenda).getByRole('list')
+    await invalidateClinicalQueries(['agenda'])
+    expect(await within(agenda).findByText('Control actualizado')).toBeInTheDocument()
+    const rows = within(agenda).getAllByRole('listitem')
+    expect(rows).toHaveLength(2)
+    expect(rows[0]).toHaveTextContent('Otro paciente')
+    expect(rows[1]).toHaveTextContent('Paciente recibido')
+    expect(within(agenda).getByRole('list')).not.toBe(previousList)
   })
 })

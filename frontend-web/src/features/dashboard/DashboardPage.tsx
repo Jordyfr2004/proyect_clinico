@@ -1,6 +1,6 @@
 import { isAxiosError } from 'axios'
 import { ArrowRight, CalendarDays, CalendarPlus, ClipboardList, ClipboardPlus, MoreHorizontal, ReceiptText, UserPlus, Wallet, type LucideIcon } from 'lucide-react'
-import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { useClinicalQuery } from '../../services/clinicalQuery'
 import { formatCurrency, formatDate } from '../../utils/displayFormat'
@@ -40,6 +40,47 @@ function DentalTooth({ size = 19, strokeWidth = 1.9 }: { size?: number; strokeWi
   return <svg fill="none" height={size} viewBox="0 0 64 72" width={size} aria-hidden="true"><path d="M32 10C24 10 19 5 12 8 4 11 5 23 8 33c3 11 8 30 13 31 5 1 6-18 11-18s6 19 11 18c5-1 10-20 13-31 3-10 4-22-4-25-7-3-12 2-20 2Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth * 2.3}/></svg>
 }
 
+function numericValue(value: string): number | null {
+  const normalized = value.replace(/[$,]/g, '')
+  return /^-?\d+(?:\.\d+)?$/.test(normalized) ? Number(normalized) : null
+}
+
+function AnimatedMetricValue({ value }: { value: string }) {
+  const [display, setDisplay] = useState(value)
+  const displayedNumber = useRef(numericValue(value))
+  useEffect(() => {
+    const from = displayedNumber.current
+    const to = numericValue(value)
+    if (from === null || to === null || from === to || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      const frame = window.requestAnimationFrame(() => { displayedNumber.current = to; setDisplay(value) })
+      return () => window.cancelAnimationFrame(frame)
+    }
+    const monetary = value.includes('$')
+    let start: number | null = null
+    let frame = 0
+    const tick = (time: number) => {
+      start ??= time
+      const progress = Math.min((time - start) / 400, 1)
+      const eased = 1 - (1 - progress) ** 3
+      const current = from + (to - from) * eased
+      displayedNumber.current = current
+      setDisplay(progress === 1 ? value : monetary ? formatCurrency(current) : String(Math.round(current)))
+      if (progress < 1) frame = window.requestAnimationFrame(tick)
+    }
+    frame = window.requestAnimationFrame(tick)
+    return () => window.cancelAnimationFrame(frame)
+  }, [value])
+  return <p className="dashboard-metric-value">{display}</p>
+}
+
+function MetricSkeleton() {
+  return <div className="dashboard-metric-skeleton" role="status"><span className="sr-only">Cargando…</span><span aria-hidden="true" className="dashboard-skeleton-line dashboard-skeleton-value"/><span aria-hidden="true" className="dashboard-skeleton-line dashboard-skeleton-label"/><span aria-hidden="true" className="dashboard-skeleton-line dashboard-skeleton-detail"/></div>
+}
+
+function AgendaSkeleton() {
+  return <div className="dashboard-agenda-skeleton" role="status"><span className="sr-only">Cargando información…</span>{[0, 1].map((index) => <div aria-hidden="true" className="dashboard-agenda-skeleton-row" key={index}><span className="dashboard-skeleton-line dashboard-skeleton-avatar"/><span className="dashboard-skeleton-line dashboard-skeleton-name"/><span className="dashboard-skeleton-line dashboard-skeleton-time"/></div>)}</div>
+}
+
 function MetricCard({ icon: Icon, tone, tag, label, detail, state, value, to, children, onRetry }: {
   icon: LucideIcon | typeof DentalTooth
   tone: 'blue' | 'cyan' | 'green' | 'violet'
@@ -56,12 +97,12 @@ function MetricCard({ icon: Icon, tone, tag, label, detail, state, value, to, ch
     <Link aria-label={`Abrir ${label}`} className="dashboard-metric-link" to={to}/>
     <span aria-hidden="true" className={`dashboard-metric-icon dashboard-tone-${tone}`}><Icon size={25} strokeWidth={1.9}/></span>
     <span className={`dashboard-metric-tag dashboard-tone-${tone}`}>{tag}</span>
-    <div className="dashboard-metric-copy">{state.kind === 'loading' ? <p className="dashboard-metric-value" role="status">Cargando…</p> : state.kind === 'error' ? <div><p className="text-sm text-red-700" role="alert">{state.message}</p><button className="dashboard-retry" onClick={onRetry} type="button">Reintentar</button></div> : <><p className="dashboard-metric-value">{value}</p><p className="dashboard-metric-label">{label}</p>{detail ? <p className="dashboard-metric-detail">{detail}</p> : null}{children}{state.refreshError ? <p className="mt-2 text-xs text-red-700" role="alert">No fue posible actualizar. <button className="dashboard-retry" onClick={onRetry} type="button">Reintentar</button></p> : null}</>}</div>
+    <div className="dashboard-metric-copy">{state.kind === 'loading' ? <MetricSkeleton/> : state.kind === 'error' ? <div><p className="text-sm text-red-700" role="alert">{state.message}</p><button className="dashboard-retry" onClick={onRetry} type="button">Reintentar</button></div> : <><AnimatedMetricValue value={value}/><p className="dashboard-metric-label">{label}</p>{detail ? <p className="dashboard-metric-detail">{detail}</p> : null}{children}{state.refreshError ? <p className="mt-2 text-xs text-red-700" role="alert">No fue posible actualizar. <button className="dashboard-retry" onClick={onRetry} type="button">Reintentar</button></p> : null}</>}</div>
   </section>
 }
 
 function PanelState({ state, empty, onRetry }: { state: DataState<unknown>; empty: string; onRetry: () => void }) {
-  if (state.kind === 'loading') return <p className="dashboard-panel-message" role="status">Cargando información…</p>
+  if (state.kind === 'loading') return <AgendaSkeleton/>
   if (state.kind === 'error') return <div className="dashboard-panel-message"><p className="text-red-700" role="alert">{state.message}</p><button className="dashboard-retry" onClick={onRetry} type="button">Reintentar</button></div>
   if (state.refreshError) return <div className="dashboard-panel-message"><p className="text-red-700" role="alert">No fue posible actualizar esta información.</p><button className="dashboard-retry" onClick={onRetry} type="button">Reintentar</button></div>
   return <p className="dashboard-panel-message">{empty}</p>
@@ -104,6 +145,7 @@ export function DashboardPage() {
   const pendingRequests = useMemo(() => pendingQuery.data
     ? pendingQuery.data.filter((entry) => entry.tipo === 'cita_medica' && entry.estado === 'pendiente')
     : [], [pendingQuery.data])
+  const agendaAppearanceKey = JSON.stringify(appointments.map(({ id, hora_inicio, descripcion, estado, paciente }) => [id, hora_inicio, descripcion, estado, paciente?.nombres, paciente?.codigo_paciente]))
   const quickLinks = [
     ...(canViewPatients ? [{ to: '/pacientes', action: 'registrar-paciente', label: 'Registrar paciente', icon: UserPlus, tone: 'blue' }] : []),
     ...(canViewAgenda ? [{ to: '/agenda', action: 'programar-cita', label: 'Programar cita', icon: CalendarPlus, tone: 'cyan' }] : []),
@@ -126,7 +168,7 @@ export function DashboardPage() {
     <div className={`dashboard-content ${canViewAgenda ? '' : 'dashboard-content-single'}`}>
       {canViewAgenda ? <section aria-labelledby="dashboard-agenda-title" className="dashboard-panel dashboard-agenda admin-surface">
         <div className="dashboard-panel-head"><div><h2 id="dashboard-agenda-title">Agenda de hoy</h2><p>{formatDate(todayKey(today))}</p></div><Link className="dashboard-panel-link" to="/agenda">Ver agenda completa <ArrowRight aria-hidden="true" size={14}/></Link></div>
-        {data.agenda.kind === 'ready' && appointments.length ? <div className="dashboard-agenda-list">{data.agenda.refreshError ? <p className="dashboard-refresh-error" role="alert">No fue posible actualizar las citas. <button className="dashboard-retry" onClick={() => { void agendaQuery.refetch() }} type="button">Reintentar</button></p> : null}<div aria-hidden="true" className="dashboard-agenda-labels"><span>Paciente</span><span>Hora</span><span>Motivo / descripción</span><span>Estado</span><span>Acción</span></div><ul>{appointments.map((entry) => <li className="dashboard-agenda-row" key={entry.id}><div className="dashboard-agenda-patient"><span aria-hidden="true" className="dashboard-patient-avatar">{patientInitials(entry.paciente?.nombres)}</span><span className="min-w-0"><strong>{entry.paciente?.nombres ?? 'Paciente no disponible'}</strong>{entry.paciente?.codigo_paciente ? <small>{entry.paciente.codigo_paciente}</small> : null}</span></div><time>{entry.hora_inicio?.slice(0, 5) ?? 'Sin hora'}</time><p className="dashboard-agenda-description">{entry.descripcion ?? 'Sin descripción'}</p><span>{entry.estado ? <span className={`admin-pill ${statusClasses[entry.estado]}`}>{statusLabels[entry.estado]}</span> : 'Sin estado'}</span><Link aria-label={`Ver cita de ${entry.paciente?.nombres ?? 'paciente no disponible'}`} className="dashboard-row-action" to="/citas-medicas"><MoreHorizontal aria-hidden="true" size={17}/></Link></li>)}</ul></div> : <PanelState empty="No hay citas médicas registradas para hoy." onRetry={() => { void agendaQuery.refetch() }} state={data.agenda}/>}
+        {data.agenda.kind === 'ready' && appointments.length ? <div className="dashboard-agenda-list">{data.agenda.refreshError ? <p className="dashboard-refresh-error" role="alert">No fue posible actualizar las citas. <button className="dashboard-retry" onClick={() => { void agendaQuery.refetch() }} type="button">Reintentar</button></p> : null}<div aria-hidden="true" className="dashboard-agenda-labels"><span>Paciente</span><span>Hora</span><span>Motivo / descripción</span><span>Estado</span><span>Acción</span></div><ul key={agendaAppearanceKey}>{appointments.map((entry) => <li className="dashboard-agenda-row" key={entry.id}><div className="dashboard-agenda-patient"><span aria-hidden="true" className="dashboard-patient-avatar">{patientInitials(entry.paciente?.nombres)}</span><span className="min-w-0"><strong>{entry.paciente?.nombres ?? 'Paciente no disponible'}</strong>{entry.paciente?.codigo_paciente ? <small>{entry.paciente.codigo_paciente}</small> : null}</span></div><time>{entry.hora_inicio?.slice(0, 5) ?? 'Sin hora'}</time><p className="dashboard-agenda-description">{entry.descripcion ?? 'Sin descripción'}</p><span>{entry.estado ? <span className={`admin-pill ${statusClasses[entry.estado]}`}>{statusLabels[entry.estado]}</span> : 'Sin estado'}</span><Link aria-label={`Ver cita de ${entry.paciente?.nombres ?? 'paciente no disponible'}`} className="dashboard-row-action" to="/citas-medicas"><MoreHorizontal aria-hidden="true" size={17}/></Link></li>)}</ul></div> : <PanelState empty="No hay citas médicas registradas para hoy." onRetry={() => { void agendaQuery.refetch() }} state={data.agenda}/>}
       </section> : null}
 
       <div className="dashboard-side">
