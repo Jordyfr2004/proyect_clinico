@@ -137,7 +137,7 @@ export function AgendaPage() {
     if (state.kind !== 'ready' || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
     const element = recordsContent.current
     if (!element || typeof element.animate !== 'function') return
-    const animation = element.animate([{ opacity: .45 }, { opacity: 1 }], { duration: 180, easing: 'ease-out' })
+    const animation = element.animate([{ opacity: .25 }, { opacity: 1 }], { duration: 250, easing: 'ease-out' })
     return () => animation.cancel()
   }, [recordsRevision, state.kind])
   useLayoutEffect(() => {

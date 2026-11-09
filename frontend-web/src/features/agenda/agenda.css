@@ -1,11 +1,11 @@
 @media (prefers-reduced-motion: no-preference) {
   .agenda-view-enter {
-    animation: agenda-view-in 220ms cubic-bezier(.2, .8, .2, 1) both;
+    animation: agenda-view-in 300ms cubic-bezier(.2, .8, .2, 1) both;
     transform-origin: center;
   }
 
   .agenda-picker-choice > span {
-    transition: background-color 170ms ease, color 170ms ease, transform 170ms ease;
+    transition: background-color 200ms ease, color 200ms ease, transform 200ms ease;
   }
 
   .agenda-picker-choice:hover > span {
@@ -13,11 +13,11 @@
   }
 
   .agenda-picker-choice[aria-pressed="true"] > span {
-    animation: agenda-choice-in 190ms cubic-bezier(.2, .8, .2, 1) both;
+    animation: agenda-choice-in 200ms cubic-bezier(.2, .8, .2, 1) both;
   }
 
   .agenda-day {
-    transition: background-color 170ms ease, border-color 170ms ease, box-shadow 170ms ease, transform 170ms ease;
+    transition: background-color 200ms ease, border-color 200ms ease, box-shadow 200ms ease, transform 200ms ease;
   }
 
   .agenda-day:hover {
@@ -25,17 +25,17 @@
   }
 
   .agenda-day[aria-pressed="true"] {
-    animation: agenda-day-in 180ms cubic-bezier(.2, .8, .2, 1) both;
+    animation: agenda-day-in 200ms cubic-bezier(.2, .8, .2, 1) both;
   }
 
   .admin-dialog-panel[aria-labelledby="agenda-appointment-title"],
   .admin-dialog-panel[aria-labelledby="agenda-entry-dialog-title"] {
-    animation: agenda-dialog-in 180ms cubic-bezier(.2, .8, .2, 1) both;
+    animation: agenda-dialog-in 250ms cubic-bezier(.2, .8, .2, 1) both;
   }
 }
 
 @keyframes agenda-view-in {
-  from { opacity: .55; transform: scale(.985); }
+  from { opacity: .25; transform: translateY(6px) scale(.985); }
   to { opacity: 1; transform: scale(1); }
 }
 
@@ -56,6 +56,7 @@
 
 @media (prefers-reduced-motion: reduce) {
   .agenda-picker-choice > span { transition: none !important; }
+  .agenda-day { transition: none !important; }
   .agenda-view-enter,
   .agenda-picker-choice[aria-pressed="true"] > span,
   .agenda-day[aria-pressed="true"],
