@@ -103,8 +103,14 @@ export function AgendaPage() {
   const [entryBusy, setEntryBusy] = useState(false)
   const [entryError, setEntryError] = useState<string | null>(null)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [menuAbove, setMenuAbove] = useState(false)
+  const [pickerStep, setPickerStep] = useState<'years' | 'months' | 'days'>('days')
+  const [pickerYear, setPickerYear] = useState(month.year)
+  const [yearPage, setYearPage] = useState(Math.floor(month.year / 12) * 12)
+  const [panelHeight, setPanelHeight] = useState<number | null>(null)
   const calendarCard = useRef<HTMLElement | null>(null)
-  const [calendarHeight, setCalendarHeight] = useState<number | null>(null)
+  const recordsCard = useRef<HTMLElement | null>(null)
+  const recordsList = useRef<HTMLDivElement | null>(null)
   const appointmentPending = useRef(false)
   const appointmentTrigger = useRef<HTMLButtonElement | null>(null)
   useEffect(() => {
@@ -122,17 +128,20 @@ export function AgendaPage() {
     return () => window.clearTimeout(timer)
   }, [location.pathname, location.state, navigate, setDaySelected, setMonth, setSelectedDate, user?.role])
   const query = useClinicalQuery(['agenda', month.value, month.year], (signal) => getAgendaMonth(month.value, month.year, signal))
-  useEffect(() => {
-    const element = calendarCard.current
-    if (!element) return
-    const updateHeight = () => setCalendarHeight(element.getBoundingClientRect().height)
-    updateHeight()
-    const observer = new ResizeObserver(updateHeight)
-    observer.observe(element)
-    return () => observer.disconnect()
-  }, [])
   const state: AgendaState = query.data ? { kind: 'ready', entries: query.data }
     : query.isError ? { kind: 'error', message: 'No fue posible cargar la agenda. Inténtalo de nuevo.' } : { kind: 'loading' }
+  useEffect(() => {
+    const measure = () => {
+      if (!calendarCard.current || !recordsCard.current) return
+      const top = Math.max(0, recordsCard.current.getBoundingClientRect().top)
+      setPanelHeight(Math.ceil(Math.max(calendarCard.current.getBoundingClientRect().height, window.innerHeight - top - 24)))
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    if (calendarCard.current) observer.observe(calendarCard.current)
+    window.addEventListener('resize', measure)
+    return () => { observer.disconnect(); window.removeEventListener('resize', measure) }
+  }, [pickerStep, appointmentSuccess, state.kind])
   const load = async (): Promise<boolean> => {
     await markClinicalQueriesStale(['agenda'])
     return (await query.refetch()).isSuccess
@@ -143,6 +152,7 @@ export function AgendaPage() {
     setSelectedDate(dateKey(year, value, 1))
     setDaySelected(false)
     setAppointmentSuccess(null)
+    setPickerStep('days')
   }
   const shiftMonth = (change: number) => {
     const next = new Date(month.year, month.value - 1 + change, 1)
@@ -156,6 +166,14 @@ export function AgendaPage() {
     ? state.entries.filter((entry) => entry.fecha?.slice(0, 7) === `${month.year}-${two(month.value)}`)
       .sort((a, b) => `${a.fecha} ${a.hora_inicio ?? ''}`.localeCompare(`${b.fecha} ${b.hora_inicio ?? ''}`))
     : []
+  const groupedEntries = monthEntries.reduce<{ date: string; entries: AgendaEntry[] }[]>((groups, entry) => {
+    const date = entry.fecha!.slice(0, 10)
+    const last = groups.at(-1)
+    if (last?.date === date) last.entries.push(entry)
+    else groups.push({ date, entries: [entry] })
+    return groups
+  }, [])
+  const monthChip = new Intl.DateTimeFormat('es-EC', { month: 'short', year: 'numeric' }).format(new Date(month.year, month.value - 1, 1))
   const closeAppointment = () => { if (appointmentPending.current) return; setAppointmentOpen(false); setAppointmentError(null); appointmentTrigger.current?.focus() }
   const saveAppointment = async (choice: EntryChoice) => {
     if (appointmentPending.current) return
@@ -200,31 +218,38 @@ export function AgendaPage() {
     {appointmentOpen ? <AccessibleDialog busy={appointmentBusy} onClose={closeAppointment} title={appointmentKind === 'medical' ? 'Agendar cita médica' : 'Agendar actividad personal'} titleId="agenda-appointment-title"><AgendaForm busy={appointmentBusy} date={selectedDate} error={appointmentError} onCancel={closeAppointment} onKindChange={(next) => { setAppointmentKind(next); setAppointmentError(null) }} onSave={(choice) => { void saveAppointment(choice) }}/></AccessibleDialog> : null}
     {entryDialog ? <AccessibleDialog busy={entryBusy} onClose={() => { if (!entryBusy) { setEntryDialog(null); setEntryError(null) } }} title={entryDialog.kind === 'edit' ? 'Editar registro de agenda' : 'Eliminar registro'} titleId="agenda-entry-dialog-title"><AgendaEntryDialog busy={entryBusy} entry={entryDialog.entry} error={entryError} kind={entryDialog.kind} onCancel={() => { setEntryDialog(null); setEntryError(null) }} onSave={(values) => { void saveEntryAction(values) }}/></AccessibleDialog> : null}
     <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,400px)_minmax(0,1fr)]">
-      <section aria-label={`Calendario de ${monthLabel}`} className="admin-surface w-full max-w-[420px] min-w-0 rounded-[20px] p-3 sm:p-4 xl:max-w-none" ref={calendarCard}>
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h2 className="flex items-center gap-2 text-base font-bold text-ink-950"><CalendarDays aria-hidden="true" size={18}/>Calendario</h2><div className="flex min-w-0 items-center gap-1"><button aria-label="Mes anterior" className="admin-secondary grid size-9 shrink-0 place-items-center rounded-lg" onClick={() => shiftMonth(-1)} type="button"><ChevronLeft aria-hidden="true" size={17}/></button><label className="sr-only" htmlFor="agenda-month">Mes</label><input aria-label="Mes" className="admin-input min-w-0 w-[145px] px-2 text-xs sm:w-[150px]" id="agenda-month" onChange={(event) => { if (!event.target.value) return; const [year, value] = event.target.value.split('-').map(Number); selectMonth(year, value) }} type="month" value={`${month.year}-${two(month.value)}`}/><button aria-label="Mes siguiente" className="admin-secondary grid size-9 shrink-0 place-items-center rounded-lg" onClick={() => shiftMonth(1)} type="button"><ChevronRight aria-hidden="true" size={17}/></button></div></div>
-        <div className="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-[#526a87]">
-          {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((label, index) => <span key={index}>{label}</span>)}
+      <section aria-label={`Calendario de ${monthLabel}`} className="admin-surface w-full max-w-[420px] min-w-0 rounded-[22px] p-4 shadow-[0_12px_30px_rgba(19,55,108,0.06)] sm:p-5 xl:sticky xl:top-6 xl:max-w-none" ref={calendarCard}>
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-3"><div className="relative shrink-0 rounded-lg text-clinic-600 focus-within:ring-2 focus-within:ring-clinic-600 focus-within:ring-offset-2"><CalendarDays aria-hidden="true" size={25}/><input aria-label="Mes" className="absolute inset-0 h-full w-full cursor-pointer opacity-0" id="agenda-month" onChange={(event) => { if (!event.target.value) return; const [year, value] = event.target.value.split('-').map(Number); selectMonth(year, value) }} title="Elegir mes y año" type="month" value={`${month.year}-${two(month.value)}`}/></div><h2 className="text-lg font-bold capitalize text-ink-950"><button aria-label="Seleccionar año y mes" className="rounded-lg text-left hover:text-clinic-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" onClick={() => { setPickerYear(month.year); setYearPage(Math.floor(month.year / 12) * 12); setPickerStep('years') }} type="button">{pickerStep === 'years' ? 'Seleccionar año' : pickerStep === 'months' ? `Meses de ${pickerYear}` : monthLabel}</button></h2></div>
+          <div className="flex shrink-0 items-center gap-2"><button aria-label="Mes anterior" className="admin-secondary grid size-10 place-items-center rounded-xl" onClick={() => shiftMonth(-1)} type="button"><ChevronLeft aria-hidden="true" size={19}/></button><button aria-label="Mes siguiente" className="admin-secondary grid size-10 place-items-center rounded-xl" onClick={() => shiftMonth(1)} type="button"><ChevronRight aria-hidden="true" size={19}/></button></div>
+        </div>
+        {pickerStep === 'years' ? <div aria-label="Seleccionar año" className="space-y-4"><div className="flex items-center justify-between text-sm font-semibold text-[#526a87]"><button aria-label="Años anteriores" className="admin-secondary grid size-9 place-items-center rounded-lg" onClick={() => setYearPage((year) => year - 12)} type="button"><ChevronLeft aria-hidden="true" size={17}/></button><span>{yearPage}–{yearPage + 11}</span><button aria-label="Años siguientes" className="admin-secondary grid size-9 place-items-center rounded-lg" onClick={() => setYearPage((year) => year + 12)} type="button"><ChevronRight aria-hidden="true" size={17}/></button></div><div className="grid grid-cols-3 gap-2">{Array.from({ length: 12 }, (_, index) => yearPage + index).map((year) => <button aria-pressed={year === month.year} className={`min-h-12 rounded-xl border text-sm font-semibold transition-colors ${year === month.year ? 'border-clinic-600 bg-clinic-50 text-clinic-700' : 'border-[#dbe6f2] text-ink-950 hover:bg-sky-50'}`} key={year} onClick={() => { setPickerYear(year); setPickerStep('months') }} type="button">{year}</button>)}</div><button className="text-sm font-semibold text-clinic-700 hover:underline" onClick={() => setPickerStep('days')} type="button">Volver al calendario</button></div> : pickerStep === 'months' ? <div aria-label="Seleccionar mes" className="space-y-4"><div className="grid grid-cols-3 gap-2">{Array.from({ length: 12 }, (_, index) => index + 1).map((value) => <button aria-pressed={pickerYear === month.year && value === month.value} className={`min-h-12 rounded-xl border text-sm font-semibold capitalize transition-colors ${pickerYear === month.year && value === month.value ? 'border-clinic-600 bg-clinic-50 text-clinic-700' : 'border-[#dbe6f2] text-ink-950 hover:bg-sky-50'}`} key={value} onClick={() => selectMonth(pickerYear, value)} type="button">{new Intl.DateTimeFormat('es-EC', { month: 'long' }).format(new Date(pickerYear, value - 1, 1))}</button>)}</div><button className="text-sm font-semibold text-clinic-700 hover:underline" onClick={() => setPickerStep('years')} type="button">Volver a años</button></div> : <div className="grid grid-cols-7 gap-1.5 text-center text-xs font-bold text-[#526a87]">
+          {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((label, index) => <span className="pb-1" key={index}>{label}</span>)}
           {Array.from({ length: offset }, (_, index) => <span aria-hidden="true" key={`empty-${index}`}/>)}
           {days.map((day) => {
             const key = dateKey(month.year, month.value, day)
             const records = state.kind === 'ready' ? state.entries.filter((entry) => entry.fecha?.slice(0, 10) === key) : []
             const active = daySelected && selectedDate === key
             const today = key === dateKey(now.getFullYear(), now.getMonth() + 1, now.getDate())
-            return <button aria-label={`Seleccionar ${day} de ${monthLabel}${records.length ? `, ${records.length} ${records.length === 1 ? 'registro' : 'registros'}` : ''}`} aria-current={today ? 'date' : undefined} aria-pressed={active} className={`relative min-h-11 rounded-lg border p-1 text-center transition-colors sm:min-h-12 ${active ? 'border-clinic-600 bg-clinic-50 ring-1 ring-clinic-600' : today ? 'border-sky-400 bg-sky-50/70 hover:bg-sky-100' : 'border-[#dbe6f2] hover:bg-[#f3f8fe]'}`} key={key} onClick={(event) => { setSelectedDate(key); setDaySelected(true); setAppointmentSuccess(null); if (user?.role === 'doctora') { appointmentTrigger.current = event.currentTarget; setAppointmentError(null); setAppointmentKind('medical'); setAppointmentOpen(true) } }} type="button"><span className="block text-sm font-bold text-ink-950">{day}</span>{records.length ? <span aria-hidden="true" className="absolute bottom-1 left-1/2 size-1 -translate-x-1/2 rounded-full bg-clinic-600"/> : null}</button>
+            return <button aria-label={`Seleccionar ${day} de ${monthLabel}${records.length ? `, ${records.length} ${records.length === 1 ? 'registro' : 'registros'}` : ''}`} aria-current={today ? 'date' : undefined} aria-pressed={active} className={`relative min-h-11 rounded-xl border p-1 text-center transition-colors sm:min-h-12 ${active ? 'border-clinic-600 bg-clinic-600 text-white shadow-[0_4px_12px_rgba(23,112,225,0.2)]' : today ? 'border-sky-400 bg-sky-50/70 hover:bg-sky-100' : 'border-[#dbe6f2] hover:bg-[#f3f8fe]'}`} key={key} onClick={(event) => { setSelectedDate(key); setDaySelected(true); setAppointmentSuccess(null); if (user?.role === 'doctora') { appointmentTrigger.current = event.currentTarget; setAppointmentError(null); setAppointmentKind('medical'); setAppointmentOpen(true) } }} type="button"><span className={`block text-sm font-bold ${active ? 'text-white' : 'text-ink-950'}`}>{day}</span>{records.length ? <span aria-hidden="true" className={`absolute bottom-1 left-1/2 size-1 -translate-x-1/2 rounded-full ${active ? 'bg-white' : 'bg-clinic-600'}`}/> : null}</button>
           })}
-        </div>
+        </div>}
       </section>
-      <section aria-label="Registros agendados" className="admin-surface flex min-h-0 min-w-0 flex-col rounded-[20px] p-5 sm:p-6 xl:h-[var(--agenda-calendar-height)] xl:overflow-hidden" style={calendarHeight === null ? undefined : { '--agenda-calendar-height': `${calendarHeight}px` } as CSSProperties}>
-        <p className="admin-kicker">Agenda del mes</p>
-        <h2 className="mt-2 text-xl font-bold text-ink-950">Agendado en {monthLabel}</h2>
+      <section aria-label="Registros agendados" className="admin-surface flex min-w-0 flex-col rounded-[22px] p-4 shadow-[0_12px_30px_rgba(19,55,108,0.06)] sm:p-5 xl:h-[var(--agenda-panel-height)] xl:overflow-hidden" ref={recordsCard} style={panelHeight === null ? undefined : { '--agenda-panel-height': `${panelHeight}px` } as CSSProperties}>
+        <div className="flex shrink-0 flex-wrap items-start justify-between gap-3"><div><h2 className="text-xl font-bold text-ink-950 sm:text-2xl">Registros del mes</h2>{state.kind === 'ready' ? <p className="admin-muted mt-1 text-sm">{monthEntries.length} {monthEntries.length === 1 ? 'registro agendado' : 'registros agendados'}</p> : null}</div><span className="rounded-full bg-clinic-50 px-3 py-1.5 text-sm font-semibold capitalize text-clinic-700">{monthChip}</span></div>
+        <div aria-label="Lista de registros del mes" className="min-h-0 xl:mt-4 xl:flex-1 xl:overflow-y-auto xl:overscroll-contain xl:pr-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" ref={recordsList} role="region" tabIndex={groupedEntries.length ? 0 : -1}>
         {state.kind === 'loading' ? <LoadingState/> : state.kind === 'error' ? <div className="mt-5"><ErrorState description={state.message} onRetry={() => { void load() }}/></div> : <>
-          <p className="admin-muted mt-2 text-sm">{monthEntries.length} {monthEntries.length === 1 ? 'registro agendado' : 'registros agendados'}</p>
-          {monthEntries.length === 0 ? <p className="admin-muted mt-6 text-sm">No hay registros agendados para este mes.</p> : <ul className="mt-4 divide-y divide-[#dbe6f2] xl:min-h-0 xl:flex-1 xl:overflow-y-auto xl:overscroll-contain xl:pr-2">{monthEntries.map((entry) => <li className="flex flex-wrap items-start gap-3 py-3 first:pt-0 last:pb-0 sm:flex-nowrap" key={entry.id}>
-            <div className="min-w-[145px] shrink-0"><p className="text-sm font-semibold text-ink-950">{formatDate(entry.fecha!)}</p><p className="admin-muted mt-1 text-sm">{entry.hora_inicio?.slice(0, 5) ?? 'Hora no disponible'}{entry.hora_fin ? `–${entry.hora_fin.slice(0, 5)}` : ''}</p></div>
-            <div className="min-w-0 flex-1"><span className="admin-pill admin-pill-ready">{entry.tipo === 'personal' ? 'Actividad personal' : 'Cita médica'}</span><p className="mt-1 break-words font-semibold text-ink-950">{entry.descripcion || (entry.tipo === 'cita_medica' ? entry.paciente?.nombres ?? 'Cita médica' : 'Actividad personal')}</p>{entry.paciente ? <p className="admin-muted mt-1 break-words text-sm">{entry.paciente.nombres}</p> : null}{entry.estado ? <p className="admin-muted mt-1 text-xs">Estado: {entry.estado}</p> : null}</div>
-            {user?.role === 'doctora' ? <div className="relative"><button aria-expanded={openMenuId === entry.id} aria-label={`Más opciones para ${entry.descripcion || entry.paciente?.nombres || 'registro'}`} className="admin-secondary grid size-10 place-items-center rounded-lg" onClick={() => setOpenMenuId((current) => current === entry.id ? null : entry.id)} type="button"><MoreVertical aria-hidden="true" size={18}/></button>{openMenuId === entry.id ? <div className="absolute right-0 top-full z-10 mt-1 min-w-36 rounded-xl border border-[#dbe6f2] bg-white p-1 shadow-lg"><button className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-ink-950 hover:bg-sky-50" onClick={() => { setOpenMenuId(null); setEntryError(null); setEntryDialog({ kind: 'edit', entry }) }} type="button">Editar</button><button className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-red-700 hover:bg-red-50" onClick={() => { setOpenMenuId(null); setEntryError(null); setEntryDialog({ kind: 'delete', entry }) }} type="button">Eliminar</button></div> : null}</div> : null}
-          </li>)}</ul>}
+          {groupedEntries.length === 0 ? <p className="admin-muted mt-6 text-sm">No hay registros agendados para este mes.</p> : <div className="mt-5 space-y-4">{groupedEntries.map((group) => <div key={group.date}>
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[#edf5ff] px-3 py-2"><h3 className="flex items-center gap-2 text-sm font-bold text-ink-950"><CalendarDays aria-hidden="true" className="text-clinic-600" size={17}/>{formatDate(group.date)}</h3><span className="admin-muted text-sm">{group.entries.length} {group.entries.length === 1 ? 'registro' : 'registros'}</span></div>
+            <ul className="divide-y divide-[#dbe6f2] px-1">{group.entries.map((entry) => <li className="flex flex-wrap items-center gap-3 py-3 sm:gap-4" key={entry.id}>
+              <time className="shrink-0 rounded-xl bg-[#e8f2ff] px-3 py-2 text-sm font-bold whitespace-nowrap text-ink-950">{entry.hora_inicio?.slice(0, 5) ?? 'Hora no disponible'}{entry.hora_fin ? ` – ${entry.hora_fin.slice(0, 5)}` : ''}</time>
+              <div className="min-w-[135px] flex-1 border-l border-[#c9daec] pl-3"><span className="admin-pill admin-pill-ready">{entry.tipo === 'personal' ? 'Actividad personal' : 'Cita médica'}</span><p className="mt-1 break-words text-sm font-semibold text-ink-950">{entry.descripcion || (entry.tipo === 'cita_medica' ? entry.paciente?.nombres ?? 'Cita médica' : 'Actividad personal')}</p>{entry.paciente ? <p className="admin-muted mt-0.5 break-words text-sm">{entry.paciente.nombres}</p> : null}</div>
+              {entry.estado ? <span aria-label={`Estado: ${entry.estado}`} className={`rounded-full px-3 py-1.5 text-xs font-semibold capitalize ${entry.estado === 'completada' ? 'bg-emerald-50 text-emerald-800' : entry.estado === 'cancelada' ? 'bg-red-50 text-red-700' : 'bg-sky-50 text-clinic-700'}`}>{entry.estado}</span> : null}
+              {user?.role === 'doctora' ? <div className="relative ml-auto"><button aria-expanded={openMenuId === entry.id} aria-label={`Más opciones para ${entry.descripcion || entry.paciente?.nombres || 'registro'}`} className="admin-secondary grid size-10 place-items-center rounded-xl" onClick={(event) => { if (openMenuId === entry.id) { setOpenMenuId(null); return } const bottom = Math.min(recordsList.current?.getBoundingClientRect().bottom ?? window.innerHeight, window.innerHeight); setMenuAbove(bottom - event.currentTarget.getBoundingClientRect().bottom < 110); setOpenMenuId(entry.id) }} type="button"><MoreVertical aria-hidden="true" size={18}/></button>{openMenuId === entry.id ? <div className={`absolute right-0 z-10 min-w-36 rounded-xl border border-[#dbe6f2] bg-white p-1 shadow-lg ${menuAbove ? 'bottom-full mb-1' : 'top-full mt-1'}`}><button className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-ink-950 hover:bg-sky-50" onClick={() => { setOpenMenuId(null); setEntryError(null); setEntryDialog({ kind: 'edit', entry }) }} type="button">Editar</button><button className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-red-700 hover:bg-red-50" onClick={() => { setOpenMenuId(null); setEntryError(null); setEntryDialog({ kind: 'delete', entry }) }} type="button">Eliminar</button></div> : null}</div> : null}
+            </li>)}</ul>
+          </div>)}</div>}
         </>}
+        </div>
       </section>
     </div>
   </div>
