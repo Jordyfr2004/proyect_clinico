@@ -94,13 +94,7 @@ class EvidenciaClinicaController extends Controller
             ],
             'tipo' => [
                 'required',
-                'in:caso_clinico,rx',
-            ],
-            'archivo' => [
-                'required',
-                'file',
-                'mimes:jpg,jpeg,png,webp,pdf',
-                'max:10240',
+                'in:caso_clinico,rx,documento',
             ],
             'archivo' => self::REGLAS_ARCHIVO,
             'descripcion' => [

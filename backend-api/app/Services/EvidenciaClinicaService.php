@@ -12,6 +12,34 @@ use Illuminate\Support\Str;
 
 class EvidenciaClinicaService
 {
+    private function tipoTexto(string $tipo): string
+    {
+        return match ($tipo) {
+            'rx' => 'una radiografía',
+            'documento' => 'un documento',
+            default => 'un caso clínico',
+        };
+    }
+
+    public function listarDelPaciente(User $user)
+    {
+        return $this->obtenerPropias($user)->load('subidoPor');
+    }
+
+    public function obtenerDelPaciente(string $id, User $user): ?EvidenciaClinica
+    {
+        return $this->obtenerPropiaPorId($id, $user);
+    }
+
+    public function descargar(EvidenciaClinica $evidencia): \Symfony\Component\HttpFoundation\StreamedResponse
+    {
+        return Storage::disk('ftp')->download(
+            $evidencia->ruta_archivo,
+            $evidencia->nombre_archivo,
+            ['Content-Type' => $evidencia->mime_type]
+        );
+    }
+
     public function listar(array $filtros)
     {
         $query = EvidenciaClinica::query()
@@ -112,12 +140,13 @@ class EvidenciaClinicaService
                 $evidencia = EvidenciaClinica::create([
                     'paciente_id' => $paciente->id,
                     'tipo' => $datos['tipo'],
-                    'nombre_archivo' => $nombreArchivo,
+                    'nombre_archivo' => $archivo->getClientOriginalName(),
                     'ruta_archivo' => $rutaArchivo,
                     'mime_type' => $archivo->getMimeType(),
                     'tamano' => $archivo->getSize(),
                     'descripcion' => $datos['descripcion'] ?? null,
-                    'fecha' => $datos['fecha'],
+                    'fecha' => $datos['fecha'] ?? now()->toDateString(),
+                    'subido_por_id' => $user->id,
                 ]);
 
                 /*
@@ -137,7 +166,7 @@ class EvidenciaClinicaService
                     );
                 }
 
-                return $evidencia->fresh();
+                return $evidencia->fresh()->load('subidoPor');
             });
         } catch (\Throwable $e) {
             /*

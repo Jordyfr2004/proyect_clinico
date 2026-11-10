@@ -70,6 +70,7 @@ class AuditoriaTransaccionesTest extends TestCase
             'role' => 'doctora',
             'activo' => true,
         ]);
+        $this->doctora->forceFill(['email_verified_at' => now()])->save();
         $this->paciente = Paciente::create([
             'codigo_paciente' => '001',
             'nombres' => 'Paciente original',
