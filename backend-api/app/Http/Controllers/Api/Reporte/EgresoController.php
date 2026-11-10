@@ -64,6 +64,8 @@ class EgresoController extends Controller
             'monto' => [
                 'required',
                 'numeric',
+                'decimal:0,2',
+                'max:99999999.99',
                 'min:0.01',
             ],
         ]);
@@ -99,6 +101,8 @@ class EgresoController extends Controller
                 'sometimes',
                 'required',
                 'numeric',
+                'decimal:0,2',
+                'max:99999999.99',
                 'min:0.01',
             ],
         ]);

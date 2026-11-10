@@ -7,6 +7,7 @@ use App\Models\Paciente;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 class ActividadService
 {
@@ -123,6 +124,19 @@ class ActividadService
 
             if (!$actividad) {
                 return null;
+            }
+
+            if ($actividad->agenda_id) {
+                $errores = [];
+                if (isset($datos['codigo_paciente']) && $datos['codigo_paciente'] !== $actividad->paciente->codigo_paciente) {
+                    $errores['codigo_paciente'] = 'El paciente corresponde a la cita vinculada.';
+                }
+                if (isset($datos['fecha']) && Carbon::parse($datos['fecha'])->toDateString() !== $actividad->fecha->toDateString()) {
+                    $errores['fecha'] = 'Corrige la fecha desde la cita vinculada.';
+                }
+                if ($errores) {
+                    throw ValidationException::withMessages($errores);
+                }
             }
 
             if (isset($datos['codigo_paciente'])) {

@@ -14,6 +14,7 @@ class Actividad extends Model
     protected $table = 'actividades';
 
     protected $fillable = [
+        'agenda_id',
         'paciente_id',
         'fecha',
         'actividad',
@@ -23,6 +24,11 @@ class Actividad extends Model
     public function paciente(): BelongsTo
     {
         return $this->belongsTo(Paciente::class);
+    }
+
+    public function agenda(): BelongsTo
+    {
+        return $this->belongsTo(Agenda::class);
     }
 
     protected function casts(): array

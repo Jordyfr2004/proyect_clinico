@@ -54,11 +54,16 @@ Route::get('/user', function (Request $request) {
 // Autenticación
 
 Route::prefix('auth')->group(function () {
+
     Route::post('/login', [AuthController::class, 'login'])
         ->middleware('throttle:auth-login');
 
     Route::post('/register-paciente', [AuthController::class, 'registerPaciente'])
         ->middleware('throttle:auth-register');
+
+    Route::post('/verify-email', [AuthController::class, 'verifyEmail']);
+
+    Route::post('/resend-verification-code', [AuthController::class, 'resendVerificationCode']);
 
     Route::post('/forgot-password', [PasswordController::class, 'forgotPassword'])
         ->middleware('throttle:password-forgot');
@@ -66,11 +71,11 @@ Route::prefix('auth')->group(function () {
     Route::post('/reset-password', [PasswordController::class, 'resetPassword'])
         ->middleware('throttle:password-reset');
 
-
     Route::post('/logout', [AuthController::class, 'logout'])
         ->middleware('auth:sanctum');
-        
+
 });
+
 
 // Usuarios
 Route::middleware('auth:sanctum', 'role:doctora')->prefix('usuarios')->group(function () {
@@ -193,8 +198,22 @@ Route::prefix('odontogramas')->group(function () {
 });
 
 
-// Fotografias y Radiografias
+// Fotografías y Radiografías
 Route::prefix('evidencias-clinicas')->group(function () {
+
+    // Paciente
+    Route::middleware('auth:sanctum', 'role:paciente')->group(function () {
+
+        Route::get('/mis', [EvidenciaClinicaController::class, 'mis']);
+
+        Route::post('/mis', [EvidenciaClinicaController::class, 'storePaciente']);
+
+        Route::get('/mis/{id}', [EvidenciaClinicaController::class, 'verPropia']);
+
+        Route::get('/mis/{id}/archivo', [EvidenciaClinicaController::class, 'archivo']);
+
+    });
+
 
     // Doctora y asistente pueden consultar
     Route::middleware('auth:sanctum', 'role:doctora,asistente')->group(function () {
@@ -202,6 +221,8 @@ Route::prefix('evidencias-clinicas')->group(function () {
         Route::get('/', [EvidenciaClinicaController::class, 'index']);
 
         Route::get('/paciente/{pacienteId}', [EvidenciaClinicaController::class, 'porPaciente']);
+
+        Route::get('/{id}/archivo', [EvidenciaClinicaController::class, 'archivo']);
 
         Route::get('/{id}', [EvidenciaClinicaController::class, 'show']);
 

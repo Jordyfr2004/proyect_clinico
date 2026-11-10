@@ -66,6 +66,8 @@ class ActividadController extends Controller
             'precio' => [
                 'required',
                 'numeric',
+                'decimal:0,2',
+                'max:99999999.99',
                 'min:0',
             ],
         ]);
@@ -114,6 +116,8 @@ class ActividadController extends Controller
                 'sometimes',
                 'required',
                 'numeric',
+                'decimal:0,2',
+                'max:99999999.99',
                 'min:0',
             ],
         ]);

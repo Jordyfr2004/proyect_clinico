@@ -39,6 +39,20 @@ class AuthService
                 ]);
             }
 
+            if (!$user->email_verified_at) {
+                throw ValidationException::withMessages([
+                    'username' => [
+                        'Debes verificar tu correo antes de iniciar sesión.',
+                    ],
+                    'requires_verification' => [
+                        true,
+                    ],
+                    'email' => [
+                        $user->email,
+                    ],
+                ]);
+            }
+
             $token = $user
                 ->createToken('auth_token')
                 ->plainTextToken;
@@ -153,16 +167,12 @@ class AuthService
                     'role' => 'paciente',
                     'paciente_id' => $paciente->id,
                     'activo' => true,
+                    'email_verified_at' => null,
                 ]);
-
-                $token = $user
-                    ->createToken('auth_token')
-                    ->plainTextToken;
 
                 return [
                     'paciente' => $paciente,
                     'user' => $user,
-                    'token' => $token,
                 ];
             }
         );

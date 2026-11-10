@@ -95,7 +95,7 @@ return [
             'charset' => env('DB_CHARSET', 'utf8'),
             'prefix' => '',
             'prefix_indexes' => true,
-            'search_path' => env('DB_SEARCH_PATH', 'public,seguridad,clinica,citas,finanzas,catalogo,auditoria'),
+            'search_path' => env('DB_SEARCH_PATH', 'public,seguridad,clinica,citas,finanzas,catalogo,auditoria,private,clinical'),
             'sslmode' => env('DB_SSLMODE', 'prefer'),
             // pdo_pgsql envía ATTR_TIMEOUT como connect_timeout (por defecto 30 s).
             'options' => extension_loaded('pdo_pgsql') ? [

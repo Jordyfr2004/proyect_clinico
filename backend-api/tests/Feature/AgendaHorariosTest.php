@@ -21,6 +21,8 @@ class AgendaHorariosTest extends TestCase
             '2026_10_02_191138_create_agendas_table.php',
             '2026_10_03_030037_add_clinical_fields_to_agenda_table.php',
             '2026_10_03_191429_create_accion_registradas_table.php',
+            '2026_10_02_043042_create_actividads_table.php',
+            '2026_10_29_000001_add_agenda_id_to_actividades_table.php',
         ] as $migration) {
             (require database_path('migrations/'.$migration))->up();
         }
@@ -196,7 +198,7 @@ class AgendaHorariosTest extends TestCase
         $cita = $this->bloque('cita_medica', $paciente->id);
         $cita->update(['diagnostico' => 'Diagnostico', 'tratamiento' => 'Tratamiento']);
 
-        $this->putJson('/api/agenda/'.$cita->id.'/completar')->assertOk();
+        $this->putJson('/api/agenda/'.$cita->id.'/completar', ['precio' => '30.50'])->assertOk();
         $this->postJson('/api/agenda/personal', [
             'fecha' => '2026-10-05',
             'hora_inicio' => '10:30',

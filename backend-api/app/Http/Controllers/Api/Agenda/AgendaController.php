@@ -389,11 +389,17 @@ class AgendaController extends Controller
         Request $request,
         string $id
     ): JsonResponse {
+        $datos = $request->validate([
+            'actividad' => ['sometimes', 'required', 'string', 'max:255'],
+            'precio' => ['required', 'numeric', 'decimal:0,2', 'min:0', 'max:99999999.99'],
+        ]);
+
         $resultado = $this
             ->agendaService
             ->completarCita(
                 $id,
-                $request->user()
+                $request->user(),
+                $datos
             );
 
         if ($resultado['estado'] === 'no_encontrado') {

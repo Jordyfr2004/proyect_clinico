@@ -355,7 +355,7 @@ class AgendaService
         User $user
     ): array {
         return $this->ejecutarConControlDeHorario(function () use ($id, $datos, $user) {
-            $registro = Agenda::find($id);
+            $registro = Agenda::lockForUpdate()->find($id);
 
             if (!$registro) {
                 return [
@@ -426,6 +426,11 @@ class AgendaService
             }
 
             $registro->update($datos);
+
+            // La fecha contable sigue la fecha de atención corregida.
+            if (isset($datos['fecha']) && $registro->estado === 'completada') {
+                $registro->actividad()->update(['fecha' => $registro->fecha->toDateString()]);
+            }
 
             $registro->load('paciente');
 
@@ -566,10 +571,11 @@ class AgendaService
 
     public function completarCita(
         string $id,
-        User $user
+        User $user,
+        array $datos
     ): array {
-        return DB::transaction(function () use ($id, $user) {
-            $registro = Agenda::find($id);
+        return DB::transaction(function () use ($id, $user, $datos) {
+            $registro = Agenda::lockForUpdate()->find($id);
 
             if (!$registro) {
                 return [
@@ -603,6 +609,16 @@ class AgendaService
             ]);
 
             $registro->load('paciente');
+
+            $actividad = app(ActividadService::class)->crear([
+                'codigo_paciente' => $registro->paciente->codigo_paciente,
+                'fecha' => $registro->fecha->toDateString(),
+                'actividad' => $datos['actividad'] ?? 'Consulta médica',
+                'precio' => $datos['precio'],
+            ], $user);
+            $actividad->agenda()->associate($registro);
+            $actividad->save();
+            $registro->load('actividad');
 
             AuditoriaService::registrarAccion(
                 $user,
