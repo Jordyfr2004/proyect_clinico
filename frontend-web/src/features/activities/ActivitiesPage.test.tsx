@@ -35,6 +35,40 @@ describe('ActivitiesPage', () => {
     expect(getActivities).toHaveBeenCalledTimes(1)
   })
 
+  it.each(['Registrar actividad', 'Editar actividad', 'Eliminar actividad'])('closes %s with a local exit transition and restores the trigger focus', async (title) => {
+    renderPage('doctora')
+    await screen.findByText('Consulta registrada')
+    let trigger: HTMLElement
+    if (title === 'Registrar actividad') {
+      trigger = screen.getByRole('button', { name: 'Registrar actividad' })
+      fireEvent.click(trigger)
+    } else {
+      trigger = screen.getByRole('button', { name: 'Opciones de actividad para Paciente recibido' })
+      fireEvent.click(trigger)
+      fireEvent.click(screen.getByRole('menuitem', { name: title === 'Editar actividad' ? 'Editar' : 'Eliminar' }))
+    }
+    const dialog = screen.getByRole('dialog', { name: title })
+    if (title === 'Eliminar actividad') expect(within(dialog).getByRole('button', { name: 'Cancelar' })).toHaveFocus()
+    else expect(within(dialog).getByLabelText('Código de paciente')).toHaveFocus()
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(dialog.querySelector('[data-activities-dialog]')).toHaveAttribute('data-closing', 'true')
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: title })).not.toBeInTheDocument())
+    expect(trigger).toHaveFocus()
+  })
+
+  it('preserves the list scroll position when a new period is applied', async () => {
+    vi.mocked(getActivities).mockResolvedValue(Array.from({ length: 60 }, (_, index) => ({ ...record, id: `activity-${index}`, actividad: `Actividad ${index}` })))
+    renderPage('doctora')
+    await screen.findByText('Actividad 0')
+    const list = screen.getByRole('region', { name: 'Lista de actividades' })
+    list.scrollTop = 180
+    fireEvent.click(screen.getByRole('button', { name: 'Día' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar filtros' }))
+    await waitFor(() => expect(getActivities).toHaveBeenCalledTimes(2))
+    await screen.findByRole('region', { name: 'Lista de actividades' })
+    expect(screen.getByRole('region', { name: 'Lista de actividades' }).scrollTop).toBe(180)
+  })
+
   it('keeps received activities visible when only the period total fails', async () => {
     vi.mocked(getActivityTotal).mockRejectedValue(new Error('network'))
     renderPage('doctora')
@@ -388,5 +422,19 @@ describe('ActivitiesPage', () => {
     fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmar eliminación' }))
     await waitFor(() => expect(deleteActivity).toHaveBeenCalledExactlyOnceWith('activity-id'))
     await waitFor(() => expect(getActivities).toHaveBeenCalledTimes(2))
+  })
+
+  it('keeps the real delete details visible when Laravel rejects deletion', async () => {
+    vi.mocked(deleteActivity).mockRejectedValue({ isAxiosError: true, response: { status: 403, data: { message: 'No tienes permiso para eliminar esta actividad.' } } })
+    renderPage('doctora')
+    await screen.findByText('Consulta registrada')
+    fireEvent.click(screen.getByRole('button', { name: 'Opciones de actividad para Paciente recibido' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Eliminar' }))
+    const dialog = screen.getByRole('dialog', { name: 'Eliminar actividad' })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmar eliminación' }))
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('No tienes permiso para eliminar esta actividad.')
+    expect(within(dialog).getByText('Paciente recibido')).toBeInTheDocument()
+    expect(within(dialog).getByText('$25.00')).toBeInTheDocument()
+    expect(screen.queryByText('Actividad eliminada correctamente.')).not.toBeInTheDocument()
   })
 })

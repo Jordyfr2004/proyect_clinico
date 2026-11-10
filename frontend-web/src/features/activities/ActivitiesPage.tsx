@@ -13,6 +13,7 @@ import { useAuth } from '../auth/authContext'
 import { createActivity, deleteActivity, getActivities, getActivityTotal, lookupPatientByCode, updateActivity, type Activity, type ActivityFilters, type ActivityPayload, type ActivityPeriod } from './activityService'
 import { markClinicalQueriesStale, useClinicalQuery } from '../../services/clinicalQuery'
 import { useClinicalViewState } from '../../services/clinicalViewState'
+import './activities.css'
 
 type PeriodKind = ActivityPeriod['periodo']
 type Dialog = { kind: 'create' | 'edit' | 'delete'; record?: Activity }
@@ -128,6 +129,7 @@ export function ActivitiesPage() {
   const [code, setCode] = useClinicalViewState('activities.code', () => '')
   const [query, setQuery] = useClinicalViewState('activities.query', () => periodParams('mes', date, month, year, ''))
   const [dialog, setDialog] = useState<Dialog | null>(() => doctor && location.state?.dashboardAction === 'registrar-actividad' ? { kind: 'create' } : null)
+  const [dialogClosing, setDialogClosing] = useState(false)
   const [busy, setBusy] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
@@ -135,9 +137,22 @@ export function ActivitiesPage() {
   const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 })
   const menuTrigger = useRef<HTMLButtonElement | null>(null)
   const recordsCard = useRef<HTMLElement | null>(null)
+  const recordsScroll = useRef<HTMLDivElement | null>(null)
+  const recordsContent = useRef<HTMLDivElement | null>(null)
+  const totalCard = useRef<HTMLElement | null>(null)
+  const savedScrollTop = useRef<number | null>(null)
+  const closeTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const restoreFocus = useRef(false)
   const [recordsMaxHeight, setRecordsMaxHeight] = useState<number | null>(null)
   const pendingMutation = useRef(false)
   const trigger = useRef<HTMLElement | null>(null)
+  useEffect(() => () => { if (closeTimer.current) clearTimeout(closeTimer.current) }, [])
+  useEffect(() => {
+    if (dialog || !restoreFocus.current) return
+    restoreFocus.current = false
+    const target = trigger.current?.isConnected ? trigger.current : document.querySelector<HTMLElement>('[data-activity-create-trigger]')
+    target?.focus()
+  }, [dialog])
   useEffect(() => {
     if (location.state?.dashboardAction !== 'registrar-actividad' || !doctor) return
     navigate(location.pathname, { replace: true, state: null })
@@ -154,6 +169,21 @@ export function ActivitiesPage() {
   }, [openMenuId])
   const recordsQuery = useClinicalQuery(['activities', query.list], (signal) => getActivities(query.list, signal))
   const totalQuery = useClinicalQuery(['activities-total', query.total], (signal) => getActivityTotal(query.total, signal))
+  useLayoutEffect(() => {
+    if (!recordsQuery.data || savedScrollTop.current === null) return
+    if (recordsScroll.current) recordsScroll.current.scrollTop = savedScrollTop.current
+    savedScrollTop.current = null
+  }, [recordsQuery.data])
+  useEffect(() => {
+    if (!recordsQuery.data?.length || !recordsContent.current || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+    const animation = recordsContent.current.animate?.([{ opacity: 0.65 }, { opacity: 1 }], { duration: 240, easing: 'ease-out' })
+    return () => animation?.cancel()
+  }, [recordsQuery.data])
+  useEffect(() => {
+    if (!totalQuery.data || !totalCard.current || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+    const animation = totalCard.current.animate?.([{ opacity: 0.7 }, { opacity: 1 }], { duration: 220, easing: 'ease-out' })
+    return () => animation?.cancel()
+  }, [totalQuery.data])
   useLayoutEffect(() => {
     if (!recordsQuery.data?.length) return
     const updateHeight = () => {
@@ -193,10 +223,18 @@ export function ActivitiesPage() {
     const [records, total] = await Promise.all([recordsQuery.refetch(), totalQuery.refetch()])
     return records.isSuccess && total.isSuccess
   }
-  const openDialog = (next: Dialog, element: HTMLElement) => { trigger.current = element; setActionError(null); setDialog(next) }
-  const closeDialog = () => { if (pendingMutation.current) return; setDialog(null); setActionError(null); trigger.current?.focus() }
+  const openDialog = (next: Dialog, element: HTMLElement) => { trigger.current = element; setActionError(null); setDialogClosing(false); setDialog(next) }
+  const finishDialogClose = () => { closeTimer.current = null; restoreFocus.current = true; setDialog(null); setDialogClosing(false); setActionError(null) }
+  const beginDialogClose = () => {
+    if (dialogClosing || closeTimer.current) return
+    if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) { finishDialogClose(); return }
+    setDialogClosing(true)
+    closeTimer.current = setTimeout(finishDialogClose, 270)
+  }
+  const closeDialog = () => { if (!pendingMutation.current) beginDialogClose() }
+  const rememberScroll = () => { savedScrollTop.current = recordsScroll.current?.scrollTop ?? null }
   const mutate = async (values?: ActivityPayload) => {
-    if (!dialog || pendingMutation.current) return
+    if (!dialog || dialogClosing || pendingMutation.current) return
     pendingMutation.current = true; setBusy(true); setActionError(null)
     try {
       let message: string
@@ -206,7 +244,7 @@ export function ActivitiesPage() {
       else return
       void markClinicalQueriesStale(['dashboard-report'])
       void markClinicalQueriesStale(['reports'])
-      if (await load()) { setSuccess(message); setDialog(null); trigger.current?.focus() }
+      if (await load()) { setSuccess(message); beginDialogClose() }
       else setActionError('El cambio se confirmó, pero no fue posible actualizar las actividades. Reintenta la consulta.')
     } catch (cause) { setActionError(errorMessage(cause)) }
     finally { pendingMutation.current = false; setBusy(false) }
@@ -214,26 +252,26 @@ export function ActivitiesPage() {
   const selectedMenuRecord = recordsQuery.data?.find((record) => record.id === openMenuId)
   const filtersPending = JSON.stringify(periodParams(period, date, month, year, code)) !== JSON.stringify(query)
   return <div className="admin-reveal max-w-[1390px] space-y-4">
-    <header className="flex flex-wrap items-end justify-between gap-4"><div><p className="admin-kicker">Gestión clínica</p><h1 className="admin-page-title mt-2">Actividades</h1><p className="admin-body mt-2">Actividades registradas para pacientes.</p></div>{doctor ? <button className="admin-primary inline-flex min-h-11 items-center gap-2 rounded-[10px] px-5 text-sm font-semibold" onClick={(event) => openDialog({ kind: 'create' }, event.currentTarget)} type="button"><Plus aria-hidden="true" size={18}/>Registrar actividad</button> : null}</header>
+    <header className="flex flex-wrap items-end justify-between gap-4"><div><p className="admin-kicker">Gestión clínica</p><h1 className="admin-page-title mt-2">Actividades</h1><p className="admin-body mt-2">Actividades registradas para pacientes.</p></div>{doctor ? <button className="admin-primary inline-flex min-h-11 items-center gap-2 rounded-[10px] px-5 text-sm font-semibold" data-activity-create-trigger onClick={(event) => openDialog({ kind: 'create' }, event.currentTarget)} type="button"><Plus aria-hidden="true" size={18}/>Registrar actividad</button> : null}</header>
     {success ? <p className="admin-success rounded-xl p-4 text-sm" role="status">{success}</p> : null}
     <section aria-label="Filtros de actividades" className="admin-surface rounded-[20px] p-3 sm:p-4 lg:flex lg:items-start lg:gap-3 xl:items-end">
       <div aria-label="Período" className="flex w-full flex-wrap gap-1 rounded-xl border border-[#dbe6f2] bg-[#f3f8fe] p-1 sm:w-fit lg:shrink-0" role="group">
         {([['dia', 'Día'], ['semana', 'Semana'], ['mes', 'Mes'], ['anio', 'Año']] as const).map(([value, label]) => <button aria-pressed={period === value} className={`min-h-10 flex-1 rounded-lg px-3 text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600 sm:flex-none ${period === value ? 'bg-clinic-600 text-white shadow-sm' : 'text-[#526a87] hover:bg-white hover:text-clinic-700'}`} key={value} onClick={() => setPeriod(value)} type="button">{label}</button>)}
       </div>
       <div className="mt-2 grid min-w-0 gap-2 sm:grid-cols-2 lg:mt-0 lg:flex-1 xl:flex xl:items-end">
-        {period === 'dia' || period === 'semana' ? <label className="min-w-0 text-sm font-medium text-ink-950 xl:min-w-[145px] xl:flex-1">{period === 'dia' ? 'Fecha del día' : 'Fecha de la semana'}<input className="admin-input mt-1 w-full text-sm" onChange={(event) => setDate(event.target.value)} type="date" value={date}/></label> : null}
-        {period === 'mes' ? <label className="min-w-0 text-sm font-medium text-ink-950 xl:min-w-[115px] xl:flex-1">Mes<select className="admin-input mt-1 w-full text-sm" onChange={(event) => setMonth(event.target.value)} value={month}>{Array.from({ length: 12 }, (_, index) => <option key={index + 1} value={index + 1}>{new Intl.DateTimeFormat('es-EC', { month: 'long' }).format(new Date(2000, index, 1))}</option>)}</select></label> : null}
-        {period === 'mes' || period === 'anio' ? <label className="min-w-0 text-sm font-medium text-ink-950 xl:min-w-[78px] xl:flex-[0.65]">Año<input className="admin-input mt-1 w-full text-sm" onChange={(event) => setYear(event.target.value)} type="number" value={year}/></label> : null}
+        {period === 'dia' || period === 'semana' ? <label className="activity-filter-enter min-w-0 text-sm font-medium text-ink-950 xl:min-w-[145px] xl:flex-1">{period === 'dia' ? 'Fecha del día' : 'Fecha de la semana'}<input className="admin-input mt-1 w-full text-sm" onChange={(event) => setDate(event.target.value)} type="date" value={date}/></label> : null}
+        {period === 'mes' ? <label className="activity-filter-enter min-w-0 text-sm font-medium text-ink-950 xl:min-w-[115px] xl:flex-1">Mes<select className="admin-input mt-1 w-full text-sm" onChange={(event) => setMonth(event.target.value)} value={month}>{Array.from({ length: 12 }, (_, index) => <option key={index + 1} value={index + 1}>{new Intl.DateTimeFormat('es-EC', { month: 'long' }).format(new Date(2000, index, 1))}</option>)}</select></label> : null}
+        {period === 'mes' || period === 'anio' ? <label className="activity-filter-enter min-w-0 text-sm font-medium text-ink-950 xl:min-w-[78px] xl:flex-[0.65]">Año<input className="admin-input mt-1 w-full text-sm" onChange={(event) => setYear(event.target.value)} type="number" value={year}/></label> : null}
         <label className="min-w-0 text-sm font-medium text-ink-950 xl:min-w-[145px] xl:flex-[1.15]">Código para filtrar<input aria-label="Código de paciente para filtrar" className="admin-input mt-1 w-full text-sm" onChange={(event) => setCode(event.target.value)} placeholder="Ej. 001" value={code}/></label>
-        <button className="admin-primary min-h-11 self-end whitespace-nowrap rounded-lg px-3 text-sm font-semibold xl:shrink-0" onClick={() => { if ((period === 'dia' || period === 'semana') && !date) return; if ((period === 'mes' || period === 'anio') && (!year || (period === 'mes' && !month))) return; setQuery(periodParams(period, date, month, year, code)) }} type="button">Aplicar filtros</button>
-        <button className="admin-secondary min-h-11 self-end whitespace-nowrap rounded-lg px-3 text-sm font-semibold sm:col-span-2 xl:shrink-0" onClick={() => { const today = new Date(); const currentDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`; const currentMonth = String(today.getMonth() + 1); const currentYear = String(today.getFullYear()); setPeriod('mes'); setDate(currentDate); setMonth(currentMonth); setYear(currentYear); setCode(''); setQuery(periodParams('mes', currentDate, currentMonth, currentYear, '')) }} type="button">Limpiar filtros</button>
+        <button className="admin-primary min-h-11 self-end whitespace-nowrap rounded-lg px-3 text-sm font-semibold xl:shrink-0" onClick={() => { if ((period === 'dia' || period === 'semana') && !date) return; if ((period === 'mes' || period === 'anio') && (!year || (period === 'mes' && !month))) return; rememberScroll(); setQuery(periodParams(period, date, month, year, code)) }} type="button">Aplicar filtros</button>
+        <button className="admin-secondary min-h-11 self-end whitespace-nowrap rounded-lg px-3 text-sm font-semibold sm:col-span-2 xl:shrink-0" onClick={() => { rememberScroll(); const today = new Date(); const currentDate = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`; const currentMonth = String(today.getMonth() + 1); const currentYear = String(today.getFullYear()); setPeriod('mes'); setDate(currentDate); setMonth(currentMonth); setYear(currentYear); setCode(''); setQuery(periodParams('mes', currentDate, currentMonth, currentYear, '')) }} type="button">Limpiar filtros</button>
       </div>
     </section>
-    {totalQuery.data ? <section aria-label="Total económico del período" className="admin-surface flex flex-col items-start gap-2 rounded-[20px] p-3 sm:flex-row sm:items-center sm:gap-4 sm:px-4 sm:py-3"><div className="flex min-w-0 items-center gap-3"><span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#e7f4ff] text-clinic-600"><Wallet size={21}/></span><div className="min-w-0"><p className="admin-kicker">Total general del período</p><p className="admin-muted mt-0.5 text-sm">Incluye todas las actividades del período, aunque filtres por paciente.</p></div></div><p className="self-end text-2xl font-bold tracking-tight text-ink-950 sm:ml-auto sm:shrink-0 sm:self-auto">{formatCurrency(totalQuery.data.total)}</p></section> : totalQuery.isError ? <ErrorState description={errorMessage(totalQuery.error)} onRetry={() => { void totalQuery.refetch() }}/> : <LoadingState/>}
+    {totalQuery.data ? <section aria-label="Total económico del período" className="admin-surface flex flex-col items-start gap-2 rounded-[20px] p-3 sm:flex-row sm:items-center sm:gap-4 sm:px-4 sm:py-3" ref={totalCard}><div className="flex min-w-0 items-center gap-3"><span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#e7f4ff] text-clinic-600"><Wallet size={21}/></span><div className="min-w-0"><p className="admin-kicker">Total general del período</p><p className="admin-muted mt-0.5 text-sm">Incluye todas las actividades del período, aunque filtres por paciente.</p></div></div><p className="self-end text-2xl font-bold tracking-tight text-ink-950 sm:ml-auto sm:shrink-0 sm:self-auto">{formatCurrency(totalQuery.data.total)}</p></section> : totalQuery.isError ? <ErrorState description={errorMessage(totalQuery.error)} onRetry={() => { void totalQuery.refetch() }}/> : <LoadingState/>}
     {recordsQuery.data ? recordsQuery.data.length === 0 ? <EmptyState description="Sin registros para los filtros seleccionados." icon={ClipboardList} title="Sin actividades en esta vista."/> : <section aria-label="Actividades registradas" className="admin-surface flex min-h-0 min-w-0 flex-col rounded-[20px] p-3 sm:p-4" ref={recordsCard} style={recordsMaxHeight === null ? undefined : { maxHeight: recordsMaxHeight }}>
       <div className="flex shrink-0 flex-wrap items-end justify-between gap-x-4 gap-y-1 border-b border-[#e3ecf6] pb-3"><div className="min-w-0"><h2 className="text-lg font-bold text-ink-950">Registros</h2><p className="admin-muted mt-0.5 text-xs sm:text-sm">Período consultado: {periodLabel(query.total)}{query.list.codigo_paciente ? ` · Código ${query.list.codigo_paciente}` : ''}</p></div><div className="flex flex-wrap items-center gap-2">{filtersPending ? <span className="rounded-full bg-[#eaf4ff] px-2 py-1 text-xs font-semibold text-clinic-700" role="status">Cambios sin aplicar</span> : null}<p className="admin-muted whitespace-nowrap text-sm">{recordsQuery.data.length} {recordsQuery.data.length === 1 ? 'actividad' : 'actividades'}</p></div></div>
-      <div aria-label="Lista de actividades" className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain pb-1 pt-2 pr-1 sm:pr-2" data-activity-scroll role="region" tabIndex={0}>
-        <IncrementalList className="space-y-2" items={recordsQuery.data} renderItem={(record) => <li className="grid min-w-0 grid-cols-[40px_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 rounded-xl border border-[#dbe6f2] bg-white p-3 shadow-[0_3px_12px_rgba(19,55,108,0.035)] focus-within:border-[#bbd6f4] sm:flex sm:flex-wrap sm:items-center sm:gap-3 lg:grid lg:grid-cols-[40px_minmax(140px,1.1fr)_minmax(130px,1fr)_auto_40px]" key={record.id}>
+      <div aria-label="Lista de actividades" className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain pb-1 pt-2 pr-1 sm:pr-2" data-activity-scroll ref={recordsScroll} role="region" tabIndex={0}>
+        <div ref={recordsContent}><IncrementalList className="space-y-2" items={recordsQuery.data} renderItem={(record) => <li className="grid min-w-0 grid-cols-[40px_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 rounded-xl border border-[#dbe6f2] bg-white p-3 shadow-[0_3px_12px_rgba(19,55,108,0.035)] focus-within:border-[#bbd6f4] sm:flex sm:flex-wrap sm:items-center sm:gap-3 lg:grid lg:grid-cols-[40px_minmax(140px,1.1fr)_minmax(130px,1fr)_auto_40px]" key={record.id}>
           <span aria-hidden="true" className="col-start-1 row-start-1 grid size-10 shrink-0 place-items-center rounded-xl bg-[#eaf4ff] text-clinic-600"><CalendarDays size={19}/></span>
           <div className="col-start-2 row-start-1 min-w-0 sm:flex-1 sm:basis-[170px]"><p className="text-sm font-semibold text-ink-950">{record.paciente.nombres}</p><p className="admin-muted mt-0.5 text-xs">Código: {record.paciente.codigo_paciente}</p></div>
           <div className="col-span-2 row-start-2 min-w-0 sm:flex-1 sm:basis-[170px] lg:col-span-1 lg:col-start-3 lg:row-start-1"><p className="text-sm font-semibold text-ink-950">{record.actividad}</p><p className="admin-muted mt-0.5 text-xs">{formatDate(record.fecha)}</p></div>
@@ -241,7 +279,7 @@ export function ActivitiesPage() {
           {doctor ? <div className="col-start-3 row-start-1 ml-auto shrink-0 lg:col-start-5" data-activity-menu>
             <button aria-expanded={openMenuId === record.id} aria-haspopup="menu" aria-label={`Opciones de actividad para ${record.paciente.nombres}`} className="admin-secondary grid size-10 place-items-center rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" data-menu-trigger onClick={(event) => { const button = event.currentTarget; if (openMenuId === record.id) { setOpenMenuId(null); return } menuTrigger.current = button; setMenuPosition(actionMenuPosition(button)); setOpenMenuId(record.id) }} onKeyDown={onMenuKeyDown} type="button"><MoreVertical aria-hidden="true" size={18}/></button>
           </div> : null}
-        </li>}/>
+        </li>}/></div>
       </div>
     </section> : recordsQuery.isError ? <ErrorState description={errorMessage(recordsQuery.error)} onRetry={() => { void recordsQuery.refetch() }}/> : <LoadingState/>}
     {totalQuery.data && totalQuery.isError ? <p className="text-sm text-red-700" role="alert">No fue posible actualizar el total. <button className="dashboard-retry" onClick={() => { void totalQuery.refetch() }} type="button">Reintentar</button></p> : null}
@@ -250,11 +288,11 @@ export function ActivitiesPage() {
       <button className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-ink-950 hover:bg-[#f2f8ff] focus-visible:outline-2 focus-visible:outline-clinic-600" onClick={() => { const anchor = menuTrigger.current; setOpenMenuId(null); if (anchor) openDialog({ kind: 'edit', record: selectedMenuRecord }, anchor) }} role="menuitem" type="button">Editar</button>
       <button className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-red-700 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-600" onClick={() => { const anchor = menuTrigger.current; setOpenMenuId(null); if (anchor) openDialog({ kind: 'delete', record: selectedMenuRecord }, anchor) }} role="menuitem" type="button">Eliminar</button>
     </div>, document.body) : null}
-    {dialog ? <AccessibleDialog busy={busy} onClose={closeDialog} title={dialog.kind === 'create' ? 'Registrar actividad' : dialog.kind === 'edit' ? 'Editar actividad' : 'Eliminar actividad'} titleId="activity-dialog-title">{dialog.kind === 'delete' && dialog.record ? <div>
+    {dialog ? <AccessibleDialog busy={busy || dialogClosing} onClose={closeDialog} title={dialog.kind === 'create' ? 'Registrar actividad' : dialog.kind === 'edit' ? 'Editar actividad' : 'Eliminar actividad'} titleId="activity-dialog-title"><div data-activities-dialog data-closing={dialogClosing ? 'true' : undefined}>{dialog.kind === 'delete' && dialog.record ? <div>
       <p className="admin-body text-sm">Revisa la actividad antes de eliminarla. Esta acción requiere confirmación.</p>
       <div className="mt-4 rounded-xl border border-[#dbe6f2] bg-[#f6faff] p-4"><div className="flex items-center gap-3"><span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#e1f0ff] text-clinic-600"><UserRound size={19}/></span><div className="min-w-0"><p className="font-semibold text-ink-950">{dialog.record.paciente.nombres}</p><p className="admin-muted text-sm">Código: {dialog.record.paciente.codigo_paciente}</p></div></div><dl className="mt-4 grid gap-3 border-t border-[#dbe6f2] pt-4 sm:grid-cols-2"><div><dt className="admin-muted text-xs">Fecha</dt><dd className="mt-0.5 text-sm font-semibold text-ink-950">{formatDate(dialog.record.fecha)}</dd></div><div><dt className="admin-muted text-xs">Precio</dt><dd className="mt-0.5 text-sm font-semibold text-clinic-700">{formatCurrency(dialog.record.precio)}</dd></div><div className="sm:col-span-2"><dt className="admin-muted text-xs">Actividad</dt><dd className="mt-0.5 text-sm font-semibold text-ink-950">{dialog.record.actividad}</dd></div></dl></div>
       {actionError ? <p className="mt-4 text-sm text-red-700" role="alert">{actionError}</p> : null}
-      <div className="mt-5 flex flex-col-reverse gap-3 border-t border-[#e3ecf6] pt-4 sm:flex-row sm:justify-end"><button className="admin-secondary min-h-11 rounded-[10px] px-5 text-sm font-semibold disabled:opacity-60" data-dialog-initial disabled={busy} onClick={closeDialog} type="button">Cancelar</button><button className="min-h-11 rounded-[10px] bg-red-700 px-5 text-sm font-semibold text-white hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:opacity-60" disabled={busy} onClick={() => { void mutate() }} type="button">{busy ? 'Eliminando…' : 'Confirmar eliminación'}</button></div>
-    </div> : <ActivityForm busy={busy} error={actionError} key={dialog.record?.id ?? 'new'} onCancel={closeDialog} onSave={mutate} record={dialog.record}/>}</AccessibleDialog> : null}
+      <div className="mt-5 flex flex-col-reverse gap-3 border-t border-[#e3ecf6] pt-4 sm:flex-row sm:justify-end"><button className="admin-secondary min-h-11 rounded-[10px] px-5 text-sm font-semibold disabled:opacity-60" data-dialog-initial disabled={busy || dialogClosing} onClick={closeDialog} type="button">Cancelar</button><button className="min-h-11 rounded-[10px] bg-red-700 px-5 text-sm font-semibold text-white hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:opacity-60" disabled={busy || dialogClosing} onClick={() => { void mutate() }} type="button">{busy ? 'Eliminando…' : 'Confirmar eliminación'}</button></div>
+    </div> : <ActivityForm busy={busy || dialogClosing} error={actionError} key={dialog.record?.id ?? 'new'} onCancel={closeDialog} onSave={mutate} record={dialog.record}/>}</div></AccessibleDialog> : null}
   </div>
 }
