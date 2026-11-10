@@ -1,6 +1,6 @@
 import type { UserRole } from './authService'
 
-export type RestrictedArea = 'usuarios' | 'pacientes' | 'agenda' | 'actividades' | 'caja' | 'servicios' | 'configuracion' | 'reportes'
+export type RestrictedArea = 'usuarios' | 'pacientes' | 'agenda' | 'actividades' | 'caja' | 'servicios' | 'configuracion' | 'reportes' | 'recetas'
 
 const allowedRoles: Record<RestrictedArea, readonly UserRole[]> = {
   usuarios: ['doctora'],
