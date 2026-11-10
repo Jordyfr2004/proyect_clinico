@@ -99,6 +99,8 @@ describe('ActivitiesPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Registrar actividad' }))
     const dialog = screen.getByRole('dialog', { name: 'Registrar actividad' })
     expect(within(dialog).getByLabelText('Código de paciente')).toHaveFocus()
+    const today = new Date()
+    expect(within(dialog).getByLabelText('Fecha')).toHaveValue(`${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`)
     fireEvent.change(within(dialog).getByLabelText('Código de paciente'), { target: { value: '001' } })
     fireEvent.click(within(dialog).getByRole('button', { name: 'Buscar paciente' }))
     expect(await within(dialog).findByText('Paciente recibido')).toBeInTheDocument()
@@ -111,6 +113,54 @@ describe('ActivitiesPage', () => {
     await waitFor(() => expect(createActivity).toHaveBeenCalledWith({ codigo_paciente: '001', fecha: '2026-10-05', actividad: 'Consulta', precio: 25 }))
     await waitFor(() => expect(getActivities).toHaveBeenCalledTimes(2))
     expect(getActivityTotal).toHaveBeenCalledTimes(2)
+  })
+
+  it('requires a confirmed patient before creating an activity', async () => {
+    renderPage('doctora')
+    await screen.findByText('Consulta registrada')
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar actividad' }))
+    const dialog = screen.getByRole('dialog', { name: 'Registrar actividad' })
+    fireEvent.change(within(dialog).getByLabelText('Código de paciente'), { target: { value: '001' } })
+    fireEvent.change(within(dialog).getByLabelText('Actividad'), { target: { value: 'Control' } })
+    fireEvent.change(within(dialog).getByLabelText('Precio (USD)'), { target: { value: '5.00' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Registrar actividad' }))
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Confirma el paciente con Buscar paciente')
+    expect(createActivity).not.toHaveBeenCalled()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Buscar paciente' }))
+    await within(dialog).findByText('Paciente confirmado')
+    expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument()
+  })
+
+  it('requires a new lookup after changing the patient code in edit', async () => {
+    renderPage('doctora')
+    await screen.findByText('Consulta registrada')
+    fireEvent.click(screen.getByRole('button', { name: 'Opciones de actividad para Paciente recibido' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Editar' }))
+    const dialog = screen.getByRole('dialog', { name: 'Editar actividad' })
+    expect(within(dialog).getByText('Paciente confirmado')).toBeInTheDocument()
+    expect(within(dialog).getByLabelText('Fecha')).toHaveValue('2026-10-05')
+    fireEvent.change(within(dialog).getByLabelText('Código de paciente'), { target: { value: '002' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar cambios' }))
+    expect(within(dialog).getByRole('alert')).toHaveTextContent('Confirma el paciente con Buscar paciente')
+    expect(updateActivity).not.toHaveBeenCalled()
+  })
+
+  it.each(['5.00', '10.50', '125.75'])('keeps USD price %s visible and submits its exact amount', async (amount) => {
+    vi.mocked(createActivity).mockResolvedValue('Actividad registrada correctamente.')
+    renderPage('doctora')
+    await screen.findByText('Consulta registrada')
+    fireEvent.click(screen.getByRole('button', { name: 'Registrar actividad' }))
+    const dialog = screen.getByRole('dialog', { name: 'Registrar actividad' })
+    fireEvent.change(within(dialog).getByLabelText('Código de paciente'), { target: { value: '001' } })
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Buscar paciente' }))
+    await within(dialog).findByText('Paciente confirmado')
+    fireEvent.change(within(dialog).getByLabelText('Actividad'), { target: { value: 'Control' } })
+    const price = within(dialog).getByLabelText('Precio (USD)')
+    fireEvent.change(price, { target: { value: amount } })
+    expect(price).toHaveValue(Number(amount))
+    expect(price).toHaveAttribute('style', 'padding-left: 2.5rem;')
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Registrar actividad' }))
+    await waitFor(() => expect(createActivity).toHaveBeenCalledWith(expect.objectContaining({ precio: Number(amount) })))
   })
 
   it('shows a 404 patient lookup without sending a mutation', async () => {
@@ -255,6 +305,17 @@ describe('ActivitiesPage', () => {
     await waitFor(() => expect(getActivities).toHaveBeenCalledTimes(2))
   })
 
+  it('shows a received numeric price with two decimals in edit', async () => {
+    vi.mocked(getActivities).mockResolvedValue([{ ...record, precio: 10.5 }])
+    renderPage('doctora')
+    await screen.findByText('Consulta registrada')
+    fireEvent.click(screen.getByRole('button', { name: 'Opciones de actividad para Paciente recibido' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Editar' }))
+    const dialog = screen.getByRole('dialog', { name: 'Editar actividad' })
+    expect(within(dialog).getByLabelText('Precio (USD)')).toHaveAttribute('value', '10.50')
+    expect(within(dialog).getByLabelText('Fecha')).toHaveValue('2026-10-05')
+  })
+
   it('keeps the dialog open and avoids a false success when refresh fails after a confirmed edit', async () => {
     vi.mocked(getActivities).mockResolvedValueOnce([record]).mockRejectedValueOnce(new Error('network'))
     vi.mocked(updateActivity).mockResolvedValue('Actividad actualizada correctamente.')
@@ -301,6 +362,11 @@ describe('ActivitiesPage', () => {
     expect(within(dialog).getByLabelText('Fecha')).toHaveValue('2026-10-05')
     expect(within(dialog).getByLabelText('Precio (USD)')).toHaveValue(25)
     fireEvent.change(within(dialog).getByLabelText(field), { target: { value } })
+    if (key === 'codigo_paciente') {
+      vi.mocked(lookupPatientByCode).mockResolvedValueOnce({ codigo_paciente: '002', nombres: 'Otro paciente' })
+      fireEvent.click(within(dialog).getByRole('button', { name: 'Buscar paciente' }))
+      await within(dialog).findByText('Otro paciente')
+    }
     fireEvent.click(within(dialog).getByRole('button', { name: 'Guardar cambios' }))
     expect(await within(dialog).findByRole('alert')).toHaveTextContent(message)
     expect(within(dialog).queryByText('Actividad vinculada')).not.toBeInTheDocument()

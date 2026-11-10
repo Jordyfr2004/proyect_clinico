@@ -60,9 +60,13 @@ function periodLabel(period: ActivityPeriod): string {
 
 function ActivityForm({ record, busy, error, onSave, onCancel }: { record?: Activity; busy: boolean; error: string | null; onSave: (values: ActivityPayload) => Promise<void>; onCancel: () => void }) {
   const [code, setCode] = useState(record?.paciente.codigo_paciente ?? '')
-  const [date, setDate] = useState(record?.fecha.slice(0, 10) ?? '')
+  const [date, setDate] = useState(() => {
+    if (record) return record.fecha.slice(0, 10)
+    const today = new Date()
+    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+  })
   const [activity, setActivity] = useState(record?.actividad ?? '')
-  const [price, setPrice] = useState(record ? String(record.precio) : '')
+  const [price, setPrice] = useState(record ? Number(record.precio).toFixed(2) : '')
   const [patient, setPatient] = useState<{ nombres: string; codigo_paciente: string } | null>(record?.paciente ?? null)
   const [lookupError, setLookupError] = useState<string | null>(null)
   const [validation, setValidation] = useState<string | null>(null)
@@ -70,9 +74,16 @@ function ActivityForm({ record, busy, error, onSave, onCancel }: { record?: Acti
   const lookupVersion = useRef(0)
   const lookup = async () => {
     if (!code.trim()) { setLookupError('Ingresa un código de paciente.'); return }
+    const searchedCode = code.trim()
     const version = ++lookupVersion.current
-    setLookingUp(true); setLookupError(null); setPatient(null)
-    try { const found = await lookupPatientByCode(code.trim()); if (version === lookupVersion.current) setPatient(found) }
+    setLookingUp(true); setLookupError(null); setValidation(null); setPatient(null)
+    try {
+      const found = await lookupPatientByCode(searchedCode)
+      if (version === lookupVersion.current) {
+        if (found.codigo_paciente === searchedCode) setPatient(found)
+        else setLookupError('El código recibido no coincide con el paciente buscado. Vuelve a buscar.')
+      }
+    }
     catch (cause) { if (version === lookupVersion.current) setLookupError(errorMessage(cause)) }
     finally { if (version === lookupVersion.current) setLookingUp(false) }
   }
@@ -82,6 +93,7 @@ function ActivityForm({ record, busy, error, onSave, onCancel }: { record?: Acti
     if (Number(price) < 0) { setValidation('El precio no puede ser negativo.'); return }
     if (!/^\d+(?:\.\d{1,2})?$/.test(price)) { setValidation('El precio debe ser un número en USD con máximo dos decimales.'); return }
     if (Number(price) > 99999999.99) { setValidation('El precio no puede superar 99.999.999,99 USD.'); return }
+    if (!patient || patient.codigo_paciente !== code.trim()) { setValidation('Confirma el paciente con Buscar paciente antes de guardar.'); return }
     if (lookupError) return
     setValidation(null)
     void onSave({ codigo_paciente: code.trim(), fecha: date, actividad: activity.trim(), precio: Number(price) })
@@ -96,7 +108,7 @@ function ActivityForm({ record, busy, error, onSave, onCancel }: { record?: Acti
       </div>
       <label className="min-w-0 text-sm font-semibold text-ink-950 sm:col-span-2">Fecha<input className="admin-input mt-1.5 w-full text-sm" onChange={(event) => setDate(event.target.value)} type="date" value={date}/></label>
       <label className="min-w-0 text-sm font-semibold text-ink-950">Actividad<input className="admin-input mt-1.5 w-full text-sm" maxLength={255} onChange={(event) => setActivity(event.target.value)} placeholder="Ej. Limpieza dental" value={activity}/></label>
-      <div className="min-w-0"><label className="text-sm font-semibold text-ink-950" htmlFor="activity-price">Precio (USD)</label><span className="relative mt-1.5 block"><span aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-semibold text-[#526a87]">$</span><input className="admin-input w-full pl-8 text-sm" id="activity-price" inputMode="decimal" max="99999999.99" min="0" onChange={(event) => setPrice(event.target.value)} placeholder="0.00" step="0.01" type="number" value={price}/></span></div>
+      <div className="min-w-0"><label className="text-sm font-semibold text-ink-950" htmlFor="activity-price">Precio (USD)</label><span className="relative mt-1.5 block"><span aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-semibold text-[#526a87]">$</span><input className="admin-input w-full text-sm" id="activity-price" inputMode="decimal" max="99999999.99" min="0" onChange={(event) => setPrice(event.target.value)} placeholder="0.00" step="0.01" style={{ paddingLeft: '2.5rem' }} type="number" value={price}/></span></div>
     </div>
     {validation || error ? <p className="mt-4 text-sm text-red-700" role="alert">{validation ?? error}</p> : null}
     <div className="mt-5 flex flex-col-reverse gap-3 border-t border-[#e3ecf6] pt-4 sm:flex-row sm:justify-end"><button className="admin-secondary min-h-11 rounded-[10px] px-5 text-sm font-semibold disabled:opacity-60" disabled={busy} onClick={onCancel} type="button">Cancelar</button><button className="admin-primary min-h-11 rounded-[10px] px-5 text-sm font-semibold disabled:opacity-60" disabled={busy || lookingUp || Boolean(lookupError)} type="submit">{busy ? 'Guardando…' : record ? 'Guardar cambios' : 'Registrar actividad'}</button></div>
