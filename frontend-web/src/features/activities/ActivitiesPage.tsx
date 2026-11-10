@@ -1,5 +1,5 @@
 import { isAxiosError } from 'axios'
-import { CalendarDays, ClipboardList, MoreVertical, Plus, Wallet } from 'lucide-react'
+import { CalendarDays, ClipboardList, MoreVertical, Plus, Search, UserRound, Wallet } from 'lucide-react'
 import { useEffect, useLayoutEffect, useRef, useState, type FormEvent, type KeyboardEvent } from 'react'
 import { createPortal } from 'react-dom'
 import { useLocation, useNavigate } from 'react-router-dom'
@@ -32,7 +32,10 @@ function errorMessage(error: unknown): string {
   if (isAxiosError(error)) {
     if (!error.response) return 'No fue posible comunicarse con el servidor.'
     if ([403, 404, 409, 422].includes(error.response.status)) {
-      const message = (error.response.data as { message?: unknown } | undefined)?.message
+      const data = error.response.data as { message?: unknown; errors?: Record<string, unknown> } | undefined
+      const fieldError = data?.errors && Object.values(data.errors).flat().find((value): value is string => typeof value === 'string' && Boolean(value.trim()))
+      if (fieldError) return fieldError
+      const message = data?.message
       if (typeof message === 'string' && message.trim()) return message
     }
   }
@@ -60,7 +63,7 @@ function ActivityForm({ record, busy, error, onSave, onCancel }: { record?: Acti
   const [date, setDate] = useState(record?.fecha.slice(0, 10) ?? '')
   const [activity, setActivity] = useState(record?.actividad ?? '')
   const [price, setPrice] = useState(record ? String(record.precio) : '')
-  const [patient, setPatient] = useState<string | null>(record?.paciente.nombres ?? null)
+  const [patient, setPatient] = useState<{ nombres: string; codigo_paciente: string } | null>(record?.paciente ?? null)
   const [lookupError, setLookupError] = useState<string | null>(null)
   const [validation, setValidation] = useState<string | null>(null)
   const [lookingUp, setLookingUp] = useState(false)
@@ -69,25 +72,34 @@ function ActivityForm({ record, busy, error, onSave, onCancel }: { record?: Acti
     if (!code.trim()) { setLookupError('Ingresa un código de paciente.'); return }
     const version = ++lookupVersion.current
     setLookingUp(true); setLookupError(null); setPatient(null)
-    try { const found = await lookupPatientByCode(code.trim()); if (version === lookupVersion.current) setPatient(found.nombres) }
+    try { const found = await lookupPatientByCode(code.trim()); if (version === lookupVersion.current) setPatient(found) }
     catch (cause) { if (version === lookupVersion.current) setLookupError(errorMessage(cause)) }
     finally { if (version === lookupVersion.current) setLookingUp(false) }
   }
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!code.trim() || !date || !activity.trim() || price === '' || !Number.isFinite(Number(price)) || Number(price) < 0) { setValidation('Completa el código, la fecha, la actividad y un precio válido.'); return }
+    if (!code.trim() || !date || !activity.trim() || price.trim() === '') { setValidation('Completa el código, la fecha, la actividad y el precio.'); return }
+    if (Number(price) < 0) { setValidation('El precio no puede ser negativo.'); return }
+    if (!/^\d+(?:\.\d{1,2})?$/.test(price)) { setValidation('El precio debe ser un número en USD con máximo dos decimales.'); return }
+    if (Number(price) > 99999999.99) { setValidation('El precio no puede superar 99.999.999,99 USD.'); return }
     if (lookupError) return
+    setValidation(null)
     void onSave({ codigo_paciente: code.trim(), fecha: date, actividad: activity.trim(), precio: Number(price) })
   }
   return <form aria-label="Datos de actividad" noValidate onSubmit={submit}>
     <div className="grid gap-4 sm:grid-cols-2">
-      <div className="sm:col-span-2"><label className="text-sm font-medium text-ink-950" htmlFor="activity-code">Código de paciente</label><div className="mt-1 flex flex-wrap gap-2"><input className="admin-input min-w-0 flex-1 text-sm" data-dialog-initial id="activity-code" onChange={(event) => { lookupVersion.current += 1; setCode(event.target.value); setPatient(null); setLookupError(null); setLookingUp(false) }} value={code}/><button className="admin-secondary min-h-11 rounded-lg px-4 text-sm font-semibold" disabled={lookingUp || busy} onClick={() => { void lookup() }} type="button">Buscar paciente</button></div>{patient ? <p className="admin-muted mt-2 text-sm" role="status">{patient}</p> : null}{lookupError ? <p className="mt-2 text-sm text-red-700" role="alert">{lookupError}</p> : null}</div>
-      <label className="text-sm font-medium text-ink-950">Fecha<input className="admin-input mt-1 w-full text-sm" onChange={(event) => setDate(event.target.value)} type="date" value={date}/></label>
-      <label className="text-sm font-medium text-ink-950">Actividad<input className="admin-input mt-1 w-full text-sm" maxLength={255} onChange={(event) => setActivity(event.target.value)} value={activity}/></label>
-      <label className="text-sm font-medium text-ink-950">Precio<input className="admin-input mt-1 w-full text-sm" min="0" onChange={(event) => setPrice(event.target.value)} step="0.01" type="number" value={price}/></label>
+      <div className="min-w-0 sm:col-span-2">
+        <label className="text-sm font-semibold text-ink-950" htmlFor="activity-code">Código de paciente</label>
+        <div className="mt-1.5 flex flex-col gap-2 sm:flex-row"><input className="admin-input min-w-0 flex-1 text-sm" data-dialog-initial id="activity-code" onChange={(event) => { lookupVersion.current += 1; setCode(event.target.value); setPatient(null); setLookupError(null); setLookingUp(false) }} placeholder="Ej. 001" value={code}/><button className="admin-secondary inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold disabled:opacity-60" disabled={lookingUp || busy} onClick={() => { void lookup() }} type="button"><Search aria-hidden="true" size={16}/>{lookingUp ? 'Buscando…' : 'Buscar paciente'}</button></div>
+        {patient ? <div className="mt-3 flex min-w-0 items-center gap-3 rounded-xl border border-[#dbe6f2] bg-[#f4f9ff] px-3 py-2.5" role="status"><span aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-lg bg-[#e1f0ff] text-clinic-600"><UserRound size={18}/></span><div className="min-w-0"><p className="admin-muted text-xs font-semibold">Paciente confirmado</p><p className="truncate text-sm font-semibold text-ink-950">{patient.nombres}</p><p className="admin-muted text-xs">Código: {patient.codigo_paciente}</p></div></div> : null}
+        {lookupError ? <p className="mt-2 text-sm text-red-700" role="alert">{lookupError}</p> : null}
+      </div>
+      <label className="min-w-0 text-sm font-semibold text-ink-950 sm:col-span-2">Fecha<input className="admin-input mt-1.5 w-full text-sm" onChange={(event) => setDate(event.target.value)} type="date" value={date}/></label>
+      <label className="min-w-0 text-sm font-semibold text-ink-950">Actividad<input className="admin-input mt-1.5 w-full text-sm" maxLength={255} onChange={(event) => setActivity(event.target.value)} placeholder="Ej. Limpieza dental" value={activity}/></label>
+      <div className="min-w-0"><label className="text-sm font-semibold text-ink-950" htmlFor="activity-price">Precio (USD)</label><span className="relative mt-1.5 block"><span aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-semibold text-[#526a87]">$</span><input className="admin-input w-full pl-8 text-sm" id="activity-price" inputMode="decimal" max="99999999.99" min="0" onChange={(event) => setPrice(event.target.value)} placeholder="0.00" step="0.01" type="number" value={price}/></span></div>
     </div>
     {validation || error ? <p className="mt-4 text-sm text-red-700" role="alert">{validation ?? error}</p> : null}
-    <div className="mt-6 flex flex-wrap gap-3"><button className="admin-primary min-h-11 rounded-[10px] px-5 text-sm font-semibold disabled:opacity-60" disabled={busy || lookingUp || Boolean(lookupError)} type="submit">{busy ? 'Guardando…' : 'Guardar'}</button><button className="admin-secondary min-h-11 rounded-[10px] px-5 text-sm font-semibold disabled:opacity-60" disabled={busy} onClick={onCancel} type="button">Volver</button></div>
+    <div className="mt-5 flex flex-col-reverse gap-3 border-t border-[#e3ecf6] pt-4 sm:flex-row sm:justify-end"><button className="admin-secondary min-h-11 rounded-[10px] px-5 text-sm font-semibold disabled:opacity-60" disabled={busy} onClick={onCancel} type="button">Cancelar</button><button className="admin-primary min-h-11 rounded-[10px] px-5 text-sm font-semibold disabled:opacity-60" disabled={busy || lookingUp || Boolean(lookupError)} type="submit">{busy ? 'Guardando…' : record ? 'Guardar cambios' : 'Registrar actividad'}</button></div>
   </form>
 }
 
@@ -190,7 +202,7 @@ export function ActivitiesPage() {
   const selectedMenuRecord = recordsQuery.data?.find((record) => record.id === openMenuId)
   const filtersPending = JSON.stringify(periodParams(period, date, month, year, code)) !== JSON.stringify(query)
   return <div className="admin-reveal max-w-[1390px] space-y-4">
-    <header className="flex flex-wrap items-end justify-between gap-4"><div><p className="admin-kicker">Registro diario</p><h1 className="admin-page-title mt-2">Actividades</h1><p className="admin-body mt-2">Actividades registradas para pacientes.</p></div>{doctor ? <button className="admin-primary inline-flex min-h-11 items-center gap-2 rounded-[10px] px-5 text-sm font-semibold" onClick={(event) => openDialog({ kind: 'create' }, event.currentTarget)} type="button"><Plus aria-hidden="true" size={18}/>Registrar actividad</button> : null}</header>
+    <header className="flex flex-wrap items-end justify-between gap-4"><div><p className="admin-kicker">Gestión clínica</p><h1 className="admin-page-title mt-2">Actividades</h1><p className="admin-body mt-2">Actividades registradas para pacientes.</p></div>{doctor ? <button className="admin-primary inline-flex min-h-11 items-center gap-2 rounded-[10px] px-5 text-sm font-semibold" onClick={(event) => openDialog({ kind: 'create' }, event.currentTarget)} type="button"><Plus aria-hidden="true" size={18}/>Registrar actividad</button> : null}</header>
     {success ? <p className="admin-success rounded-xl p-4 text-sm" role="status">{success}</p> : null}
     <section aria-label="Filtros de actividades" className="admin-surface rounded-[20px] p-3 sm:p-4 lg:flex lg:items-start lg:gap-3 xl:items-end">
       <div aria-label="Período" className="flex w-full flex-wrap gap-1 rounded-xl border border-[#dbe6f2] bg-[#f3f8fe] p-1 sm:w-fit lg:shrink-0" role="group">
@@ -226,6 +238,11 @@ export function ActivitiesPage() {
       <button className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-ink-950 hover:bg-[#f2f8ff] focus-visible:outline-2 focus-visible:outline-clinic-600" onClick={() => { const anchor = menuTrigger.current; setOpenMenuId(null); if (anchor) openDialog({ kind: 'edit', record: selectedMenuRecord }, anchor) }} role="menuitem" type="button">Editar</button>
       <button className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-red-700 hover:bg-red-50 focus-visible:outline-2 focus-visible:outline-red-600" onClick={() => { const anchor = menuTrigger.current; setOpenMenuId(null); if (anchor) openDialog({ kind: 'delete', record: selectedMenuRecord }, anchor) }} role="menuitem" type="button">Eliminar</button>
     </div>, document.body) : null}
-    {dialog ? <AccessibleDialog busy={busy} onClose={closeDialog} title={dialog.kind === 'create' ? 'Registrar actividad' : dialog.kind === 'edit' ? 'Editar actividad' : 'Eliminar actividad'} titleId="activity-dialog-title">{dialog.kind === 'delete' ? <div><p className="admin-body text-sm">¿Eliminar este registro de actividad?</p>{actionError ? <p className="mt-4 text-sm text-red-700" role="alert">{actionError}</p> : null}<div className="mt-6 flex gap-3"><button className="min-h-11 rounded-lg bg-red-700 px-5 text-sm font-semibold text-white disabled:opacity-60" disabled={busy} onClick={() => { void mutate() }} type="button">{busy ? 'Eliminando…' : 'Confirmar eliminación'}</button><button className="admin-secondary min-h-11 rounded-lg px-5 text-sm font-semibold" disabled={busy} onClick={closeDialog} type="button">Volver</button></div></div> : <ActivityForm busy={busy} error={actionError} key={dialog.record?.id ?? 'new'} onCancel={closeDialog} onSave={mutate} record={dialog.record}/>}</AccessibleDialog> : null}
+    {dialog ? <AccessibleDialog busy={busy} onClose={closeDialog} title={dialog.kind === 'create' ? 'Registrar actividad' : dialog.kind === 'edit' ? 'Editar actividad' : 'Eliminar actividad'} titleId="activity-dialog-title">{dialog.kind === 'delete' && dialog.record ? <div>
+      <p className="admin-body text-sm">Revisa la actividad antes de eliminarla. Esta acción requiere confirmación.</p>
+      <div className="mt-4 rounded-xl border border-[#dbe6f2] bg-[#f6faff] p-4"><div className="flex items-center gap-3"><span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#e1f0ff] text-clinic-600"><UserRound size={19}/></span><div className="min-w-0"><p className="font-semibold text-ink-950">{dialog.record.paciente.nombres}</p><p className="admin-muted text-sm">Código: {dialog.record.paciente.codigo_paciente}</p></div></div><dl className="mt-4 grid gap-3 border-t border-[#dbe6f2] pt-4 sm:grid-cols-2"><div><dt className="admin-muted text-xs">Fecha</dt><dd className="mt-0.5 text-sm font-semibold text-ink-950">{formatDate(dialog.record.fecha)}</dd></div><div><dt className="admin-muted text-xs">Precio</dt><dd className="mt-0.5 text-sm font-semibold text-clinic-700">{formatCurrency(dialog.record.precio)}</dd></div><div className="sm:col-span-2"><dt className="admin-muted text-xs">Actividad</dt><dd className="mt-0.5 text-sm font-semibold text-ink-950">{dialog.record.actividad}</dd></div></dl></div>
+      {actionError ? <p className="mt-4 text-sm text-red-700" role="alert">{actionError}</p> : null}
+      <div className="mt-5 flex flex-col-reverse gap-3 border-t border-[#e3ecf6] pt-4 sm:flex-row sm:justify-end"><button className="admin-secondary min-h-11 rounded-[10px] px-5 text-sm font-semibold disabled:opacity-60" data-dialog-initial disabled={busy} onClick={closeDialog} type="button">Cancelar</button><button className="min-h-11 rounded-[10px] bg-red-700 px-5 text-sm font-semibold text-white hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:opacity-60" disabled={busy} onClick={() => { void mutate() }} type="button">{busy ? 'Eliminando…' : 'Confirmar eliminación'}</button></div>
+    </div> : <ActivityForm busy={busy} error={actionError} key={dialog.record?.id ?? 'new'} onCancel={closeDialog} onSave={mutate} record={dialog.record}/>}</AccessibleDialog> : null}
   </div>
 }
