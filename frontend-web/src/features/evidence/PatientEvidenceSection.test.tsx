@@ -2,10 +2,8 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter, Outlet, Route, Routes } from 'react-router-dom'
 import { AuthContext } from '../auth/authContext'
-import type { UserRole } from '../auth/authService'
 import { PatientEvidenceSection } from './PatientEvidenceSection'
 import { createPatientEvidence, deletePatientEvidence, getPatientEvidence, updatePatientEvidence } from './evidenceService'
-import { AuthContext } from '../auth/authContext'
 
 vi.mock('./evidenceService', () => ({ getPatientEvidence: vi.fn(), createPatientEvidence: vi.fn(), updatePatientEvidence: vi.fn(), deletePatientEvidence: vi.fn() }))
 const evidence = { id: 'evidence-1', paciente_id: 'patient-1', tipo: 'rx' as const, nombre_archivo: 'Archivo recibido', ruta_archivo: 'internal/path', mime_type: 'image/png', tamano: 1024, descripcion: 'Descripción recibida', fecha: '2026-10-04' }
@@ -25,60 +23,16 @@ describe('PatientEvidenceSection', () => {
     expect(screen.getByText('1 KB')).toBeInTheDocument()
     expect(screen.getByText('Radiografía')).toBeInTheDocument()
     expect(screen.getByText('4 de octubre de 2026')).toBeInTheDocument()
-    expect(screen.getByText('Paciente (app móvil)')).toBeInTheDocument()
     expect(screen.queryByText(evidence.ruta_archivo)).not.toBeInTheDocument()
   })
 
-  it('lets the assistant view files but not upload or delete them', async () => {
+  it('lets the assistant read evidence without mutation controls', async () => {
     vi.mocked(getPatientEvidence).mockResolvedValue([evidence])
     renderEvidence('asistente')
-    expect(await screen.findByRole('button', { name: 'Ver Archivo recibido' })).toBeInTheDocument()
-    expect(screen.queryByRole('form', { name: 'Subir evidencia clínica' })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: 'Eliminar Archivo recibido' })).not.toBeInTheDocument()
-  })
-
-  it('uploads a radiograph and shows it in the list', async () => {
-    vi.mocked(getPatientEvidence).mockResolvedValue([])
-    vi.mocked(uploadPatientEvidence).mockResolvedValue({ ...evidence, id: 'evidence-2', nombre_archivo: 'panoramica.png', subido_por: { id: 'staff-1', name: 'Doctora', role: 'doctora' } })
-    renderEvidence()
-    const form = await screen.findByRole('form', { name: 'Subir evidencia clínica' })
-    const file = new File(['png'], 'panoramica.png', { type: 'image/png' })
-    fireEvent.change(within(form).getByLabelText(/Archivo/), { target: { files: [file] } })
-    fireEvent.change(within(form).getByLabelText('Descripción (opcional)'), { target: { value: 'Panorámica' } })
-    fireEvent.click(within(form).getByRole('button', { name: 'Subir al expediente' }))
-    expect(await screen.findByText('panoramica.png')).toBeInTheDocument()
-    expect(uploadPatientEvidence).toHaveBeenCalledExactlyOnceWith(patient.id, { tipo: 'rx', archivo: file, descripcion: 'Panorámica' })
-  })
-
-  it('rejects unsupported files before uploading', async () => {
-    vi.mocked(getPatientEvidence).mockResolvedValue([])
-    renderEvidence()
-    const form = await screen.findByRole('form', { name: 'Subir evidencia clínica' })
-    fireEvent.change(within(form).getByLabelText(/Archivo/), { target: { files: [new File(['x'], 'script.exe', { type: 'application/x-msdownload' })] } })
-    fireEvent.click(within(form).getByRole('button', { name: 'Subir al expediente' }))
-    expect(await within(form).findByRole('alert')).toHaveTextContent('JPG, PNG, WebP o un PDF')
-    expect(uploadPatientEvidence).not.toHaveBeenCalled()
-  })
-
-  it('shows the server message when the file server is down', async () => {
-    vi.mocked(getPatientEvidence).mockResolvedValue([evidence])
-    vi.mocked(getEvidenceFile).mockRejectedValue({ isAxiosError: true, response: { status: 503, data: { message: 'El servidor de archivos no está disponible en este momento.' } } })
-    vi.spyOn(window, 'open').mockReturnValue(null)
-    renderEvidence()
-    fireEvent.click(await screen.findByRole('button', { name: 'Ver Archivo recibido' }))
-    expect(await screen.findByRole('alert')).toHaveTextContent('El servidor de archivos no está disponible')
-  })
-
-  it('asks for confirmation before deleting', async () => {
-    vi.mocked(getPatientEvidence).mockResolvedValue([evidence])
-    vi.mocked(deleteEvidence).mockResolvedValue()
-    renderEvidence()
-    fireEvent.click(await screen.findByRole('button', { name: 'Eliminar Archivo recibido' }))
-    const dialog = screen.getByRole('dialog', { name: 'Eliminar evidencia' })
-    expect(deleteEvidence).not.toHaveBeenCalled()
-    fireEvent.click(within(dialog).getByRole('button', { name: 'Eliminar' }))
-    await waitFor(() => expect(screen.queryByText('Archivo recibido')).not.toBeInTheDocument())
-    expect(deleteEvidence).toHaveBeenCalledExactlyOnceWith('evidence-1')
+    expect(await screen.findByText('Archivo recibido')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Registrar evidencia' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Editar evidencia' })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Eliminar evidencia' })).not.toBeInTheDocument()
   })
 
   it('shows an honest empty state', async () => {

@@ -261,7 +261,7 @@ describe('patient views', () => {
     fireEvent.change(within(detail).getByRole('textbox', { name: 'Observación' }), { target: { value: 'Ejemplo local' } })
     expect(screen.getByText('1 pieza marcada')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Guardar odontograma' })).toBeDisabled()
-    expect(within(screen.getByRole('navigation', { name: 'Secciones del expediente' })).getAllByRole('link')).toHaveLength(3)
+    expect(within(screen.getByRole('navigation', { name: 'Secciones del expediente' })).getAllByRole('link')).toHaveLength(4)
   })
 
   it('opens Odontograma first when Diagnósticos has no explicit apartado', async () => {
