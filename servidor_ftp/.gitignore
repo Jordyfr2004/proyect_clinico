@@ -1,0 +1,6 @@
+.env
+.venv/
+logs/
+__pycache__/
+# Archivos que sube el backend
+archivos/clinica/

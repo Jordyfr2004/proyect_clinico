@@ -15,7 +15,7 @@ class EvidenciaClinicaService
     public function listar(array $filtros)
     {
         $query = EvidenciaClinica::query()
-            ->with('paciente')
+            ->with(['paciente', 'subidoPor'])
             ->orderBy('fecha', 'desc');
 
         if (!empty($filtros['paciente_id'])) {
@@ -51,6 +51,7 @@ class EvidenciaClinicaService
             'paciente_id',
             $pacienteId
         )
+            ->with('subidoPor')
             ->orderBy('fecha', 'desc')
             ->get();
 
@@ -67,6 +68,10 @@ class EvidenciaClinicaService
             ->find($id);
     }
 
+    /**
+     * Sube el archivo al servidor FTP y registra la evidencia. Si falla el
+     * registro en la base de datos, el archivo subido se elimina.
+     */
     public function crear(
         array $datos,
         UploadedFile $archivo,
@@ -212,9 +217,7 @@ class EvidenciaClinicaService
                 $evidencia->paciente_id
             );
 
-            $tipoTexto = $evidencia->tipo === 'rx'
-                ? 'una radiografía'
-                : 'un caso clínico';
+            $tipoTexto = $this->tipoTexto($evidencia->tipo);
 
             $codigoPaciente = $paciente->codigo_paciente;
 

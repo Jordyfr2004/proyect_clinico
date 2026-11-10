@@ -1,0 +1,93 @@
+# ==============================================================================
+# Laptop 1 - NGINX: reverse proxy y balanceador del Proyecto Clínico.
+# Generado por instalar.sh a partir de red.env. No editar a mano en el servidor.
+# ==============================================================================
+
+# Log con la instancia del backend que atendió cada petición ($upstream_addr)
+# y el identificador que también aparece en los logs de Laravel.
+log_format clinica '$remote_addr [$time_local] "$request" $status '
+                   'req_id=$request_id upstream=$upstream_addr '
+                   'upstream_status=$upstream_status '
+                   'tiempo=$request_time upstream_tiempo=$upstream_response_time';
+
+# Dos instancias del backend (PHP) en la Laptop 3.
+# Si una falla 2 veces seguidas, se aparta 15 s y las peticiones van a la otra.
+upstream clinica_backend {
+    least_conn;
+    server ${BACKEND_IP}:${BACKEND1_PORT} max_fails=2 fail_timeout=15s;
+    server ${BACKEND_IP}:${BACKEND2_PORT} max_fails=2 fail_timeout=15s;
+    keepalive 16;
+}
+
+# Frontend web en la Laptop 2.
+upstream clinica_web {
+    server ${WEB_IP}:${WEB_PORT} max_fails=2 fail_timeout=15s;
+}
+
+# Las peticiones que llegan por Tailscale Funnel (bloque público) son HTTPS para el cliente.
+map $server_port $clinica_proto {
+    ${PUBLICO_PORT} https;
+    default         $scheme;
+}
+
+# Límite de intentos para login y recuperación de contraseña (por IP del cliente).
+limit_req_zone $binary_remote_addr zone=clinica_auth:10m rate=5r/s;
+
+server {
+    listen 80;
+    server_name ${SERVER_NAME} _;
+
+    access_log /var/log/nginx/clinica_access.log clinica;
+    error_log  /var/log/nginx/clinica_error.log warn;
+
+    # Fotos de perfil y radiografías.
+    client_max_body_size 20m;
+
+    add_header X-Content-Type-Options nosniff always;
+    add_header Referrer-Policy strict-origin-when-cross-origin always;
+
+    # --- API Laravel: balanceada entre backend1 y backend2 ---------------------
+    location ^~ /api/auth/ {
+        limit_req zone=clinica_auth burst=10 nodelay;
+        limit_req_status 429;
+        include /etc/nginx/snippets/clinica-backend.conf;
+    }
+
+    location ^~ /api/ {
+        include /etc/nginx/snippets/clinica-backend.conf;
+    }
+
+    location = /up {
+        include /etc/nginx/snippets/clinica-backend.conf;
+    }
+
+    # Respuesta propia si las dos instancias están caídas (usada en clinica-backend.conf).
+    location @backend_no_disponible {
+        default_type application/json;
+        add_header Retry-After 30 always;
+        return 503 '{"message":"El servicio no está disponible en este momento. Intenta nuevamente en unos minutos."}';
+    }
+
+    # Estado de NGINX, solo desde la red del proyecto (diagnóstico).
+    location = /nginx_status {
+        stub_status;
+        allow 127.0.0.1;
+        allow ${BALANCEADOR_IP};
+        allow ${BACKEND_IP};
+        allow ${WEB_IP};
+        deny all;
+    }
+
+    # --- Frontend web (React) en la Laptop 2 -----------------------------------
+    location / {
+        proxy_pass http://clinica_web;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header X-Request-ID $request_id;
+        proxy_connect_timeout 3s;
+        proxy_read_timeout 30s;
+    }
+}

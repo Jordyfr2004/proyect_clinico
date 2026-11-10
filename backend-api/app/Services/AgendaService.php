@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Models\Agenda;
 use App\Models\Paciente;
 use App\Models\User;
+use Carbon\Carbon;
 use Closure;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
@@ -51,6 +52,20 @@ class AgendaService
             ->exists();
     }
 
+    /**
+     * Indica si la excepción es la violación de una restricción concreta. El nombre
+     * se busca sin comillas porque PostgreSQL las cambia según el idioma del servidor
+     * ("nombre" en inglés, «nombre» en español).
+     */
+    private function violaRestriccion(
+        QueryException $exception,
+        string $sqlstate,
+        string $restriccion
+    ): bool {
+        return ($exception->errorInfo[0] ?? null) === $sqlstate
+            && preg_match('/\b' . preg_quote($restriccion, '/') . '\b/u', $exception->errorInfo[2] ?? '') === 1;
+    }
+
     private function ejecutarConControlDeHorario(
         Closure $operacion,
         ?string $registroId = null
@@ -59,8 +74,7 @@ class AgendaService
             return DB::transaction($operacion);
         } catch (QueryException $exception) {
             if (
-                ($exception->errorInfo[0] ?? null) !== '23P01' ||
-                !str_contains($exception->errorInfo[2] ?? '', '"agenda_sin_solapamientos"')
+                !$this->violaRestriccion($exception, '23P01', 'agenda_sin_solapamientos')
             ) {
                 throw $exception;
             }
@@ -257,8 +271,7 @@ class AgendaService
             ]));
         } catch (QueryException $exception) {
             if (
-                ($exception->errorInfo[0] ?? null) !== '23505' ||
-                !str_contains($exception->errorInfo[2] ?? '', '"agenda_paciente_pendiente_unico"')
+                !$this->violaRestriccion($exception, '23505', 'agenda_paciente_pendiente_unico')
             ) {
                 throw $exception;
             }
@@ -647,6 +660,190 @@ class AgendaService
             'estado' => 'ok',
             'citas' => $citas,
         ];
+    }
+
+    /**
+     * Cita médica del paciente autenticado, o null si no le pertenece.
+     */
+    private function citaDelPaciente(
+        string $id,
+        User $user
+    ): ?Agenda {
+        return Agenda::where('id', $id)
+            ->where('paciente_id', $user->paciente_id)
+            ->where('tipo', 'cita_medica')
+            ->lockForUpdate()
+            ->first();
+    }
+
+    private function yaInicio(
+        Agenda $registro
+    ): bool {
+        if (!$registro->fecha || !$registro->hora_inicio) {
+            return false;
+        }
+
+        $inicio = Carbon::parse(
+            $registro->fecha->format('Y-m-d') . ' ' . $registro->hora_inicio,
+            config('app.timezone')
+        );
+
+        return $inicio->lessThanOrEqualTo(now());
+    }
+
+    public function cancelarMiCita(
+        string $id,
+        User $user
+    ): array {
+        if (!$user->paciente_id) {
+            return [
+                'estado' => 'sin_paciente',
+                'registro' => null,
+            ];
+        }
+
+        return DB::transaction(function () use ($id, $user) {
+            $registro = $this->citaDelPaciente($id, $user);
+
+            if (!$registro) {
+                return [
+                    'estado' => 'no_encontrado',
+                    'registro' => null,
+                ];
+            }
+
+            if ($registro->estado === 'cancelada') {
+                return [
+                    'estado' => 'ya_cancelada',
+                    'registro' => $registro,
+                ];
+            }
+
+            if ($registro->estado === 'completada') {
+                return [
+                    'estado' => 'completada',
+                    'registro' => $registro,
+                ];
+            }
+
+            if ($this->yaInicio($registro)) {
+                return [
+                    'estado' => 'ya_inicio',
+                    'registro' => $registro,
+                ];
+            }
+
+            $registro->update([
+                'estado' => 'cancelada',
+            ]);
+
+            AuditoriaService::registrarAccion(
+                $user,
+                'agenda',
+                'cancelar_cita_paciente',
+                'Cancelaste tu cita médica.'
+            );
+
+            return [
+                'estado' => 'cancelada',
+                'registro' => $registro->fresh(),
+            ];
+        });
+    }
+
+    /**
+     * El paciente pide otra fecha: la cita vuelve a "pendiente", se libera el
+     * horario y la doctora la programa de nuevo con programarSolicitud().
+     */
+    public function reprogramarMiCita(
+        string $id,
+        User $user,
+        ?string $motivo = null
+    ): array {
+        if (!$user->paciente_id) {
+            return [
+                'estado' => 'sin_paciente',
+                'registro' => null,
+            ];
+        }
+
+        try {
+            return DB::transaction(function () use ($id, $user, $motivo) {
+                $registro = $this->citaDelPaciente($id, $user);
+
+                if (!$registro) {
+                    return [
+                        'estado' => 'no_encontrado',
+                        'registro' => null,
+                    ];
+                }
+
+                if ($registro->estado !== 'programada') {
+                    return [
+                        'estado' => 'no_programada',
+                        'registro' => $registro,
+                    ];
+                }
+
+                if ($this->yaInicio($registro)) {
+                    return [
+                        'estado' => 'ya_inicio',
+                        'registro' => $registro,
+                    ];
+                }
+
+                $pendiente = Agenda::where('paciente_id', $user->paciente_id)
+                    ->where('tipo', 'cita_medica')
+                    ->where('estado', 'pendiente')
+                    ->exists();
+
+                if ($pendiente) {
+                    return [
+                        'estado' => 'solicitud_existente',
+                        'registro' => $registro,
+                    ];
+                }
+
+                $nota = 'Reprogramación solicitada por el paciente. Fecha anterior: '
+                    . $registro->fecha->format('Y-m-d') . ' '
+                    . substr($registro->hora_inicio, 0, 5) . '.';
+
+                if ($motivo) {
+                    $nota .= " Motivo: {$motivo}";
+                }
+
+                $registro->update([
+                    'fecha' => null,
+                    'hora_inicio' => null,
+                    'hora_fin' => null,
+                    'estado' => 'pendiente',
+                    'descripcion' => trim(($registro->descripcion ?? '') . "\n" . $nota),
+                ]);
+
+                AuditoriaService::registrarAccion(
+                    $user,
+                    'agenda',
+                    'reprogramar_cita_paciente',
+                    'Solicitaste reprogramar tu cita médica.'
+                );
+
+                return [
+                    'estado' => 'reprogramacion_solicitada',
+                    'registro' => $registro->fresh(),
+                ];
+            });
+        } catch (QueryException $exception) {
+            if (
+                !$this->violaRestriccion($exception, '23505', 'agenda_paciente_pendiente_unico')
+            ) {
+                throw $exception;
+            }
+
+            return [
+                'estado' => 'solicitud_existente',
+                'registro' => null,
+            ];
+        }
     }
 
     public function eliminar(

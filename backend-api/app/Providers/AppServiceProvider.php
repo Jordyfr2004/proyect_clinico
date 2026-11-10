@@ -17,6 +17,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        // Laravel no pasa statement_timeout al DSN de PostgreSQL; libpq lo lee de PGOPTIONS.
+        // Así una consulta colgada no bloquea la instancia (el de conexión va en config/database.php).
+        $pgsql = config('database.connections.pgsql');
+        putenv('PGOPTIONS=-c statement_timeout='.max(1, (int) ($pgsql['statement_timeout'] ?? 15)).'s');
+
         $this->app->singleton(Brevo::class, fn () => new Brevo(
             apiKey: (string) config('services.brevo.api_key'),
             options: [
