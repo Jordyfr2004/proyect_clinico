@@ -6,9 +6,18 @@ use App\Http\Controllers\Controller;
 use App\Services\EvidenciaClinicaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class EvidenciaClinicaController extends Controller
 {
+    // Imágenes y PDF hasta 20 MB (límite también configurado en NGINX y PHP-FPM).
+    private const REGLAS_ARCHIVO = [
+        'required',
+        'file',
+        'mimes:jpg,jpeg,png,webp,pdf',
+        'max:20480',
+    ];
+
     public function __construct(
         private EvidenciaClinicaService $evidenciaClinicaService
     ) {
@@ -85,20 +94,16 @@ class EvidenciaClinicaController extends Controller
             ],
             'tipo' => [
                 'required',
-                'in:caso_clinico,rx',
+                'in:caso_clinico,rx,documento',
             ],
-            'archivo' => [
-                'required',
-                'file',
-                'mimes:jpg,jpeg,png,webp,pdf',
-                'max:10240',
-            ],
+            'archivo' => self::REGLAS_ARCHIVO,
             'descripcion' => [
                 'nullable',
                 'string',
+                'max:1000',
             ],
             'fecha' => [
-                'required',
+                'nullable',
                 'date',
             ],
         ]);
@@ -117,6 +122,100 @@ class EvidenciaClinicaController extends Controller
         ], 201);
     }
 
+    public function archivo(
+        string $id
+    ): StreamedResponse|JsonResponse {
+        $evidencia = $this
+            ->evidenciaClinicaService
+            ->obtenerPorId($id);
+
+        if (!$evidencia) {
+            return response()->json([
+                'message' => 'Evidencia clínica no encontrada.',
+            ], 404);
+        }
+
+        return $this
+            ->evidenciaClinicaService
+            ->descargar($evidencia);
+    }
+
+    public function misEvidencias(
+        Request $request
+    ): JsonResponse {
+        if (!$request->user()->paciente_id) {
+            return response()->json([
+                'message' => 'La cuenta no está vinculada a un paciente.',
+            ], 422);
+        }
+
+        return response()->json([
+            'data' => $this
+                ->evidenciaClinicaService
+                ->listarDelPaciente($request->user()),
+        ]);
+    }
+
+    public function subirMia(
+        Request $request
+    ): JsonResponse {
+        $user = $request->user();
+
+        if (!$user->paciente_id) {
+            return response()->json([
+                'message' => 'La cuenta no está vinculada a un paciente.',
+            ], 422);
+        }
+
+        $datos = $request->validate([
+            'tipo' => [
+                'required',
+                'in:rx,documento',
+            ],
+            'archivo' => self::REGLAS_ARCHIVO,
+            'descripcion' => [
+                'nullable',
+                'string',
+                'max:1000',
+            ],
+        ]);
+
+        $evidencia = $this
+            ->evidenciaClinicaService
+            ->crear(
+                [...$datos, 'paciente_id' => $user->paciente_id],
+                $request->file('archivo'),
+                $user
+            );
+
+        return response()->json([
+            'message' => 'Archivo subido correctamente.',
+            'data' => $evidencia,
+        ], 201);
+    }
+
+    public function archivoMio(
+        Request $request,
+        string $id
+    ): StreamedResponse|JsonResponse {
+        $evidencia = $this
+            ->evidenciaClinicaService
+            ->obtenerDelPaciente(
+                $id,
+                $request->user()
+            );
+
+        if (!$evidencia) {
+            return response()->json([
+                'message' => 'Archivo no encontrado.',
+            ], 404);
+        }
+
+        return $this
+            ->evidenciaClinicaService
+            ->descargar($evidencia);
+    }
+
     public function update(
         Request $request,
         string $id
@@ -125,7 +224,7 @@ class EvidenciaClinicaController extends Controller
             'tipo' => [
                 'sometimes',
                 'required',
-                'in:caso_clinico,rx',
+                'in:caso_clinico,rx,documento',
             ],
             'descripcion' => [
                 'sometimes',

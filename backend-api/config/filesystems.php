@@ -56,7 +56,7 @@ return [
             'root' => env('FTP_ROOT', '/'),
             'passive' => true,
             'ssl' => false,
-            'timeout' => 30,
+            'timeout' => (int) env('FTP_TIMEOUT', 5),
             'throw' => true,
         ],
 

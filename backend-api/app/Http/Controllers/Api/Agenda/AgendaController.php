@@ -446,6 +446,83 @@ class AgendaController extends Controller
         ]);
     }
 
+    public function cancelarMiCita(
+        Request $request,
+        string $id
+    ): JsonResponse {
+        $resultado = $this
+            ->agendaService
+            ->cancelarMiCita(
+                $id,
+                $request->user()
+            );
+
+        return match ($resultado['estado']) {
+            'sin_paciente' => response()->json([
+                'message' => 'El usuario no está vinculado a un paciente.',
+            ], 422),
+            'no_encontrado' => response()->json([
+                'message' => 'Cita no encontrada.',
+            ], 404),
+            'ya_cancelada' => response()->json([
+                'message' => 'La cita ya se encuentra cancelada.',
+            ], 409),
+            'completada' => response()->json([
+                'message' => 'Una cita completada no puede cancelarse.',
+            ], 409),
+            'ya_inicio' => response()->json([
+                'message' => 'La cita ya comenzó o ya pasó; comunícate con el consultorio.',
+            ], 409),
+            default => response()->json([
+                'message' => 'Cita cancelada correctamente.',
+                'data' => $resultado['registro'],
+            ]),
+        };
+    }
+
+    public function reprogramarMiCita(
+        Request $request,
+        string $id
+    ): JsonResponse {
+        $datos = $request->validate([
+            'motivo' => [
+                'nullable',
+                'string',
+                'max:255',
+            ],
+        ]);
+
+        $resultado = $this
+            ->agendaService
+            ->reprogramarMiCita(
+                $id,
+                $request->user(),
+                $datos['motivo'] ?? null
+            );
+
+        return match ($resultado['estado']) {
+            'sin_paciente' => response()->json([
+                'message' => 'El usuario no está vinculado a un paciente.',
+            ], 422),
+            'no_encontrado' => response()->json([
+                'message' => 'Cita no encontrada.',
+            ], 404),
+            'no_programada' => response()->json([
+                'message' => 'Solo se pueden reprogramar citas programadas.',
+            ], 409),
+            'ya_inicio' => response()->json([
+                'message' => 'La cita ya comenzó o ya pasó; comunícate con el consultorio.',
+            ], 409),
+            'solicitud_existente' => response()->json([
+                'message' => 'Ya tienes una solicitud de cita pendiente.',
+            ], 409),
+            default => response()->json([
+                'message' => 'Solicitud de reprogramación enviada. El consultorio te asignará una nueva fecha.',
+                'data' => $resultado['registro'],
+            ]),
+        };
+    }
+
     public function destroy(
         Request $request,
         string $id

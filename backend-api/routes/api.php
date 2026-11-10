@@ -36,7 +36,15 @@ use App\Http\Controllers\Api\Configuracion\AuditoriaController;
 use App\Http\Controllers\Api\Servicio\CategoriaServicioController;
 use App\Http\Controllers\Api\Servicio\ServicioConsultorioController;
 
+use App\Http\Controllers\Api\Sistema\SaludController;
 
+use App\Http\Controllers\Api\Receta\RecetaController;
+use App\Http\Controllers\Api\Receta\PlantillaRecetaController;
+
+
+
+// Estado de la instancia (usado por el balanceador y las pruebas de fallo)
+Route::get('/health', SaludController::class);
 
 Route::get('/user', function (Request $request) {
     return $request->user();
@@ -152,6 +160,18 @@ Route::middleware('auth:sanctum', 'role:paciente')->prefix('paciente')->group(fu
 
     Route::get('/mi-historial', [HistorialClinicoController::class, 'miHistorial']);
 
+    // Radiografías y documentos del propio paciente (app móvil)
+    Route::get('/mis-evidencias', [EvidenciaClinicaController::class, 'misEvidencias']);
+
+    Route::post('/mis-evidencias', [EvidenciaClinicaController::class, 'subirMia']);
+
+    // Recetas del propio paciente (app móvil)
+    Route::get('/mis-recetas', [RecetaController::class, 'misRecetas']);
+
+    Route::get('/mis-recetas/{id}', [RecetaController::class, 'miReceta']);
+
+    Route::get('/mis-evidencias/{id}/archivo', [EvidenciaClinicaController::class, 'archivoMio']);
+
 });
 
 
@@ -205,6 +225,8 @@ Route::prefix('evidencias-clinicas')->group(function () {
         Route::get('/{id}/archivo', [EvidenciaClinicaController::class, 'archivo']);
 
         Route::get('/{id}', [EvidenciaClinicaController::class, 'show']);
+
+        Route::get('/{id}/archivo', [EvidenciaClinicaController::class, 'archivo']);
 
     });
 
@@ -344,6 +366,10 @@ Route::prefix('agenda')->group(function () {
 
         Route::post('/solicitar-cita', [AgendaController::class, 'solicitarCita']);
 
+        Route::put('/mis-citas/{id}/cancelar', [AgendaController::class, 'cancelarMiCita']);
+
+        Route::put('/mis-citas/{id}/reprogramar', [AgendaController::class, 'reprogramarMiCita']);
+
     });
 
 
@@ -403,5 +429,53 @@ Route::middleware('auth:sanctum', 'role:doctora')->prefix('configuracion')->grou
     Route::delete('/acciones/{id}', [AuditoriaController::class, 'ocultarAccion']);
 
     Route::get('/sesiones', [AuditoriaController::class, 'sesiones']);
+
+    // Historial de cambios con valor anterior y nuevo (trazabilidad)
+    Route::get('/cambios', [AuditoriaController::class, 'cambios']);
+
+});
+
+
+// Recetas: la doctora las emite; la asistente puede consultarlas
+Route::prefix('recetas')->group(function () {
+
+    Route::middleware('auth:sanctum', 'role:doctora,asistente')->group(function () {
+
+        Route::get('/', [RecetaController::class, 'index']);
+
+        Route::get('/{id}', [RecetaController::class, 'show']);
+
+    });
+
+    Route::middleware('auth:sanctum', 'role:doctora')->group(function () {
+
+        Route::post('/', [RecetaController::class, 'store']);
+
+        Route::put('/{id}', [RecetaController::class, 'update']);
+
+        Route::delete('/{id}', [RecetaController::class, 'destroy']);
+
+    });
+
+});
+
+// Plantillas de recetas
+Route::prefix('plantillas-receta')->group(function () {
+
+    Route::middleware('auth:sanctum', 'role:doctora,asistente')->group(function () {
+
+        Route::get('/', [PlantillaRecetaController::class, 'index']);
+
+    });
+
+    Route::middleware('auth:sanctum', 'role:doctora')->group(function () {
+
+        Route::post('/', [PlantillaRecetaController::class, 'store']);
+
+        Route::put('/{id}', [PlantillaRecetaController::class, 'update']);
+
+        Route::delete('/{id}', [PlantillaRecetaController::class, 'destroy']);
+
+    });
 
 });

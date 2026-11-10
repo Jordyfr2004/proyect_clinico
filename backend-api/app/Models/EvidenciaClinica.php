@@ -22,6 +22,7 @@ class EvidenciaClinica extends Model
         'tamano',
         'descripcion',
         'fecha',
+        'subido_por_id',
     ];
 
     protected function casts(): array
@@ -35,5 +36,11 @@ class EvidenciaClinica extends Model
     public function paciente(): BelongsTo
     {
         return $this->belongsTo(Paciente::class);
+    }
+
+    public function subidoPor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'subido_por_id')
+            ->select(['id', 'name', 'role']);
     }
 }

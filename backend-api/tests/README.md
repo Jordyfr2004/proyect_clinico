@@ -103,3 +103,19 @@ php artisan migrate --path=database/migrations/2026_10_14_000002_add_attempts_to
 La primera crea la tabla de códigos; la segunda agrega el contador necesario
 para limitar los intentos incorrectos. La configuración del envío mediante Brevo
 está documentada en [Recuperación de contraseña](../docs/password-recovery.md).
+
+## Esquemas y trazabilidad (PostgreSQL)
+
+`EsquemasTrazabilidadTest` ejecuta todas las migraciones en una base vacía y comprueba:
+- que cada tabla quedó en su esquema (`seguridad`, `clinica`, `citas`, ...);
+- que los triggers de `auditoria.registro_cambios` registran el usuario, la IP y los valores anterior y nuevo;
+- que no se guardan contraseñas;
+- que el historial no se puede borrar.
+
+**La base se borra en cada prueba**, por eso su nombre debe terminar en `_test`:
+
+```powershell
+$env:CLINICA_TEST_PGSQL_URL = 'postgresql://usuario:password@127.0.0.1:5432/proyect_clinico_test'
+php artisan test --compact
+```
+

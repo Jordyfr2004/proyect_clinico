@@ -1,0 +1,133 @@
+import { Link, Navigate, Outlet, Route, Routes } from 'react-router-dom'
+import { LockKeyhole } from 'lucide-react'
+import { lazy, Suspense, useEffect, useState } from 'react'
+import { AUTH_FORBIDDEN_EVENT } from '../services/apiClient'
+import { useAuth } from '../features/auth/authContext'
+import { canAccessArea, isStaffRole, type RestrictedArea } from '../features/auth/roleAccess'
+import { ForgotPasswordPage } from '../features/auth/ForgotPasswordPage'
+import { LoginPage } from '../features/auth/LoginPage'
+import { LoadingState } from '../components/states/LoadingState'
+import { AppLayout } from '../layouts/AppLayout'
+import { PublicLayout } from '../layouts/PublicLayout'
+
+const DashboardPage = lazy(() => import('../features/dashboard/DashboardPage').then((module) => ({ default: module.DashboardPage })))
+const AgendaPage = lazy(() => import('../features/agenda/AgendaPage').then((module) => ({ default: module.AgendaPage })))
+const MedicalAppointmentsPage = lazy(() => import('../features/medical-appointments/MedicalAppointmentsPage').then((module) => ({ default: module.MedicalAppointmentsPage })))
+const ActivitiesPage = lazy(() => import('../features/activities/ActivitiesPage').then((module) => ({ default: module.ActivitiesPage })))
+const CashPage = lazy(() => import('../features/cash/CashPage').then((module) => ({ default: module.CashPage })))
+const PatientsPage = lazy(() => import('../features/patients/PatientsPage').then((module) => ({ default: module.PatientsPage })))
+const PatientWorkspace = lazy(() => import('../features/patients/PatientWorkspace').then((module) => ({ default: module.PatientWorkspace })))
+const PatientDiagnosisSection = lazy(() => import('../features/patients/PatientDiagnosisSection').then((module) => ({ default: module.PatientDiagnosisSection })))
+const ClinicalHistorySection = lazy(() => import('../features/clinical-history/ClinicalHistorySection').then((module) => ({ default: module.ClinicalHistorySection })))
+const PatientEvidenceSection = lazy(() => import('../features/evidence/PatientEvidenceSection').then((module) => ({ default: module.PatientEvidenceSection })))
+const UsersPage = lazy(() => import('../features/assistant/UsersPage').then((module) => ({ default: module.UsersPage })))
+const SystemActivityPage = lazy(() => import('../features/audit/SystemActivityPage').then((module) => ({ default: module.SystemActivityPage })))
+const ReportsPage = lazy(() => import('../features/reports/ReportsPage').then((module) => ({ default: module.ReportsPage })))
+const PatientPrescriptionsSection = lazy(() => import('../features/prescriptions/PatientPrescriptionsSection').then((module) => ({ default: module.PatientPrescriptionsSection })))
+const PrescriptionTemplatesPage = lazy(() => import('../features/prescriptions/PrescriptionTemplatesPage').then((module) => ({ default: module.PrescriptionTemplatesPage })))
+const CatalogPage = lazy(() => import('../features/catalog/CatalogPage').then((module) => ({ default: module.CatalogPage })))
+
+function ProtectedRouteContent() {
+  return <Suspense fallback={<LoadingState/>}><Outlet/></Suspense>
+}
+
+function LoadingSession() {
+  return <div className="grid min-h-screen place-items-center text-sm text-slate-500">Verificando sesión…</div>
+}
+
+function RestrictedRoute({ area }: { area: RestrictedArea }) {
+  const { user } = useAuth()
+  if (canAccessArea(user?.role, area)) return <Outlet/>
+
+  return <section aria-labelledby="access-denied-title" className="admin-state admin-surface max-w-2xl rounded-[20px] p-7 sm:p-10">
+    <span aria-hidden="true" className="admin-module-icon mb-6 size-14 rounded-[16px]"><LockKeyhole size={26}/></span>
+    <p className="admin-kicker">Acceso restringido</p><h1 className="mt-2 text-2xl font-semibold text-ink-950" id="access-denied-title">Acceso no autorizado</h1>
+    <p className="admin-body mt-2">No tienes permiso para acceder a esta sección.</p>
+    <Link className="admin-secondary admin-interactive mt-6 inline-flex min-h-11 items-center rounded-[10px] px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2" to="/">Volver al Dashboard</Link>
+  </section>
+}
+
+function ProtectedArea() {
+  const { status: authStatus, user, logout } = useAuth()
+  const [forbidden, setForbidden] = useState(false)
+  const [logoutPending, setLogoutPending] = useState(false)
+  useEffect(() => {
+    if (authStatus !== 'authenticated') return
+    const onForbidden = () => setForbidden(true)
+    window.addEventListener(AUTH_FORBIDDEN_EVENT, onForbidden)
+    return () => window.removeEventListener(AUTH_FORBIDDEN_EVENT, onForbidden)
+  }, [authStatus])
+  if (authStatus === 'loading') return <LoadingSession/>
+  if (authStatus !== 'authenticated') return <Navigate replace to="/login"/>
+  if (!isStaffRole(user?.role)) return (
+    <main className="grid min-h-screen place-items-center bg-slate-50 p-6">
+      <section className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-6" aria-labelledby="staff-only-title">
+        <h1 className="text-xl font-semibold text-ink-950" id="staff-only-title">Este portal está disponible para el personal de la clínica.</h1>
+        <button className="mt-6 min-h-11 rounded-lg bg-clinic-700 px-4 font-semibold text-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600 disabled:opacity-60" disabled={logoutPending} onClick={() => { setLogoutPending(true); void logout().finally(() => setLogoutPending(false)) }} type="button">{logoutPending ? 'Cerrando sesión…' : 'Cerrar sesión'}</button>
+      </section>
+    </main>
+  )
+  return <>
+    {forbidden ? (
+      <div className="admin-state border-b border-[#b9d7f4] bg-[#eaf5ff] px-4 py-4 text-[#174b83] sm:px-7" role="alert">
+        <div className="mx-auto flex max-w-[1450px] flex-wrap items-center gap-x-5 gap-y-2"><div className="flex-1"><h2 className="font-semibold">Acceso no autorizado</h2><p className="mt-1 text-sm leading-6">No tienes permiso para completar esta operación.</p></div><button className="min-h-11 rounded-[10px] border border-[#83b7eb] px-4 text-sm font-semibold hover:bg-[#dceeff] focus-visible:outline-2 focus-visible:outline-offset-2" onClick={() => setForbidden(false)} type="button">Cerrar aviso</button></div>
+      </div>
+    ) : null}
+    <AppLayout/>
+  </>
+}
+
+export function AppRouter() {
+  const { status: authStatus } = useAuth()
+
+  return (
+    <Routes>
+      <Route element={<PublicLayout/>}>
+        <Route element={authStatus === 'loading' ? <LoadingSession/> : authStatus === 'authenticated' ? <Navigate replace to="/"/> : <LoginPage/>} path="/login"/>
+        <Route element={authStatus === 'loading' ? <LoadingSession/> : authStatus === 'authenticated' ? <Navigate replace to="/"/> : <ForgotPasswordPage/>} path="/recuperar-contrasena"/>
+      </Route>
+      <Route element={<ProtectedArea/>}>
+        <Route element={<ProtectedRouteContent/>}>
+        <Route element={<DashboardPage/>} index/>
+        <Route element={<RestrictedRoute area="agenda"/>}>
+          <Route element={<AgendaPage/>} path="agenda"/>
+          <Route element={<MedicalAppointmentsPage/>} path="citas-medicas"/>
+        </Route>
+        <Route element={<RestrictedRoute area="actividades"/>}>
+          <Route element={<ActivitiesPage/>} path="actividades"/>
+        </Route>
+        <Route element={<RestrictedRoute area="caja"/>}>
+          <Route element={<CashPage/>} path="caja"/>
+        </Route>
+        <Route element={<RestrictedRoute area="pacientes"/>}>
+          <Route element={<PatientsPage/>} path="pacientes"/>
+          <Route element={<PatientWorkspace/>} path="pacientes/:patientId">
+            <Route element={<Navigate replace to="historial"/>} index/>
+            <Route element={<Navigate replace to="../historial"/>} path="resumen"/>
+            <Route element={<ClinicalHistorySection/>} path="historial"/>
+            <Route element={<PatientDiagnosisSection/>} path="diagnosticos"/>
+            <Route element={<Navigate replace to="../diagnosticos?apartado=tratamientos"/>} path="tratamientos"/>
+            <Route element={<Navigate replace to="../diagnosticos?apartado=odontograma"/>} path="odontograma"/>
+            <Route element={<PatientEvidenceSection/>} path="radiografias"/>
+            <Route element={<PatientPrescriptionsSection/>} path="recetas"/>
+          </Route>
+        </Route>
+        <Route element={<RestrictedRoute area="reportes"/>}>
+          <Route element={<ReportsPage/>} path="reportes"/>
+        </Route>
+        <Route element={<RestrictedRoute area="recetas"/>}>
+          <Route element={<PrescriptionTemplatesPage/>} path="plantillas-recetas"/>
+        </Route>
+        <Route element={<RestrictedRoute area="usuarios"/>}>
+          <Route element={<UsersPage/>} path="usuarios"/>
+        </Route>
+        <Route element={<RestrictedRoute area="configuracion"/>}>
+          <Route element={<SystemActivityPage/>} path="configuracion"/>
+          <Route element={<CatalogPage/>} path="servicios"/>
+        </Route>
+        </Route>
+      </Route>
+      <Route element={authStatus === 'loading' ? <LoadingSession/> : <Navigate replace to={authStatus === 'authenticated' ? '/' : '/login'}/>} path="*"/>
+    </Routes>
+  )
+}

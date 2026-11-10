@@ -1,0 +1,13 @@
+# Contexto operativo del frontend web
+
+Este proyecto gestiona un consultorio odontológico. `frontend-web/` es la Máquina 2: portal administrativo para doctora y asistente. El paciente usa la aplicación móvil; su registro y perfil no se exponen en web. El PDF original **Definicion del proyecto.pdf** sigue siendo la fuente formal; este archivo resume las reglas de trabajo.
+
+El alcance web validado comprende autenticación, usuarios y permisos, pacientes, agenda y citas, historial clínico, diagnósticos, tratamientos, odontograma, evidencias, servicios, ingresos y egresos, reportes, dashboard y notificaciones. Inventario no pertenece al alcance inicial.
+
+Flujo: **Web → API Laravel → backend → persistencia/archivos**. El frontend no accede directamente a PostgreSQL ni al File Server. Laravel es la autoridad de permisos; las restricciones de rutas en React solo mejoran la experiencia. No se inventan endpoints, contratos ni estructuras; no se usan datos clínicos simulados en runtime ni `localStorage` como sustituto de la base. Los mocks se limitan a pruebas aisladas. Las funcionalidades sin contrato verificable se mantienen pendientes.
+
+Contratos integrados tras revisar `origin/backend` `e676dec44e503d58ec3e22933a048779265fd9c0`: sesión Bearer y recuperación de contraseña; asistentes múltiples para doctora; pacientes con búsqueda y paginación del servidor; historial clínico; agenda y citas médicas; actividades, cuentas de pacientes, Caja, auditoría, metadatos de evidencias; reportes, catálogo de categorías/servicios y foto de perfil propia. Dashboard usa `/reportes/dashboard` únicamente para doctora. La foto protegida se descarga mediante Axios con Bearer; no se abre directamente la URL en `<img>`. Las pruebas automatizadas con respuestas aisladas no equivalen a E2E autenticado con Laravel; ese paso permanece pendiente.
+
+Bloqueos: la eliminación de categorías invoca una relación `servicios()` ausente en el modelo Laravel y no se ofrece en web. Siguen pendientes odontograma estructurado, apertura/escritura de archivos clínicos, recetas, presupuestos, inventario, notificaciones y portal web de pacientes hasta tener contratos y autorización verificados. También deben verificarse con el equipo backend las rutas clínicas pendientes de autorización por rol.
+
+Solo se conserva `access_token` en `sessionStorage` como decisión provisional; no se guardan contraseñas ni objetos clínicos. `VITE_API_BASE_URL` apunta localmente a la API confirmada. Las variables `VITE_*` son públicas y no deben contener secretos. Antes de considerar estable un cambio deben pasar `npm run lint`, `npm test` y `npm run build`.

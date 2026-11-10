@@ -10,10 +10,13 @@ use App\Models\EvidenciaClinica;
 use App\Models\HistorialClinico;
 use App\Models\Odontograma;
 use App\Models\Paciente;
+use App\Models\Receta;
 use App\Models\SesionRegistrada;
 use App\Models\User;
 use Closure;
+use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Laravel\Sanctum\PersonalAccessToken;
 use PHPUnit\Framework\Attributes\DataProvider;
 use RuntimeException;
@@ -50,6 +53,8 @@ class AuditoriaTransaccionesTest extends TestCase
             '2026_10_03_191429_create_accion_registradas_table.php',
             '2026_10_29_000001_add_agenda_id_to_actividades_table.php',
             '2026_10_03_191440_create_sesion_registradas_table.php',
+            '2026_10_18_000001_add_subido_por_to_evidencias_clinicas_table.php',
+            '2026_10_18_000002_create_recetas_tables.php',
         ] as $migration) {
             (require database_path('migrations/'.$migration))->up();
         }
@@ -65,6 +70,7 @@ class AuditoriaTransaccionesTest extends TestCase
             'role' => 'doctora',
             'activo' => true,
         ]);
+        $this->doctora->forceFill(['email_verified_at' => now()])->save();
         $this->paciente = Paciente::create([
             'codigo_paciente' => '001',
             'nombres' => 'Paciente original',
@@ -89,6 +95,7 @@ class AuditoriaTransaccionesTest extends TestCase
             'EgresoService' => ['crear', 'actualizar', 'eliminar'],
             'EvidenciaClinicaService' => ['crear', 'actualizar', 'eliminar'],
             'HistorialClinicoService' => ['crear', 'actualizar'],
+            'RecetaService' => ['crear', 'actualizar', 'eliminar'],
             'OdontogramaService' => ['guardar_nuevo', 'guardar_existente', 'eliminar'],
             'AgendaService' => [
                 'crearPersonal', 'crearCitaMedica', 'programarSolicitud', 'actualizar',
@@ -175,7 +182,7 @@ class AuditoriaTransaccionesTest extends TestCase
         $state = [];
         foreach ([
             'pacientes', 'users', 'personal_access_tokens', 'actividades', 'egresos',
-            'evidencias_clinicas', 'historiales_clinicos', 'odontogramas', 'agenda',
+            'evidencias_clinicas', 'historiales_clinicos', 'odontogramas', 'agenda', 'recetas',
             'acciones_registradas', 'sesiones_registradas',
         ] as $table) {
             $state[$table] = DB::table($table)->orderBy('id')->get()
@@ -221,9 +228,8 @@ class AuditoriaTransaccionesTest extends TestCase
             $target->createToken('existente');
 
             return match ($method) {
-                'cambiarPasswordAsistente' => fn () => $service->$method('password-nuevo', $actor),
-                'desactivarUsuario', 'activarUsuario', 'desvincularPaciente' => fn () => $service->$method($target->id, $actor),
-                default => fn () => $service->$method($actor),
+                'cambiarPasswordAsistente' => fn () => $service->$method($target->id, 'password-nuevo', $actor),
+                default => fn () => $service->$method($target->id, $actor),
             };
         }
 
@@ -283,7 +289,19 @@ class AuditoriaTransaccionesTest extends TestCase
             'HistorialClinicoService' => [HistorialClinico::class, [
                 'paciente_id' => $paciente->id, 'cirugias' => 'Ninguna',
             ], ['cirugias' => 'Actualizadas']],
+            'RecetaService' => [Receta::class, [
+                'paciente_id' => $paciente->id, 'fecha' => '2026-10-20',
+                'medicamentos' => [['nombre' => 'Ibuprofeno', 'dosis' => '400 mg', 'frecuencia' => 'Cada 8 horas']],
+            ], ['indicaciones' => 'Tomar con comida']],
         };
+
+        if ($serviceName === 'EvidenciaClinicaService') {
+            Storage::fake('ftp');
+        }
+
+        if ($method === 'crear' && $serviceName === 'EvidenciaClinicaService') {
+            return fn () => $service->crear($data, UploadedFile::fake()->image('rx.png'), $actor);
+        }
 
         if ($method === 'crear') {
             if ($serviceName === 'ActividadService') {

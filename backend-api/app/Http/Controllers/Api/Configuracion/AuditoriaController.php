@@ -46,6 +46,23 @@ class AuditoriaController extends Controller
         ]);
     }
 
+    public function cambios(
+        Request $request
+    ): JsonResponse {
+        $filtros = $request->validate([
+            'tabla' => ['nullable', 'string', 'max:100'],
+            'registro_id' => ['nullable', 'string', 'max:100'],
+            'usuario_id' => ['nullable', 'uuid'],
+            'fecha' => ['nullable', 'date'],
+        ]);
+
+        return response()->json([
+            'cambios' => $this
+                ->auditoriaService
+                ->listarCambios($filtros),
+        ]);
+    }
+
     public function ocultarAccion(
         string $id
     ): JsonResponse {

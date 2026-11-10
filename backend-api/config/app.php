@@ -30,6 +30,18 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Instancia del backend
+    |--------------------------------------------------------------------------
+    |
+    | Nombre de esta instancia (backend1, backend2). Se envía en la cabecera
+    | X-Backend-Instance y en los logs para demostrar el balanceo.
+    |
+    */
+
+    'instancia' => env('BACKEND_INSTANCE', gethostname() ?: 'backend'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Debug Mode
     |--------------------------------------------------------------------------
     |
@@ -65,7 +77,7 @@ return [
     |
     */
 
-    'timezone' => 'UTC',
+    'timezone' => env('APP_TIMEZONE', 'UTC'),
 
     /*
     |--------------------------------------------------------------------------
