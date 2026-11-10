@@ -71,6 +71,27 @@ describe('ActivitiesPage', () => {
     expect(trigger).toHaveFocus()
   })
 
+  it('keeps first and last action menus outside the scrolling list and closes on outside click', async () => {
+    vi.mocked(getActivities).mockResolvedValue(Array.from({ length: 3 }, (_, index) => ({ ...record, id: `activity-${index}`, paciente: { ...record.paciente, nombres: `Paciente ${index}` } })))
+    renderPage('doctora')
+    await screen.findByText('Paciente 0')
+    const list = screen.getByRole('region', { name: 'Lista de actividades' })
+    const first = screen.getByRole('button', { name: 'Opciones de actividad para Paciente 0' })
+    fireEvent.click(first)
+    expect(list).not.toContainElement(screen.getByRole('menu'))
+    expect(document.body).toContainElement(screen.getByRole('menu'))
+    fireEvent.pointerDown(screen.getByRole('heading', { name: 'Actividades' }))
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument()
+    fireEvent.scroll(list, { target: { scrollTop: 500 } })
+    const last = screen.getByRole('button', { name: 'Opciones de actividad para Paciente 2' })
+    fireEvent.click(last)
+    expect(list).not.toContainElement(screen.getByRole('menu'))
+    fireEvent.keyDown(last, { key: 'ArrowDown' })
+    expect(screen.getByRole('menuitem', { name: 'Editar' })).toHaveFocus()
+    fireEvent.keyDown(screen.getByRole('menuitem', { name: 'Editar' }), { key: 'Escape' })
+    expect(last).toHaveFocus()
+  })
+
   it('uses a real patient lookup and refreshes list and total after creating', async () => {
     vi.mocked(createActivity).mockResolvedValue('Actividad registrada correctamente.')
     renderPage('doctora')
