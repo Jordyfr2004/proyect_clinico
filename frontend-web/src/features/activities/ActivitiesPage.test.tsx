@@ -212,6 +212,33 @@ describe('ActivitiesPage', () => {
     await waitFor(() => expect(getActivities).toHaveBeenCalledWith(expect.objectContaining({ mes: expect.any(Number), anio: expect.any(Number) }), expect.any(AbortSignal)))
   })
 
+  it('distinguishes pending filters from the period actually queried', async () => {
+    renderPage('asistente')
+    await screen.findByText('Consulta registrada')
+    fireEvent.change(screen.getByLabelText('Mes'), { target: { value: '11' } })
+    fireEvent.change(screen.getByLabelText('Año'), { target: { value: '2026' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar filtros' }))
+    expect(await screen.findByText('Período consultado: noviembre de 2026')).toBeInTheDocument()
+    expect(screen.queryByText('Cambios sin aplicar')).not.toBeInTheDocument()
+
+    const callsAfterApply = vi.mocked(getActivities).mock.calls.length
+    fireEvent.click(screen.getByRole('button', { name: 'Día' }))
+    fireEvent.change(screen.getByLabelText('Fecha del día'), { target: { value: '2026-11-10' } })
+    expect(screen.getByText('Cambios sin aplicar')).toBeInTheDocument()
+    expect(screen.getByText('Período consultado: noviembre de 2026')).toBeInTheDocument()
+    expect(getActivities).toHaveBeenCalledTimes(callsAfterApply)
+
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar filtros' }))
+    expect(await screen.findByText('Período consultado: 10 de noviembre de 2026')).toBeInTheDocument()
+    expect(screen.queryByText('Cambios sin aplicar')).not.toBeInTheDocument()
+    await waitFor(() => expect(getActivities).toHaveBeenCalledWith(expect.objectContaining({ fecha: '2026-11-10' }), expect.any(AbortSignal)))
+
+    fireEvent.click(screen.getByRole('button', { name: 'Limpiar filtros' }))
+    expect(screen.queryByText('Cambios sin aplicar')).not.toBeInTheDocument()
+    const currentMonth = new Intl.DateTimeFormat('es-EC', { month: 'long' }).format(new Date())
+    expect(screen.getByText(`Período consultado: ${currentMonth} de ${new Date().getFullYear()}`)).toBeInTheDocument()
+  })
+
   it('edits a received activity and reloads the backend list', async () => {
     vi.mocked(updateActivity).mockResolvedValue('Actividad actualizada correctamente.')
     renderPage('doctora')

@@ -48,6 +48,13 @@ function periodParams(kind: PeriodKind, date: string, month: string, year: strin
   return { list, total }
 }
 
+function periodLabel(period: ActivityPeriod): string {
+  if ('fecha' in period) return period.periodo === 'dia' ? formatDate(period.fecha) : `semana del ${formatDate(period.fecha)}`
+  if (period.periodo === 'anio') return String(period.anio)
+  const month = new Intl.DateTimeFormat('es-EC', { month: 'long' }).format(new Date(period.anio, Number(period.mes) - 1, 1))
+  return `${month} de ${period.anio}`
+}
+
 function ActivityForm({ record, busy, error, onSave, onCancel }: { record?: Activity; busy: boolean; error: string | null; onSave: (values: ActivityPayload) => Promise<void>; onCancel: () => void }) {
   const [code, setCode] = useState(record?.paciente.codigo_paciente ?? '')
   const [date, setDate] = useState(record?.fecha.slice(0, 10) ?? '')
@@ -181,6 +188,7 @@ export function ActivitiesPage() {
     finally { pendingMutation.current = false; setBusy(false) }
   }
   const selectedMenuRecord = recordsQuery.data?.find((record) => record.id === openMenuId)
+  const filtersPending = JSON.stringify(periodParams(period, date, month, year, code)) !== JSON.stringify(query)
   return <div className="admin-reveal max-w-[1390px] space-y-4">
     <header className="flex flex-wrap items-end justify-between gap-4"><div><p className="admin-kicker">Registro diario</p><h1 className="admin-page-title mt-2">Actividades</h1><p className="admin-body mt-2">Actividades registradas para pacientes.</p></div>{doctor ? <button className="admin-primary inline-flex min-h-11 items-center gap-2 rounded-[10px] px-5 text-sm font-semibold" onClick={(event) => openDialog({ kind: 'create' }, event.currentTarget)} type="button"><Plus aria-hidden="true" size={18}/>Registrar actividad</button> : null}</header>
     {success ? <p className="admin-success rounded-xl p-4 text-sm" role="status">{success}</p> : null}
@@ -199,7 +207,7 @@ export function ActivitiesPage() {
     </section>
     {totalQuery.data ? <section aria-label="Total económico del período" className="admin-surface flex flex-col items-start gap-2 rounded-[20px] p-3 sm:flex-row sm:items-center sm:gap-4 sm:px-4 sm:py-3"><div className="flex min-w-0 items-center gap-3"><span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#e7f4ff] text-clinic-600"><Wallet size={21}/></span><div className="min-w-0"><p className="admin-kicker">Total general del período</p><p className="admin-muted mt-0.5 text-sm">Incluye todas las actividades del período, aunque filtres por paciente.</p></div></div><p className="self-end text-2xl font-bold tracking-tight text-ink-950 sm:ml-auto sm:shrink-0 sm:self-auto">{formatCurrency(totalQuery.data.total)}</p></section> : totalQuery.isError ? <ErrorState description={errorMessage(totalQuery.error)} onRetry={() => { void totalQuery.refetch() }}/> : <LoadingState/>}
     {recordsQuery.data ? recordsQuery.data.length === 0 ? <EmptyState description="Sin registros para los filtros seleccionados." icon={ClipboardList} title="Sin actividades en esta vista."/> : <section aria-label="Actividades registradas" className="admin-surface flex min-h-0 min-w-0 flex-col rounded-[20px] p-3 sm:p-4" ref={recordsCard} style={recordsMaxHeight === null ? undefined : { maxHeight: recordsMaxHeight }}>
-      <div className="flex shrink-0 flex-wrap items-end justify-between gap-2 border-b border-[#e3ecf6] pb-3"><div><p className="admin-kicker">Actividad clínica</p><h2 className="mt-1 text-lg font-bold text-ink-950">Registros</h2></div><p className="admin-muted text-sm">{recordsQuery.data.length} {recordsQuery.data.length === 1 ? 'actividad' : 'actividades'}</p></div>
+      <div className="flex shrink-0 flex-wrap items-end justify-between gap-x-4 gap-y-1 border-b border-[#e3ecf6] pb-3"><div className="min-w-0"><h2 className="text-lg font-bold text-ink-950">Registros</h2><p className="admin-muted mt-0.5 text-xs sm:text-sm">Período consultado: {periodLabel(query.total)}{query.list.codigo_paciente ? ` · Código ${query.list.codigo_paciente}` : ''}</p></div><div className="flex flex-wrap items-center gap-2">{filtersPending ? <span className="rounded-full bg-[#eaf4ff] px-2 py-1 text-xs font-semibold text-clinic-700" role="status">Cambios sin aplicar</span> : null}<p className="admin-muted whitespace-nowrap text-sm">{recordsQuery.data.length} {recordsQuery.data.length === 1 ? 'actividad' : 'actividades'}</p></div></div>
       <div aria-label="Lista de actividades" className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain pb-1 pt-2 pr-1 sm:pr-2" data-activity-scroll role="region" tabIndex={0}>
         <IncrementalList className="space-y-2" items={recordsQuery.data} renderItem={(record) => <li className="grid min-w-0 grid-cols-[40px_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 rounded-xl border border-[#dbe6f2] bg-white p-3 shadow-[0_3px_12px_rgba(19,55,108,0.035)] focus-within:border-[#bbd6f4] sm:flex sm:flex-wrap sm:items-center sm:gap-3 lg:grid lg:grid-cols-[40px_minmax(140px,1.1fr)_minmax(130px,1fr)_auto_40px]" key={record.id}>
           <span aria-hidden="true" className="col-start-1 row-start-1 grid size-10 shrink-0 place-items-center rounded-xl bg-[#eaf4ff] text-clinic-600"><CalendarDays size={19}/></span>
