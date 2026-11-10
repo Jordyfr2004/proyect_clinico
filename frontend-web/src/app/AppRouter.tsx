@@ -24,6 +24,8 @@ const PatientEvidenceSection = lazy(() => import('../features/evidence/PatientEv
 const UsersPage = lazy(() => import('../features/assistant/UsersPage').then((module) => ({ default: module.UsersPage })))
 const SystemActivityPage = lazy(() => import('../features/audit/SystemActivityPage').then((module) => ({ default: module.SystemActivityPage })))
 const ReportsPage = lazy(() => import('../features/reports/ReportsPage').then((module) => ({ default: module.ReportsPage })))
+const PatientPrescriptionsSection = lazy(() => import('../features/prescriptions/PatientPrescriptionsSection').then((module) => ({ default: module.PatientPrescriptionsSection })))
+const PrescriptionTemplatesPage = lazy(() => import('../features/prescriptions/PrescriptionTemplatesPage').then((module) => ({ default: module.PrescriptionTemplatesPage })))
 const CatalogPage = lazy(() => import('../features/catalog/CatalogPage').then((module) => ({ default: module.CatalogPage })))
 
 function ProtectedRouteContent() {
@@ -111,10 +113,14 @@ export function AppRouter() {
             <Route element={<Navigate replace to="../diagnosticos?apartado=tratamientos"/>} path="tratamientos"/>
             <Route element={<Navigate replace to="../diagnosticos?apartado=odontograma"/>} path="odontograma"/>
             <Route element={<PatientEvidenceSection/>} path="radiografias"/>
+            <Route element={<PatientPrescriptionsSection/>} path="recetas"/>
           </Route>
         </Route>
         <Route element={<RestrictedRoute area="reportes"/>}>
           <Route element={<ReportsPage/>} path="reportes"/>
+        </Route>
+        <Route element={<RestrictedRoute area="recetas"/>}>
+          <Route element={<PrescriptionTemplatesPage/>} path="plantillas-recetas"/>
         </Route>
         <Route element={<RestrictedRoute area="usuarios"/>}>
           <Route element={<UsersPage/>} path="usuarios"/>

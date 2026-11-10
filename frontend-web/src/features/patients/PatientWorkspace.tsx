@@ -12,7 +12,7 @@ import { PatientEditForm } from './PatientEditForm'
 import { getPatient, updatePatient, type Patient, type UpdatePatientPayload } from './patientService'
 import { patientLoadError } from './patientLoadError'
 
-const sections = [['historial', 'Historial clínico'], ['diagnosticos', 'Diagnósticos'], ['radiografias', 'Evidencias clínicas']]
+const sections = [['historial', 'Historial clínico'], ['diagnosticos', 'Diagnósticos'], ['radiografias', 'Evidencias clínicas'], ['recetas', 'Recetas']]
 type PatientState = { kind: 'loading' } | { kind: 'ready'; patient: Patient } | { kind: 'missing' } | { kind: 'error'; message: string }
 
 function PatientDetail({ patientId }: { patientId: string }) {

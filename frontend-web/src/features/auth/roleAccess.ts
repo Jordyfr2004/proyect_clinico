@@ -11,6 +11,7 @@ const allowedRoles: Record<RestrictedArea, readonly UserRole[]> = {
   servicios: ['doctora'],
   configuracion: ['doctora'],
   reportes: ['doctora'],
+  recetas: ['doctora'],
 }
 
 export function isStaffRole(role: UserRole | undefined): boolean {

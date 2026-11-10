@@ -102,6 +102,35 @@ export function PatientEvidenceSection() {
     finally { pendingMutation.current = false; setBusy(false) }
   }
 
+  const open = async (record: Evidence) => {
+    if (opening) return
+    // La ventana se abre antes de la descarga para que el navegador no la bloquee.
+    const viewer = window.open('', '_blank')
+    setOpening(record.id); setActionError(null)
+    try {
+      const url = URL.createObjectURL(await getEvidenceFile(record.id))
+      if (viewer) viewer.location.href = url
+      else window.location.assign(url)
+      setTimeout(() => URL.revokeObjectURL(url), 60_000)
+    } catch (cause) {
+      viewer?.close()
+      setActionError(requestError(cause, 'No fue posible abrir el archivo.'))
+    } finally { setOpening(null) }
+  }
+
+  const remove = async () => {
+    if (!confirmDelete || deleting) return
+    setDeleting(true); setActionError(null)
+    try {
+      await deleteEvidence(confirmDelete.id)
+      setState((current) => current.kind === 'ready' ? { kind: 'ready', records: current.records.filter((record) => record.id !== confirmDelete.id) } : current)
+      setConfirmDelete(null)
+    } catch (cause) {
+      setConfirmDelete(null)
+      setActionError(requestError(cause, 'No fue posible eliminar la evidencia.'))
+    } finally { setDeleting(false) }
+  }
+
   return <section aria-labelledby="evidence-title" className="admin-surface rounded-[20px] p-6 sm:p-8">
     <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="admin-kicker">Expediente clínico</p><h2 className="mt-2 text-xl font-semibold text-ink-950" id="evidence-title" ref={heading} tabIndex={-1}>Evidencias clínicas</h2></div>{doctor ? <button className="admin-primary inline-flex min-h-11 items-center gap-2 rounded-lg px-4 text-sm font-semibold" onClick={(event) => openDialog({ kind: 'create' }, event.currentTarget)} type="button"><Plus aria-hidden="true" size={18}/>Registrar evidencia</button> : null}</div>
     {success ? <p className="admin-success mt-5 rounded-xl p-4 text-sm" role="status">{success}</p> : null}

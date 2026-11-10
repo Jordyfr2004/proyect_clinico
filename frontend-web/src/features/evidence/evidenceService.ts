@@ -5,6 +5,7 @@ const evidenceSchema = z.object({
   id: z.string(), paciente_id: z.string(), tipo: z.enum(['caso_clinico', 'rx']),
   nombre_archivo: z.string(), mime_type: z.string(),
   tamano: z.number(), descripcion: z.string().nullable(), fecha: z.string(),
+  subido_por: z.object({ id: z.string(), name: z.string(), role: z.string() }).nullable().optional(),
 })
 const responseSchema = z.object({
   paciente: z.object({ id: z.string(), codigo_paciente: z.string(), nombres: z.string() }),

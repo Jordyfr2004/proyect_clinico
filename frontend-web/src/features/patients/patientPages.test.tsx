@@ -229,18 +229,19 @@ describe('patient views', () => {
     expect(screen.getByRole('button', { name: 'Siguiente' })).toBeDisabled()
   })
 
-  it('loads a real patient detail with exactly three main sections', async () => {
+  it('loads a real patient detail with exactly four main sections', async () => {
     vi.mocked(getPatient).mockResolvedValue(patient)
     renderDetail('/pacientes/patient-id/historial')
     expect(screen.getByRole('status')).toHaveTextContent('Cargando información')
     expect(await screen.findByRole('heading', { name: 'Nombre recibido' })).toBeInTheDocument()
     expect(getPatient).toHaveBeenCalledWith('patient-id')
     const tabs = screen.getByRole('navigation', { name: 'Secciones del expediente' })
-    expect(within(tabs).getAllByRole('link')).toHaveLength(3)
+    expect(within(tabs).getAllByRole('link')).toHaveLength(4)
     expect(within(tabs).getByRole('link', { name: 'Historial clínico' })).toBeInTheDocument()
     expect(within(tabs).getByRole('link', { name: 'Diagnósticos' })).toBeInTheDocument()
     expect(within(tabs).getByRole('link', { name: 'Evidencias clínicas' })).toBeInTheDocument()
-    expect(within(tabs).queryByText(/Recetas|Planes|Tratamientos|Odontograma|Resumen/)).not.toBeInTheDocument()
+    expect(within(tabs).getByRole('link', { name: 'Recetas' })).toBeInTheDocument()
+    expect(within(tabs).queryByText(/Planes|Tratamientos|Odontograma|Resumen/)).not.toBeInTheDocument()
   })
 
   it('keeps Tratamientos and Odontograma inside Diagnósticos, including legacy links', async () => {

@@ -1,0 +1,31 @@
+# ==============================================================================
+# Laptop 2 - NGINX que publica el frontend web (React compilado con Vite).
+# Solo acepta peticiones del balanceador: los clientes entran por la Laptop 1.
+# ==============================================================================
+server {
+    listen ${WEB_PORT};
+    server_name _;
+
+    root /var/www/clinica-web;
+    index index.html;
+
+    access_log /var/log/nginx/clinica_web_access.log;
+    error_log  /var/log/nginx/clinica_web_error.log warn;
+
+    allow 127.0.0.1;
+    allow ${BALANCEADOR_IP};
+    deny all;
+
+    # Archivos con hash en el nombre: se pueden guardar en caché mucho tiempo.
+    location /assets/ {
+        expires 30d;
+        add_header Cache-Control "public, immutable";
+        try_files $uri =404;
+    }
+
+    # Rutas de React Router: cualquier ruta desconocida carga index.html.
+    location / {
+        add_header Cache-Control "no-cache";
+        try_files $uri $uri/ /index.html;
+    }
+}
