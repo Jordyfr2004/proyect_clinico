@@ -8,6 +8,7 @@ use App\Models\User;
 use Closure;
 use Illuminate\Database\QueryException;
 use Illuminate\Support\Facades\DB;
+use App\Events\CitaActualizada;
 
 class AgendaService
 {
@@ -246,19 +247,24 @@ class AgendaService
         }
 
         try {
-            $registro = DB::transaction(fn () => Agenda::create([
-                'paciente_id' => $user->paciente_id,
-                'fecha' => null,
-                'hora_inicio' => null,
-                'hora_fin' => null,
-                'tipo' => 'cita_medica',
-                'descripcion' => null,
-                'estado' => 'pendiente',
-            ]));
+            $registro = DB::transaction(
+                fn () => Agenda::create([
+                    'paciente_id' => $user->paciente_id,
+                    'fecha' => null,
+                    'hora_inicio' => null,
+                    'hora_fin' => null,
+                    'tipo' => 'cita_medica',
+                    'descripcion' => null,
+                    'estado' => 'pendiente',
+                ])
+            );
         } catch (QueryException $exception) {
             if (
                 ($exception->errorInfo[0] ?? null) !== '23505' ||
-                !str_contains($exception->errorInfo[2] ?? '', '"agenda_paciente_pendiente_unico"')
+                !str_contains(
+                    $exception->errorInfo[2] ?? '',
+                    '"agenda_paciente_pendiente_unico"'
+                )
             ) {
                 throw $exception;
             }
@@ -268,6 +274,12 @@ class AgendaService
                 'registro' => null,
             ];
         }
+
+        event(new CitaActualizada(
+            $registro->id,
+            $registro->paciente_id,
+            'solicitada'
+        ));
 
         return [
             'estado' => 'creado',
