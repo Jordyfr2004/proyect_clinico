@@ -170,6 +170,8 @@ describe('MedicalAppointmentsPage', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Opciones de cita para Paciente recibido' }))
     fireEvent.click(screen.getByRole('button', { name: 'Editar cita' }))
     const dialog = screen.getByRole('dialog', { name: 'Editar cita médica' })
+    expect(within(dialog).getByText('Paciente recibido')).toBeInTheDocument()
+    expect(within(dialog).getByText('Código: 001')).toBeInTheDocument()
     const date = within(dialog).getByLabelText('Fecha de la cita *')
     expect(date).toHaveAttribute('type', 'date')
     expect(date).toHaveValue('2026-10-05')
