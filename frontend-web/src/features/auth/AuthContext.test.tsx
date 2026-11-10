@@ -38,19 +38,19 @@ describe('AuthProvider', () => {
     expect(await screen.findByRole('heading', { name: 'Este portal está disponible para el personal de la clínica.' })).toBeInTheDocument()
     expect(screen.queryByRole('navigation')).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Cerrar sesión' }))
-    expect(await screen.findByRole('heading', { name: 'Bienvenido de nuevo' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Tu salud dental merece una atención cercana.' })).toBeInTheDocument()
     expect(authService.logout).toHaveBeenCalledOnce()
     expect(getAccessToken()).toBeNull()
   })
   it('moves from login to the protected area after a successful response', async () => {
     vi.mocked(authService.login).mockResolvedValue({ message: 'Inicio de sesión correcto.', token_type: 'Bearer', access_token: 'token-confirmado', user: confirmedUser })
-    render(<MemoryRouter initialEntries={['/login']}><AuthProvider><AppRouter/></AuthProvider></MemoryRouter>)
+    render(<MemoryRouter initialEntries={['/acceso']}><AuthProvider><AppRouter/></AuthProvider></MemoryRouter>)
 
     fireEvent.change(await screen.findByLabelText('Usuario o cédula'), { target: { value: '1234567890' } })
     fireEvent.change(screen.getByLabelText('Contraseña'), { target: { value: 'valid-password-123' } })
     fireEvent.click(screen.getByRole('button', { name: 'Iniciar sesión' }))
 
-    expect(await screen.findByRole('heading', { name: 'Resumen de gestión' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Bienvenida, Doctora' })).toBeInTheDocument()
     expect(getAccessToken()).toBe('token-confirmado')
   })
 
@@ -117,17 +117,18 @@ describe('AuthProvider', () => {
     expect(screen.getByTestId('auth-user')).toHaveTextContent('none')
   })
 
-  it('returns to login after logout even if the server request fails', async () => {
+  it('returns to the public presentation after logout even if the server request fails', async () => {
     setAccessToken('token-existente')
     vi.mocked(authService.getCurrentUser).mockResolvedValue(confirmedUser)
     vi.mocked(authService.logout).mockRejectedValue(new Error('network'))
     render(<MemoryRouter initialEntries={['/']}><AuthProvider><AppRouter/></AuthProvider></MemoryRouter>)
 
-    expect(await screen.findByRole('heading', { name: 'Resumen de gestión' })).toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Abrir menú de usuario' }))
+    expect(await screen.findByRole('heading', { name: 'Bienvenida, Doctora' })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Abrir menú de perfil' }))
     fireEvent.click(screen.getByRole('menuitem', { name: 'Cerrar sesión' }))
 
-    expect(await screen.findByRole('heading', { name: 'Bienvenido de nuevo' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { name: 'Tu salud dental merece una atención cercana.' })).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Bienvenido de nuevo' })).not.toBeInTheDocument()
     expect(getAccessToken()).toBeNull()
   })
 

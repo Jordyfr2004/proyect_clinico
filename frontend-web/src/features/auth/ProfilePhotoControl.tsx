@@ -6,7 +6,6 @@ import { deleteProfilePhoto, uploadProfilePhoto } from './profilePhotoService'
 import { removeClinicalQueries } from '../../services/clinicalQuery'
 
 const allowedTypes = new Set(['image/jpeg', 'image/png', 'image/webp'])
-const roleLabels = { doctora: 'Doctora', asistente: 'Asistente', paciente: 'Paciente' }
 
 function errorMessage(error: unknown): string {
   if (isAxiosError(error)) {
@@ -69,7 +68,7 @@ export function ProfilePhotoControl({ initialPhotoUrl, onBusyChange }: { initial
   return <div className="text-center">
     <ProtectedPhoto className="mx-auto size-36 rounded-full text-4xl font-semibold sm:size-44" fallbackText={initials} key={`${user.id}-${revision}`} name={user.name} onLoadError={handleLoadError} photoUrl={photoUrl}/>
     <p className="mt-3 truncate text-base font-semibold text-ink-950" title={user.name}>{user.name}</p>
-    <p className="mt-0.5 text-sm text-slate-500">{roleLabels[user.role]}</p>
+    <p className="mt-0.5 text-sm text-slate-500">Personal clínico</p>
     {loadError && photoUrl ? <p className="mt-3 text-sm text-amber-800" role="status">No fue posible mostrar la foto guardada. Puedes intentarlo de nuevo más tarde.</p> : null}
     {error ? <p className="mt-3 text-sm text-red-700" role="alert">{error}</p> : null}
     <div className="mt-5 flex flex-wrap justify-center gap-2">

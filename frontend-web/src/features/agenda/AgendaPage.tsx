@@ -1,16 +1,18 @@
 import { isAxiosError } from 'axios'
-import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react'
-import { useRef, useState, type FormEvent } from 'react'
+import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight, MoreVertical } from 'lucide-react'
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type FormEvent } from 'react'
+import { useLocation, useNavigate } from 'react-router-dom'
 import { ErrorState } from '../../components/states/ErrorState'
 import { LoadingState } from '../../components/states/LoadingState'
 import { AccessibleDialog } from '../../components/ui/AccessibleDialog'
 import { formatDate } from '../../utils/displayFormat'
 import { useAuth } from '../auth/authContext'
-import { createMedicalAppointment, createPersonalEntry, getAgendaMonth, type AgendaEntry, type MedicalAppointmentPayload, type PersonalEntryPayload } from './agendaService'
+import { createMedicalAppointment, createPersonalEntry, deleteAgendaEntry, getAgendaMonth, updateAgendaEntry, type AgendaEntry, type MedicalAppointmentPayload, type PersonalEntryPayload } from './agendaService'
 import { markClinicalQueriesStale, useClinicalQuery } from '../../services/clinicalQuery'
 import { useClinicalViewState } from '../../services/clinicalViewState'
 import type { Patient } from '../patients/patientService'
 import { AgendaPatientSearch } from './AgendaPatientSearch'
+import './agenda.css'
 
 type AgendaState = { kind: 'loading' } | { kind: 'ready'; entries: AgendaEntry[] } | { kind: 'error'; message: string }
 const two = (value: number) => String(value).padStart(2, '0')
@@ -27,6 +29,31 @@ function errorMessage(error: unknown): string {
 
 type EntryChoice = { kind: 'medical'; values: MedicalAppointmentPayload } | { kind: 'personal'; values: PersonalEntryPayload }
 
+function AgendaEntryDialog({ entry, kind, busy, error, onCancel, onSave }: { entry: AgendaEntry; kind: 'edit' | 'delete'; busy: boolean; error: string | null; onCancel: () => void; onSave: (values?: { fecha: string; hora_inicio: string; hora_fin: string; descripcion: string | null }) => void }) {
+  const [fecha, setFecha] = useState(entry.fecha?.slice(0, 10) ?? '')
+  const [inicio, setInicio] = useState(entry.hora_inicio?.slice(0, 5) ?? '')
+  const [fin, setFin] = useState(entry.hora_fin?.slice(0, 5) ?? '')
+  const [descripcion, setDescripcion] = useState(entry.descripcion ?? '')
+  const [validation, setValidation] = useState<string | null>(null)
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (busy) return
+    if (kind === 'delete') { onSave(); return }
+    if (!fecha || !inicio || !fin || fin <= inicio) { setValidation('Revisa la fecha y el horario. La hora final debe ser posterior a la inicial.'); return }
+    onSave({ fecha, hora_inicio: inicio, hora_fin: fin, descripcion: descripcion.trim() || null })
+  }
+  return <form aria-label={kind === 'edit' ? 'Editar registro de agenda' : 'Eliminar registro de agenda'} noValidate onSubmit={submit}>
+    {kind === 'delete' ? <p className="admin-body text-sm">¿Eliminar este registro de agenda? Esta acción no se puede deshacer.</p> : <div className="grid gap-4 sm:grid-cols-2">
+      <label className="text-sm font-medium text-ink-950 sm:col-span-2">Fecha<input className="admin-input mt-1 w-full text-sm" data-dialog-initial onChange={(event) => setFecha(event.target.value)} required type="date" value={fecha}/></label>
+      <label className="text-sm font-medium text-ink-950">Hora de inicio<input className="admin-input mt-1 w-full text-sm" onChange={(event) => setInicio(event.target.value)} required type="time" value={inicio}/></label>
+      <label className="text-sm font-medium text-ink-950">Hora de fin<input className="admin-input mt-1 w-full text-sm" onChange={(event) => setFin(event.target.value)} required type="time" value={fin}/></label>
+      <label className="text-sm font-medium text-ink-950 sm:col-span-2">Descripción<textarea className="admin-input mt-1 w-full text-sm" onChange={(event) => setDescripcion(event.target.value)} rows={3} value={descripcion}/></label>
+    </div>}
+    {validation || error ? <p className="mt-4 text-sm text-red-700" role="alert">{validation ?? error}</p> : null}
+    <div className="mt-6 flex flex-wrap gap-3"><button className={`${kind === 'delete' ? 'min-h-11 rounded-lg border border-red-200 px-5 text-sm font-semibold text-red-700' : 'admin-primary rounded-lg px-5 text-sm font-semibold'} min-h-11 disabled:opacity-60`} disabled={busy} type="submit">{busy ? 'Procesando…' : kind === 'delete' ? 'Eliminar' : 'Guardar cambios'}</button><button className="admin-secondary min-h-11 rounded-lg px-5 text-sm font-semibold disabled:opacity-60" disabled={busy} onClick={onCancel} type="button">Cancelar</button></div>
+  </form>
+}
+
 function AgendaForm({ date, busy, error, onCancel, onSave, onKindChange }: { date: string; busy: boolean; error: string | null; onCancel: () => void; onSave: (choice: EntryChoice) => void; onKindChange: (kind: 'medical' | 'personal') => void }) {
   const [kind, setKind] = useState<'medical' | 'personal'>('medical')
   const [patient, setPatient] = useState<Patient | null>(null)
@@ -34,7 +61,13 @@ function AgendaForm({ date, busy, error, onCancel, onSave, onKindChange }: { dat
   const [end, setEnd] = useState('')
   const [description, setDescription] = useState('')
   const [validation, setValidation] = useState<string | null>(null)
-  const selectKind = (next: 'medical' | 'personal') => { setKind(next); setValidation(null); onKindChange(next) }
+  const selectKind = (next: 'medical' | 'personal') => {
+    if (next === kind) return
+    setPatient(null)
+    setKind(next)
+    setValidation(null)
+    onKindChange(next)
+  }
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (busy) return
@@ -46,15 +79,17 @@ function AgendaForm({ date, busy, error, onCancel, onSave, onKindChange }: { dat
     else onSave({ kind, values: { codigo_paciente: patient!.codigo_paciente, fecha: date, hora_inicio: start, hora_fin: end, descripcion: description.trim() || null } })
   }
   return <form aria-label={kind === 'medical' ? 'Agendar cita médica' : 'Agendar actividad personal'} noValidate onSubmit={submit}>
-    <div aria-label="Tipo de registro" className="mb-5 flex flex-wrap gap-2" role="group"><button aria-pressed={kind === 'medical'} className={`admin-secondary min-h-11 rounded-lg px-4 text-sm font-semibold ${kind === 'medical' ? 'border-clinic-600 bg-clinic-50 text-clinic-700' : ''}`} disabled={busy} onClick={() => selectKind('medical')} type="button">Cita médica</button><button aria-pressed={kind === 'personal'} className={`admin-secondary min-h-11 rounded-lg px-4 text-sm font-semibold ${kind === 'personal' ? 'border-clinic-600 bg-clinic-50 text-clinic-700' : ''}`} disabled={busy} onClick={() => selectKind('personal')} type="button">Actividad personal</button></div>
-    <p className="admin-body mb-5 text-sm">Fecha seleccionada: <strong>{formatDate(date)}</strong></p>
-    <div className="grid gap-4 sm:grid-cols-2">{kind === 'medical' ? <AgendaPatientSearch disabled={busy} onSelect={(next) => { setPatient(next); setValidation(null) }} selected={patient}/> : null}<label className="text-sm font-medium text-ink-950">Hora de inicio<input className="admin-input mt-1 w-full text-sm" onChange={(event) => setStart(event.target.value)} required type="time" value={start}/></label><label className="text-sm font-medium text-ink-950">Hora de fin<input className="admin-input mt-1 w-full text-sm" onChange={(event) => setEnd(event.target.value)} required type="time" value={end}/></label><label className="text-sm font-medium text-ink-950 sm:col-span-2">{kind === 'medical' ? 'Descripción (opcional)' : 'Descripción'}<textarea className="admin-input mt-1 w-full text-sm" onChange={(event) => setDescription(event.target.value)} required={kind === 'personal'} rows={2} value={description}/></label></div>
+    <div aria-label="Tipo de registro" className="mb-3 flex flex-wrap gap-2" role="group"><button aria-pressed={kind === 'medical'} className={`admin-secondary min-h-11 rounded-lg px-4 text-sm font-semibold ${kind === 'medical' ? 'border-clinic-600 bg-clinic-50 text-clinic-700' : ''}`} disabled={busy} onClick={() => selectKind('medical')} type="button">Cita médica</button><button aria-pressed={kind === 'personal'} className={`admin-secondary min-h-11 rounded-lg px-4 text-sm font-semibold ${kind === 'personal' ? 'border-clinic-600 bg-clinic-50 text-clinic-700' : ''}`} disabled={busy} onClick={() => selectKind('personal')} type="button">Actividad personal</button></div>
+    <p className="admin-body mb-4 text-sm">Fecha seleccionada: <strong>{formatDate(date)}</strong></p>
+    <div className="grid gap-3 sm:grid-cols-2">{kind === 'medical' ? <AgendaPatientSearch disabled={busy} onSelect={(next) => { setPatient(next); setValidation(null) }} selected={patient}/> : null}<label className="text-sm font-medium text-ink-950">Hora de inicio<input className="admin-input mt-1 w-full text-sm" onChange={(event) => setStart(event.target.value)} required type="time" value={start}/></label><label className="text-sm font-medium text-ink-950">Hora de fin<input className="admin-input mt-1 w-full text-sm" onChange={(event) => setEnd(event.target.value)} required type="time" value={end}/></label><label className="text-sm font-medium text-ink-950 sm:col-span-2">{kind === 'medical' ? 'Descripción (opcional)' : 'Descripción'}<textarea className="admin-input mt-1 w-full text-sm" onChange={(event) => setDescription(event.target.value)} required={kind === 'personal'} rows={2} value={description}/></label></div>
     {validation || error ? <p className="mt-4 text-sm text-red-700" role="alert">{validation ?? error}</p> : null}
-    <div className="mt-6 flex flex-wrap gap-3"><button className="admin-primary min-h-11 rounded-lg px-5 text-sm font-semibold disabled:opacity-60" disabled={busy} type="submit">{busy ? 'Guardando…' : kind === 'medical' ? 'Guardar cita' : 'Guardar actividad'}</button><button className="admin-secondary min-h-11 rounded-lg px-5 text-sm font-semibold disabled:opacity-60" disabled={busy} onClick={onCancel} type="button">Cancelar</button></div>
+    <div className="sticky bottom-0 z-30 mt-5 flex flex-wrap gap-3 border-t border-[#dbe6f2] bg-white pt-4"><button className="admin-primary min-h-11 rounded-lg px-5 text-sm font-semibold disabled:opacity-60" disabled={busy} type="submit">{busy ? 'Guardando…' : kind === 'medical' ? 'Guardar cita' : 'Guardar actividad'}</button><button className="admin-secondary min-h-11 rounded-lg px-5 text-sm font-semibold disabled:opacity-60" disabled={busy} onClick={onCancel} type="button">Cancelar</button></div>
   </form>
 }
 
 export function AgendaPage() {
+  const location = useLocation()
+  const navigate = useNavigate()
   const { user } = useAuth()
   const now = new Date()
   const [month, setMonth] = useClinicalViewState('agenda.month', () => ({ year: now.getFullYear(), value: now.getMonth() + 1 }))
@@ -65,11 +100,60 @@ export function AgendaPage() {
   const [appointmentBusy, setAppointmentBusy] = useState(false)
   const [appointmentError, setAppointmentError] = useState<string | null>(null)
   const [appointmentSuccess, setAppointmentSuccess] = useState<string | null>(null)
+  const [entryDialog, setEntryDialog] = useState<{ kind: 'edit' | 'delete'; entry: AgendaEntry } | null>(null)
+  const [entryBusy, setEntryBusy] = useState(false)
+  const [entryError, setEntryError] = useState<string | null>(null)
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [menuAbove, setMenuAbove] = useState(false)
+  const [pickerStep, setPickerStep] = useState<'years' | 'months' | 'days'>('days')
+  const [pickerYear, setPickerYear] = useState(month.year)
+  const [yearPage, setYearPage] = useState(Math.floor(month.year / 12) * 12)
+  const [panelHeight, setPanelHeight] = useState<number | null>(null)
+  const calendarCard = useRef<HTMLElement | null>(null)
+  const recordsCard = useRef<HTMLElement | null>(null)
+  const recordsList = useRef<HTMLDivElement | null>(null)
+  const recordsContent = useRef<HTMLDivElement | null>(null)
   const appointmentPending = useRef(false)
-  const appointmentTrigger = useRef<HTMLButtonElement>(null)
+  const appointmentTrigger = useRef<HTMLButtonElement | null>(null)
+  useEffect(() => {
+    if (location.state?.dashboardAction !== 'programar-cita' || user?.role !== 'doctora') return
+    const timer = window.setTimeout(() => {
+      const today = new Date()
+      setMonth({ year: today.getFullYear(), value: today.getMonth() + 1 })
+      setSelectedDate(dateKey(today.getFullYear(), today.getMonth() + 1, today.getDate()))
+      setDaySelected(true)
+      setAppointmentKind('medical')
+      setAppointmentError(null)
+      setAppointmentOpen(true)
+      navigate(location.pathname, { replace: true, state: null })
+    }, 0)
+    return () => window.clearTimeout(timer)
+  }, [location.pathname, location.state, navigate, setDaySelected, setMonth, setSelectedDate, user?.role])
   const query = useClinicalQuery(['agenda', month.value, month.year], (signal) => getAgendaMonth(month.value, month.year, signal))
   const state: AgendaState = query.data ? { kind: 'ready', entries: query.data }
     : query.isError ? { kind: 'error', message: 'No fue posible cargar la agenda. Inténtalo de nuevo.' } : { kind: 'loading' }
+  const recordsRevision = `${month.year}-${month.value}-${query.dataUpdatedAt}`
+  useEffect(() => {
+    if (state.kind !== 'ready' || window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return
+    const element = recordsContent.current
+    if (!element || typeof element.animate !== 'function') return
+    const animation = element.animate([{ opacity: .25 }, { opacity: 1 }], { duration: 250, easing: 'ease-out' })
+    return () => animation.cancel()
+  }, [recordsRevision, state.kind])
+  useLayoutEffect(() => {
+    const measure = () => {
+      if (!calendarCard.current || !recordsCard.current) return
+      const main = recordsCard.current.closest('main')
+      const bottomPadding = main ? parseFloat(window.getComputedStyle(main).paddingBottom) || 0 : 0
+      const top = recordsCard.current.getBoundingClientRect().top
+      setPanelHeight(Math.floor(Math.max(calendarCard.current.getBoundingClientRect().height, window.innerHeight - top - bottomPadding)))
+    }
+    measure()
+    const observer = new ResizeObserver(measure)
+    if (calendarCard.current) observer.observe(calendarCard.current)
+    window.addEventListener('resize', measure)
+    return () => { observer.disconnect(); window.removeEventListener('resize', measure) }
+  }, [pickerStep, appointmentSuccess, state.kind, query.isFetching, query.isError])
   const load = async (): Promise<boolean> => {
     await markClinicalQueriesStale(['agenda'])
     return (await query.refetch()).isSuccess
@@ -80,6 +164,7 @@ export function AgendaPage() {
     setSelectedDate(dateKey(year, value, 1))
     setDaySelected(false)
     setAppointmentSuccess(null)
+    setPickerStep('days')
   }
   const shiftMonth = (change: number) => {
     const next = new Date(month.year, month.value - 1 + change, 1)
@@ -89,7 +174,27 @@ export function AgendaPage() {
   const offset = (new Date(month.year, month.value - 1, 1).getDay() + 6) % 7
   const days = Array.from({ length: dayCount }, (_, index) => index + 1)
   const monthLabel = new Intl.DateTimeFormat('es-EC', { month: 'long', year: 'numeric' }).format(new Date(month.year, month.value - 1, 1))
-  const selectedEntries = state.kind === 'ready' ? state.entries.filter((entry) => entry.fecha?.slice(0, 10) === selectedDate) : []
+  const monthEntries = state.kind === 'ready'
+    ? state.entries.filter((entry) => entry.fecha?.slice(0, 7) === `${month.year}-${two(month.value)}`)
+      .sort((a, b) => `${a.fecha} ${a.hora_inicio ?? ''}`.localeCompare(`${b.fecha} ${b.hora_inicio ?? ''}`))
+    : []
+  const groupedEntries = monthEntries.reduce<{ date: string; entries: AgendaEntry[] }[]>((groups, entry) => {
+    const date = entry.fecha!.slice(0, 10)
+    const last = groups.at(-1)
+    if (last?.date === date) last.entries.push(entry)
+    else groups.push({ date, entries: [entry] })
+    return groups
+  }, [])
+  const monthChip = new Intl.DateTimeFormat('es-EC', { month: 'short', year: 'numeric' }).format(new Date(month.year, month.value - 1, 1))
+  const openDatePicker = () => { setPickerYear(month.year); setYearPage(Math.floor(month.year / 12) * 12); setPickerStep('years') }
+  const goToToday = () => {
+    const today = new Date()
+    setMonth({ year: today.getFullYear(), value: today.getMonth() + 1 })
+    setSelectedDate(dateKey(today.getFullYear(), today.getMonth() + 1, today.getDate()))
+    setDaySelected(true)
+    setPickerStep('days')
+    setAppointmentSuccess(null)
+  }
   const closeAppointment = () => { if (appointmentPending.current) return; setAppointmentOpen(false); setAppointmentError(null); appointmentTrigger.current?.focus() }
   const saveAppointment = async (choice: EntryChoice) => {
     if (appointmentPending.current) return
@@ -108,42 +213,78 @@ export function AgendaPage() {
     } catch (error) { setAppointmentError(errorMessage(error)) }
     finally { appointmentPending.current = false; setAppointmentBusy(false) }
   }
+  const saveEntryAction = async (values?: { fecha: string; hora_inicio: string; hora_fin: string; descripcion: string | null }) => {
+    if (!entryDialog || entryBusy) return
+    setEntryBusy(true); setEntryError(null)
+    try {
+      const message = entryDialog.kind === 'edit'
+        ? await updateAgendaEntry(entryDialog.entry.id, values!)
+        : await deleteAgendaEntry(entryDialog.entry.id)
+      if (entryDialog.entry.tipo === 'cita_medica') {
+        void markClinicalQueriesStale(['dashboard-report'])
+        void markClinicalQueriesStale(['reports'])
+      }
+      const refreshed = await load()
+      setAppointmentSuccess(refreshed ? message : `${message} No fue posible actualizar el calendario; vuelve a cargarlo.`)
+      setEntryDialog(null)
+    } catch (error) { setEntryError(errorMessage(error)) }
+    finally { setEntryBusy(false) }
+  }
 
   return <div className="admin-reveal max-w-[1390px] space-y-6">
-    <header><p className="admin-kicker">Organización clínica</p><h1 className="admin-page-title mt-2">Agenda</h1><p className="admin-body mt-2">Consulta los registros existentes del calendario.</p></header>
-    {state.kind === 'error' ? <ErrorState description={state.message} onRetry={() => { void load() }}/> : null}
+    <header><p className="admin-kicker">Organización clínica</p><h1 className="admin-page-title mt-2">Agenda</h1><p className="admin-body mt-2">Consulta las citas y actividades del mes{user?.role === 'doctora' ? ' y selecciona un día para agendar.' : '.'}</p></header>
     {state.kind === 'ready' && query.isFetching ? <p className="admin-muted text-sm" role="status">Actualizando agenda…</p> : null}
     {state.kind === 'ready' && query.isError ? <p className="text-sm text-red-700" role="alert">No fue posible actualizar la agenda. <button className="dashboard-retry" onClick={() => { void load() }} type="button">Reintentar</button></p> : null}
     {appointmentSuccess ? <p className="admin-success rounded-xl p-4 text-sm" role="status">{appointmentSuccess}</p> : null}
-    {appointmentOpen ? <AccessibleDialog busy={appointmentBusy} onClose={closeAppointment} title={appointmentKind === 'medical' ? 'Agendar cita médica' : 'Agendar actividad personal'} titleId="agenda-appointment-title"><AgendaForm busy={appointmentBusy} date={selectedDate} error={appointmentError} onCancel={closeAppointment} onKindChange={setAppointmentKind} onSave={(choice) => { void saveAppointment(choice) }}/></AccessibleDialog> : null}
-    <div className="flex justify-end"><div className="flex items-center gap-2"><button aria-label="Mes anterior" className="admin-secondary grid size-11 place-items-center rounded-lg" onClick={() => shiftMonth(-1)} type="button"><ChevronLeft aria-hidden="true" size={18}/></button><label className="text-xs font-semibold text-ink-950">Mes<input aria-label="Mes" className="admin-input ml-2 text-sm" onChange={(event) => { if (!event.target.value) return; const [year, value] = event.target.value.split('-').map(Number); selectMonth(year, value) }} type="month" value={`${month.year}-${two(month.value)}`}/></label><button aria-label="Mes siguiente" className="admin-secondary grid size-11 place-items-center rounded-lg" onClick={() => shiftMonth(1)} type="button"><ChevronRight aria-hidden="true" size={18}/></button></div></div>
+    {appointmentOpen ? <AccessibleDialog busy={appointmentBusy} onClose={closeAppointment} title={appointmentKind === 'medical' ? 'Agendar cita médica' : 'Agendar actividad personal'} titleId="agenda-appointment-title"><AgendaForm busy={appointmentBusy} date={selectedDate} error={appointmentError} onCancel={closeAppointment} onKindChange={(next) => { setAppointmentKind(next); setAppointmentError(null) }} onSave={(choice) => { void saveAppointment(choice) }}/></AccessibleDialog> : null}
+    {entryDialog ? <AccessibleDialog busy={entryBusy} onClose={() => { if (!entryBusy) { setEntryDialog(null); setEntryError(null) } }} title={entryDialog.kind === 'edit' ? 'Editar registro de agenda' : 'Eliminar registro'} titleId="agenda-entry-dialog-title"><AgendaEntryDialog busy={entryBusy} entry={entryDialog.entry} error={entryError} kind={entryDialog.kind} onCancel={() => { setEntryDialog(null); setEntryError(null) }} onSave={(values) => { void saveEntryAction(values) }}/></AccessibleDialog> : null}
     <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,400px)_minmax(0,1fr)]">
-      <section aria-label={`Calendario de ${monthLabel}`} className="admin-surface w-full max-w-[420px] min-w-0 rounded-[20px] p-3 sm:p-4 xl:max-w-none">
-        <h2 className="mb-3 flex items-center gap-2 text-base font-bold capitalize text-ink-950"><CalendarDays aria-hidden="true" size={18}/>{monthLabel}</h2>
-        <div className="grid grid-cols-7 gap-1 text-center text-xs font-semibold text-[#526a87]">
-          {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((label, index) => <span key={index}>{label}</span>)}
+      <section aria-label={`Calendario de ${monthLabel}`} className="admin-surface w-full max-w-[420px] min-w-0 rounded-[22px] p-4 shadow-[0_12px_30px_rgba(19,55,108,0.06)] sm:p-5 xl:sticky xl:top-6 xl:max-w-none" ref={calendarCard}>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div className="flex min-w-0 items-center gap-3"><button aria-label="Abrir selector de año, mes y día" className="shrink-0 rounded-lg text-clinic-600 hover:text-clinic-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" onClick={openDatePicker} type="button"><CalendarDays aria-hidden="true" size={25}/></button><div className="min-w-0"><h2 className="text-lg font-bold capitalize text-ink-950"><button aria-label="Seleccionar año y mes" className="inline-flex items-center gap-1 rounded-lg text-left hover:text-clinic-700 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" onClick={openDatePicker} type="button">{pickerStep === 'years' ? 'Seleccionar año' : pickerStep === 'months' ? `Meses de ${pickerYear}` : monthLabel}<ChevronDown aria-hidden="true" className="shrink-0 text-clinic-600" size={16}/></button></h2><p className="text-xs font-medium text-[#526a87]">Año → Mes → Días</p></div></div>
+          <div className="flex shrink-0 items-center gap-2"><button aria-label="Mes anterior" className="admin-secondary grid size-10 place-items-center rounded-xl" onClick={() => shiftMonth(-1)} type="button"><ChevronLeft aria-hidden="true" size={19}/></button><button aria-label="Mes siguiente" className="admin-secondary grid size-10 place-items-center rounded-xl" onClick={() => shiftMonth(1)} type="button"><ChevronRight aria-hidden="true" size={19}/></button></div>
+        </div>
+        {pickerStep === 'years' ? <div aria-label="Seleccionar año" className="agenda-view-enter space-y-4">
+          <div className="flex items-center justify-between text-sm font-semibold text-[#526a87]"><button aria-label="Años anteriores" className="admin-secondary grid size-9 place-items-center rounded-lg" onClick={() => setYearPage((year) => year - 12)} type="button"><ChevronLeft aria-hidden="true" size={17}/></button><span>{yearPage}–{yearPage + 11}</span><button aria-label="Años siguientes" className="admin-secondary grid size-9 place-items-center rounded-lg" onClick={() => setYearPage((year) => year + 12)} type="button"><ChevronRight aria-hidden="true" size={17}/></button></div>
+          <div className="grid grid-cols-4 gap-x-1 gap-y-3 py-1">{Array.from({ length: 12 }, (_, index) => yearPage + index).map((year) => <button aria-pressed={year === pickerYear} className="agenda-picker-choice grid min-h-16 place-items-center rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" key={year} onClick={() => { setPickerYear(year); setPickerStep('months') }} type="button"><span className={`grid size-16 place-items-center rounded-full text-sm font-semibold transition-colors ${year === pickerYear ? 'bg-clinic-600 text-white' : 'text-ink-950 hover:bg-clinic-50'}`}>{year}</span></button>)}</div>
+          <button className="text-sm font-semibold text-clinic-700 hover:underline" onClick={() => setPickerStep('days')} type="button">Volver al calendario</button>
+        </div> : pickerStep === 'months' ? <div aria-label="Seleccionar mes" className="agenda-view-enter space-y-4" key={`months-${pickerYear}`}>
+          <div className="grid grid-cols-4 gap-x-1 gap-y-3 py-1">{Array.from({ length: 12 }, (_, index) => index + 1).map((value) => {
+            const date = new Date(pickerYear, value - 1, 1)
+            const label = new Intl.DateTimeFormat('es-EC', { month: 'long' }).format(date)
+            const shortLabel = new Intl.DateTimeFormat('es-EC', { month: 'short' }).format(date).replace('.', '')
+            const active = pickerYear === month.year && value === month.value
+            return <button aria-label={label} aria-pressed={active} className="agenda-picker-choice grid min-h-16 place-items-center rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" key={value} onClick={() => selectMonth(pickerYear, value)} type="button"><span className={`grid size-16 place-items-center rounded-full text-sm font-semibold capitalize transition-colors ${active ? 'bg-clinic-600 text-white' : 'text-ink-950 hover:bg-clinic-50'}`}>{shortLabel}</span></button>
+          })}</div>
+          <button className="text-sm font-semibold text-clinic-700 hover:underline" onClick={() => setPickerStep('years')} type="button">Volver a años</button>
+        </div> : <div className="agenda-view-enter grid grid-cols-7 gap-1.5 text-center text-xs font-bold text-[#526a87]" key={`days-${month.year}-${month.value}`}>
+          {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((label, index) => <span className="pb-1" key={index}>{label}</span>)}
           {Array.from({ length: offset }, (_, index) => <span aria-hidden="true" key={`empty-${index}`}/>)}
           {days.map((day) => {
             const key = dateKey(month.year, month.value, day)
             const records = state.kind === 'ready' ? state.entries.filter((entry) => entry.fecha?.slice(0, 10) === key) : []
             const active = daySelected && selectedDate === key
             const today = key === dateKey(now.getFullYear(), now.getMonth() + 1, now.getDate())
-            return <button aria-label={`Seleccionar ${day} de ${monthLabel}${records.length ? `, ${records.length} ${records.length === 1 ? 'registro' : 'registros'}` : ''}`} aria-current={today ? 'date' : undefined} aria-pressed={active} className={`relative min-h-11 rounded-lg border p-1 text-center transition-colors sm:min-h-12 ${active ? 'border-clinic-600 bg-clinic-50 ring-1 ring-clinic-600' : today ? 'border-sky-400 bg-sky-50/70 hover:bg-sky-100' : 'border-[#dbe6f2] hover:bg-[#f3f8fe]'}`} key={key} onClick={() => { setSelectedDate(key); setDaySelected(true); setAppointmentSuccess(null) }} type="button"><span className="block text-sm font-bold text-ink-950">{day}</span>{records.length ? <span aria-hidden="true" className="absolute bottom-1 left-1/2 size-1 -translate-x-1/2 rounded-full bg-clinic-600"/> : null}</button>
+            return <button aria-label={`Seleccionar ${day} de ${monthLabel}${records.length ? `, ${records.length} ${records.length === 1 ? 'registro' : 'registros'}` : ''}`} aria-current={today ? 'date' : undefined} aria-pressed={active} className={`agenda-day relative min-h-[47px] rounded-xl border p-1 text-center transition-colors ${active ? 'border-clinic-600 bg-clinic-600 text-white shadow-[0_4px_12px_rgba(23,112,225,0.2)]' : today ? 'border-sky-400 bg-sky-50/70 hover:bg-sky-100' : 'border-[#dbe6f2] hover:bg-[#f3f8fe]'}`} key={key} onClick={(event) => { setSelectedDate(key); setDaySelected(true); setAppointmentSuccess(null); if (user?.role === 'doctora') { appointmentTrigger.current = event.currentTarget; setAppointmentError(null); setAppointmentKind('medical'); setAppointmentOpen(true) } }} type="button"><span className={`block text-sm font-bold ${active ? 'text-white' : 'text-ink-950'}`}>{day}</span>{records.length ? <span aria-hidden="true" className={`absolute bottom-1 left-1/2 size-1 -translate-x-1/2 rounded-full ${active ? 'bg-white' : 'bg-clinic-600'}`}/> : null}</button>
           })}
-        </div>
+        </div>}
+        {pickerStep === 'days' ? <div className="mt-2 flex items-center justify-between gap-2 border-t border-[#dbe6f2] pt-2 text-xs text-[#526a87]"><span className="flex items-center gap-2"><span aria-hidden="true" className="size-1.5 rounded-full bg-clinic-600"/>Día con registros</span><button className="rounded-lg px-2 py-1 font-semibold text-clinic-700 hover:bg-clinic-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" onClick={goToToday} type="button">Ir a hoy</button></div> : null}
       </section>
-      <section aria-labelledby="selected-day-title" className="admin-surface rounded-[20px] p-5 sm:p-6">
-        <p className="admin-kicker">Día seleccionado</p><h2 className="mt-2 text-xl font-bold text-ink-950" id="selected-day-title">{daySelected ? formatDate(selectedDate) : 'Selecciona un día'}</h2>
-        {!daySelected ? <p className="admin-muted mt-3 text-sm">Selecciona un día del calendario para consultar sus registros.</p> : state.kind === 'loading' ? <LoadingState/> : state.kind === 'error' ? null : <>
-          {user?.role === 'doctora' ? <button className="admin-primary mt-5 min-h-11 rounded-lg px-4 text-sm font-semibold" onClick={() => { setAppointmentError(null); setAppointmentKind('medical'); setAppointmentOpen(true) }} ref={appointmentTrigger} type="button">Agendar</button> : null}
-          <p className="admin-muted mt-3 text-sm">{selectedEntries.length} {selectedEntries.length === 1 ? 'registro' : 'registros'}</p>
-          {selectedEntries.length === 0 ? <p className="admin-muted mt-5 text-sm">Sin registros para este día.</p> : <ul className="mt-5 space-y-3">{selectedEntries.map((entry) => <li className="rounded-xl border border-[#dbe6f2] p-4" key={entry.id}>
-            <span className="admin-pill admin-pill-ready">{entry.tipo === 'personal' ? 'Actividad personal' : 'Cita médica'}</span>
-            <p className="mt-2 font-semibold text-ink-950">{entry.descripcion || (entry.tipo === 'cita_medica' ? entry.paciente?.nombres ?? 'Cita médica' : 'Actividad personal')}</p>
-            <p className="admin-muted mt-1 text-sm">{entry.hora_inicio?.slice(0, 5)}–{entry.hora_fin?.slice(0, 5)}{entry.paciente ? ` · ${entry.paciente.nombres}` : ''}</p>
-            {entry.estado ? <p className="admin-muted mt-1 text-xs">Estado: {entry.estado}</p> : null}
-          </li>)}</ul>}
-        </>}
+      <section aria-label="Registros agendados" className="admin-surface flex min-w-0 flex-col rounded-[22px] p-4 shadow-[0_12px_30px_rgba(19,55,108,0.06)] sm:p-5 xl:h-[var(--agenda-panel-height)] xl:overflow-hidden" ref={recordsCard} style={panelHeight === null ? undefined : { '--agenda-panel-height': `${panelHeight}px` } as CSSProperties}>
+        <div className="flex shrink-0 flex-wrap items-start justify-between gap-3"><div><h2 className="text-xl font-bold text-ink-950 sm:text-2xl">Registros del mes</h2>{state.kind === 'ready' ? <p className="admin-muted mt-1 text-sm">{monthEntries.length} {monthEntries.length === 1 ? 'registro agendado' : 'registros agendados'}</p> : null}</div><span className="rounded-full bg-clinic-50 px-3 py-1.5 text-sm font-semibold capitalize text-clinic-700">{monthChip}</span></div>
+        <div aria-label="Lista de registros del mes" className="min-h-0 xl:mt-4 xl:flex-1 xl:overflow-y-auto xl:overscroll-contain xl:pr-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" ref={recordsList} role="region" tabIndex={groupedEntries.length ? 0 : -1}>
+        {state.kind === 'loading' ? <LoadingState/> : state.kind === 'error' ? <div className="mt-5"><ErrorState description={state.message} onRetry={() => { void load() }}/></div> : <div ref={recordsContent}>
+          {groupedEntries.length === 0 ? <p className="admin-muted mt-6 text-sm">No hay registros agendados para este mes.</p> : <div className="mt-5 space-y-4">{groupedEntries.map((group) => <div key={group.date}>
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[#edf5ff] px-3 py-2"><h3 className="flex items-center gap-2 text-sm font-bold text-ink-950"><CalendarDays aria-hidden="true" className="text-clinic-600" size={17}/>{formatDate(group.date)}</h3><span className="admin-muted text-sm">{group.entries.length} {group.entries.length === 1 ? 'registro' : 'registros'}</span></div>
+            <ul className="divide-y divide-[#dbe6f2] px-1">{group.entries.map((entry) => <li className="flex flex-wrap items-center gap-3 py-3 sm:gap-4" key={entry.id}>
+              <time className="shrink-0 rounded-xl bg-[#e8f2ff] px-3 py-2 text-sm font-bold whitespace-nowrap text-ink-950">{entry.hora_inicio?.slice(0, 5) ?? 'Hora no disponible'}{entry.hora_fin ? ` – ${entry.hora_fin.slice(0, 5)}` : ''}</time>
+              <div className="min-w-[135px] flex-1 border-l border-[#c9daec] pl-3"><span className="admin-pill admin-pill-ready">{entry.tipo === 'personal' ? 'Actividad personal' : 'Cita médica'}</span><p className="mt-1 break-words text-sm font-semibold text-ink-950">{entry.descripcion || (entry.tipo === 'cita_medica' ? entry.paciente?.nombres ?? 'Cita médica' : 'Actividad personal')}</p>{entry.paciente ? <p className="admin-muted mt-0.5 break-words text-sm">{entry.paciente.nombres}</p> : null}</div>
+              {entry.estado ? <span aria-label={`Estado: ${entry.estado}`} className={`rounded-full px-3 py-1.5 text-xs font-semibold capitalize ${entry.estado === 'completada' ? 'bg-emerald-50 text-emerald-800' : entry.estado === 'cancelada' ? 'bg-red-50 text-red-700' : 'bg-sky-50 text-clinic-700'}`}>{entry.estado}</span> : null}
+              {user?.role === 'doctora' ? <div className="relative ml-auto"><button aria-expanded={openMenuId === entry.id} aria-label={`Más opciones para ${entry.descripcion || entry.paciente?.nombres || 'registro'}`} className="admin-secondary grid size-10 place-items-center rounded-xl" onClick={(event) => { if (openMenuId === entry.id) { setOpenMenuId(null); return } const bottom = Math.min(recordsList.current?.getBoundingClientRect().bottom ?? window.innerHeight, window.innerHeight); setMenuAbove(bottom - event.currentTarget.getBoundingClientRect().bottom < 110); setOpenMenuId(entry.id) }} type="button"><MoreVertical aria-hidden="true" size={18}/></button>{openMenuId === entry.id ? <div className={`absolute right-0 z-10 min-w-36 rounded-xl border border-[#dbe6f2] bg-white p-1 shadow-lg ${menuAbove ? 'bottom-full mb-1' : 'top-full mt-1'}`}><button className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-ink-950 hover:bg-sky-50" onClick={() => { setOpenMenuId(null); setEntryError(null); setEntryDialog({ kind: 'edit', entry }) }} type="button">Editar</button><button className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-red-700 hover:bg-red-50" onClick={() => { setOpenMenuId(null); setEntryError(null); setEntryDialog({ kind: 'delete', entry }) }} type="button">Eliminar</button></div> : null}</div> : null}
+            </li>)}</ul>
+          </div>)}</div>}
+        </div>}
+        </div>
       </section>
     </div>
   </div>

@@ -71,6 +71,6 @@ export function ForgotPasswordPage() {
     <h1 className="mt-6 text-3xl font-bold tracking-tight text-ink-950">Recupera tu acceso</h1>
     <p className="mt-3 leading-6 text-slate-600">Solicita un código con tu correo electrónico para restablecer la contraseña.</p>
     {completed ? <p className="admin-success mt-7 rounded-lg p-4 text-sm" role="status">{completed}</p> : email === null ? <EmailStep onComplete={(value, message) => { setEmail(value); setRequestMessage(message) }}/> : <CodeStep email={email} onChangeEmail={() => setEmail(null)} onComplete={setCompleted} requestMessage={requestMessage}/>}
-    <Link className="mt-7 inline-flex min-h-11 items-center gap-2 rounded-lg text-sm font-semibold text-clinic-700 hover:text-clinic-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" to="/login"><ArrowLeft aria-hidden="true" size={16}/>Volver al inicio de sesión</Link>
+    <Link className="mt-7 inline-flex min-h-11 items-center gap-2 rounded-lg text-sm font-semibold text-clinic-700 hover:text-clinic-600 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" to="/acceso"><ArrowLeft aria-hidden="true" size={16}/>Volver al inicio de sesión</Link>
   </div>
 }

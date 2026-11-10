@@ -2,8 +2,8 @@ import { z } from 'zod'
 import { apiClient } from '../../services/apiClient'
 
 const evidenceSchema = z.object({
-  id: z.string(), paciente_id: z.string(), tipo: z.enum(['caso_clinico', 'rx', 'documento']),
-  nombre_archivo: z.string(), ruta_archivo: z.string(), mime_type: z.string(),
+  id: z.string(), paciente_id: z.string(), tipo: z.enum(['caso_clinico', 'rx']),
+  nombre_archivo: z.string(), mime_type: z.string(),
   tamano: z.number(), descripcion: z.string().nullable(), fecha: z.string(),
   subido_por: z.object({ id: z.string(), name: z.string(), role: z.string() }).nullable().optional(),
 })
@@ -14,39 +14,43 @@ const responseSchema = z.object({
 
 export type Evidence = z.infer<typeof evidenceSchema>
 export type EvidenceType = Evidence['tipo']
-export type EvidenceUpload = { tipo: EvidenceType; archivo: File; descripcion?: string }
+export type EvidenceCreateValues = { paciente_id: string; tipo: EvidenceType; archivo: File; descripcion: string | null; fecha: string }
+export type EvidenceUpdateValues = { tipo: EvidenceType; descripcion: string | null; fecha: string }
 
-export const EVIDENCE_ACCEPT = '.jpg,.jpeg,.png,.webp,.pdf'
-export const EVIDENCE_MAX_BYTES = 20 * 1024 * 1024
+const mutationSchema = z.object({ message: z.string(), data: evidenceSchema })
+const messageSchema = z.object({ message: z.string() })
 
-function requireApiBaseUrl() {
+function configured() {
   if (!apiClient.defaults.baseURL) throw new Error('VITE_API_BASE_URL is not configured')
 }
 
-export async function getPatientEvidence(patientId: string): Promise<Evidence[]> {
-  requireApiBaseUrl()
-  const { data } = await apiClient.get<unknown>(`/evidencias-clinicas/paciente/${encodeURIComponent(patientId)}`)
+export async function getPatientEvidence(patientId: string, signal?: AbortSignal): Promise<Evidence[]> {
+  configured()
+  const path = `/evidencias-clinicas/paciente/${encodeURIComponent(patientId)}`
+  const { data } = signal ? await apiClient.get<unknown>(path, { signal }) : await apiClient.get<unknown>(path)
   return responseSchema.parse(data).data
 }
 
-export async function uploadPatientEvidence(patientId: string, values: EvidenceUpload): Promise<Evidence> {
-  requireApiBaseUrl()
-  const form = new FormData()
-  form.append('paciente_id', patientId)
-  form.append('tipo', values.tipo)
-  form.append('archivo', values.archivo)
-  if (values.descripcion?.trim()) form.append('descripcion', values.descripcion.trim())
-  const { data } = await apiClient.post<unknown>('/evidencias-clinicas', form)
-  return z.object({ data: evidenceSchema }).parse(data).data
+export async function createPatientEvidence(values: EvidenceCreateValues): Promise<string> {
+  configured()
+  const body = new FormData()
+  body.append('paciente_id', values.paciente_id)
+  body.append('tipo', values.tipo)
+  body.append('archivo', values.archivo)
+  body.append('fecha', values.fecha)
+  if (values.descripcion !== null) body.append('descripcion', values.descripcion)
+  const { data } = await apiClient.post<unknown>('/evidencias-clinicas', body)
+  return mutationSchema.parse(data).message
 }
 
-export async function getEvidenceFile(evidenceId: string): Promise<Blob> {
-  requireApiBaseUrl()
-  const { data } = await apiClient.get<Blob>(`/evidencias-clinicas/${encodeURIComponent(evidenceId)}/archivo`, { responseType: 'blob' })
-  return data
+export async function updatePatientEvidence(id: string, values: EvidenceUpdateValues): Promise<string> {
+  configured()
+  const { data } = await apiClient.put<unknown>(`/evidencias-clinicas/${encodeURIComponent(id)}`, values)
+  return mutationSchema.parse(data).message
 }
 
-export async function deleteEvidence(evidenceId: string): Promise<void> {
-  requireApiBaseUrl()
-  await apiClient.delete(`/evidencias-clinicas/${encodeURIComponent(evidenceId)}`)
+export async function deletePatientEvidence(id: string): Promise<string> {
+  configured()
+  const { data } = await apiClient.delete<unknown>(`/evidencias-clinicas/${encodeURIComponent(id)}`)
+  return messageSchema.parse(data).message
 }

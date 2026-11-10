@@ -1,7 +1,7 @@
 import { ArrowUpRight, Plus, Search, UsersRound } from 'lucide-react'
 import { isAxiosError } from 'axios'
 import { useEffect, useRef, useState } from 'react'
-import { Link } from 'react-router-dom'
+import { Link, useLocation, useNavigate } from 'react-router-dom'
 import { ZodError } from 'zod'
 import { EmptyState } from '../../components/states/EmptyState'
 import { ErrorState } from '../../components/states/ErrorState'
@@ -17,7 +17,9 @@ import { useClinicalViewState } from '../../services/clinicalViewState'
 type PatientsState = { kind: 'loading' } | { kind: 'ready'; page: PatientPage } | { kind: 'error'; message: string }
 
 export function PatientsPage() {
-  const [createOpen, setCreateOpen] = useState(false)
+  const location = useLocation()
+  const navigate = useNavigate()
+  const [createOpen, setCreateOpen] = useState(() => location.state?.dashboardAction === 'registrar-paciente')
   const [createError, setCreateError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [search, setSearch] = useClinicalViewState('patients.search', () => '')
@@ -25,6 +27,11 @@ export function PatientsPage() {
   const [debouncedSearch, setDebouncedSearch] = useState(search.trim())
   const submitPending = useRef(false)
   const createTrigger = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (location.state?.dashboardAction !== 'registrar-paciente') return
+    navigate(location.pathname, { replace: true, state: null })
+  }, [location.pathname, location.state, navigate])
 
   useEffect(() => {
     const timer = window.setTimeout(() => setDebouncedSearch(search.trim()), 250)

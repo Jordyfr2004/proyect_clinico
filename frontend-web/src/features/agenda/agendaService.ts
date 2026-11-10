@@ -18,6 +18,7 @@ export type PersonalEntryPayload = AgendaSlot & { descripcion: string }
 export type MedicalAppointmentPayload = AgendaSlot & { codigo_paciente: string; descripcion: string | null }
 export type AgendaUpdatePayload = Partial<AgendaSlot & { descripcion: string | null }>
 export type ClinicalDataPayload = { diagnostico: string; tratamiento: string; observacion: string | null }
+export type CompleteAppointmentPayload = { actividad: string; precio: number }
 
 function requireApiBaseUrl() {
   if (!apiClient.defaults.baseURL) throw new Error('VITE_API_BASE_URL is not configured')
@@ -41,7 +42,7 @@ async function post(path: string, values: PersonalEntryPayload | MedicalAppointm
   return messageSchema.parse(data).message
 }
 
-async function put(path: string, values?: AgendaSlot | AgendaUpdatePayload | ClinicalDataPayload): Promise<string> {
+async function put(path: string, values?: AgendaSlot | AgendaUpdatePayload | ClinicalDataPayload | CompleteAppointmentPayload): Promise<string> {
   requireApiBaseUrl()
   const { data } = values === undefined ? await apiClient.put<unknown>(path) : await apiClient.put<unknown>(path, values)
   return messageSchema.parse(data).message
@@ -52,7 +53,7 @@ export const createMedicalAppointment = (values: MedicalAppointmentPayload) => p
 export const programRequest = (id: string, values: AgendaSlot) => put(`/agenda/solicitud/${encodeURIComponent(id)}/programar`, values)
 export const updateAgendaEntry = (id: string, values: AgendaUpdatePayload) => put(`/agenda/${encodeURIComponent(id)}`, values)
 export const cancelAppointment = (id: string) => put(`/agenda/${encodeURIComponent(id)}/cancelar`)
-export const completeAppointment = (id: string) => put(`/agenda/${encodeURIComponent(id)}/completar`)
+export const completeAppointment = (id: string, values: CompleteAppointmentPayload) => put(`/agenda/${encodeURIComponent(id)}/completar`, values)
 export async function registerClinicalData(id: string, values: ClinicalDataPayload): Promise<string> {
   requireApiBaseUrl()
   const { data } = await apiClient.put<unknown>(`/agenda/${encodeURIComponent(id)}/datos-clinicos`, values)

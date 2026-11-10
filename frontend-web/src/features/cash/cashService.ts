@@ -2,14 +2,21 @@ import { z } from 'zod'
 import { apiClient } from '../../services/apiClient'
 
 const expenseSchema = z.object({ id: z.string(), fecha: z.string(), concepto: z.string(), monto: z.union([z.string(), z.number()]) })
-const summarySchema = z.object({ periodo: z.enum(['dia', 'semana', 'mes', 'anio']), ingresos: z.string(), egresos: z.string(), saldo: z.string() })
+const movementSchema = z.object({
+  id: z.string(), tipo: z.enum(['ingreso', 'egreso']), fecha: z.string(), concepto: z.string(),
+  ingreso: z.union([z.string(), z.number()]), egreso: z.union([z.string(), z.number()]),
+  codigo_paciente: z.string().nullable().optional(), nombres: z.string().nullable().optional(),
+})
+const summarySchema = z.object({ periodo: z.enum(['dia', 'semana', 'mes', 'anio']), ingresos: z.string(), egresos: z.string(), saldo: z.string(), movimientos: z.array(movementSchema) })
 const messageSchema = z.object({ message: z.string() })
 
 export type Expense = z.infer<typeof expenseSchema>
 export type CashSummary = z.infer<typeof summarySchema>
+export type CashMovement = z.infer<typeof movementSchema>
 export type CashPeriod = { periodo: 'dia' | 'semana'; fecha: string } | { periodo: 'mes'; mes: number; anio: number } | { periodo: 'anio'; anio: number }
 export type ExpenseFilters = { fecha?: string; semana?: string; mes?: number; anio?: number }
 export type ExpensePayload = { fecha: string; concepto: string; monto: number }
+export type ExpenseUpdate = Pick<ExpensePayload, 'concepto' | 'monto'>
 
 function requireApiBaseUrl() {
   if (!apiClient.defaults.baseURL) throw new Error('VITE_API_BASE_URL is not configured')
@@ -33,7 +40,7 @@ export async function createExpense(values: ExpensePayload): Promise<string> {
   return messageSchema.parse(data).message
 }
 
-export async function updateExpense(id: string, values: ExpensePayload): Promise<string> {
+export async function updateExpense(id: string, values: ExpenseUpdate): Promise<string> {
   requireApiBaseUrl()
   const { data } = await apiClient.put<unknown>(`/egresos/${encodeURIComponent(id)}`, values)
   return messageSchema.parse(data).message

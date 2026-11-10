@@ -33,17 +33,20 @@ describe('confirmed backend paths', () => {
 
   it('uses backend Caja totals and exact egreso endpoints', async () => {
     apiClient.defaults.baseURL = 'http://api.test/api'
-    const get = vi.spyOn(apiClient, 'get').mockResolvedValueOnce({ data: { periodo: 'dia', ingresos: '10.00', egresos: '3.00', saldo: '7.00' } }).mockResolvedValueOnce({ data: { data: [] } })
+    const movement = { id: 'activity-1', tipo: 'ingreso', fecha: '2026-10-04', concepto: 'Limpieza', ingreso: '10.00', egreso: '0.00', codigo_paciente: '008', nombres: 'Paciente' }
+    const get = vi.spyOn(apiClient, 'get').mockResolvedValueOnce({ data: { periodo: 'dia', ingresos: '10.00', egresos: '3.00', saldo: '7.00', movimientos: [movement] } }).mockResolvedValueOnce({ data: { data: [] } })
     const post = vi.spyOn(apiClient, 'post').mockResolvedValue({ data: { message: 'Confirmado' } })
     const put = vi.spyOn(apiClient, 'put').mockResolvedValue({ data: { message: 'Confirmado' } })
     const remove = vi.spyOn(apiClient, 'delete').mockResolvedValue({ data: { message: 'Confirmado' } })
-    expect((await getCashSummary({ periodo: 'dia', fecha: '2026-10-04' })).saldo).toBe('7.00')
+    const cash = await getCashSummary({ periodo: 'dia', fecha: '2026-10-04' })
+    expect(cash.saldo).toBe('7.00')
+    expect(cash.movimientos).toEqual([movement])
     await getExpenses({ fecha: '2026-10-04' })
     expect(get.mock.calls).toEqual([['/reportes/caja', { params: { periodo: 'dia', fecha: '2026-10-04' } }], ['/egresos', { params: { fecha: '2026-10-04' } }]])
     const payload = { fecha: '2026-10-04', concepto: 'Confirmado', monto: 3 }
-    await createExpense(payload); await updateExpense('expense-1', payload); await deleteExpense('expense-1')
+    await createExpense(payload); await updateExpense('expense-1', { concepto: payload.concepto, monto: payload.monto }); await deleteExpense('expense-1')
     expect(post).toHaveBeenCalledWith('/egresos', payload)
-    expect(put).toHaveBeenCalledWith('/egresos/expense-1', payload)
+    expect(put).toHaveBeenCalledWith('/egresos/expense-1', { concepto: payload.concepto, monto: payload.monto })
     expect(remove).toHaveBeenCalledWith('/egresos/expense-1')
   })
 
