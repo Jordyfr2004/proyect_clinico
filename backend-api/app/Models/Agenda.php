@@ -16,6 +16,7 @@ class Agenda extends Model
 
     protected $fillable = [
         'paciente_id',
+        'nombre_reserva',
         'fecha',
         'hora_inicio',
         'hora_fin',

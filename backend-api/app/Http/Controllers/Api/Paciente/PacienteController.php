@@ -20,10 +20,15 @@ class PacienteController extends Controller
     {
         $datos = $request->validate([
             'buscar' => ['nullable', 'string', 'max:255'],
+            'agenda' => ['nullable', 'boolean'],
         ]);
-        $pacientes = $this->pacienteService->listar($datos['buscar'] ?? '');
 
-        return response()->json($pacientes);
+        $resultado = $this->pacienteService->listar(
+            $datos['buscar'] ?? '',
+            (bool) ($datos['agenda'] ?? false)
+        );
+
+        return response()->json($resultado);
     }
 
     public function show(string $id): JsonResponse

@@ -95,9 +95,18 @@ class AgendaController extends Controller
     ): JsonResponse {
         $datos = $request->validate([
             'codigo_paciente' => [
-                'required',
+                'nullable',
                 'string',
                 'exists:pacientes,codigo_paciente',
+                'required_without:nombre_reserva',
+                'prohibits:nombre_reserva',
+            ],
+            'nombre_reserva' => [
+                'nullable',
+                'string',
+                'max:255',
+                'required_without:codigo_paciente',
+                'prohibits:codigo_paciente',
             ],
             'fecha' => [
                 'required',
@@ -323,6 +332,12 @@ class AgendaController extends Controller
         if ($resultado['estado'] === 'no_es_cita') {
             return response()->json([
                 'message' => 'El registro no corresponde a una cita médica.',
+            ], 409);
+        }
+
+        if ($resultado['estado'] === 'sin_paciente_registrado') {
+            return response()->json([
+                'message' => 'No se pueden registrar datos clínicos en una reserva sin paciente registrado.',
             ], 409);
         }
 
