@@ -6,28 +6,153 @@ use App\Models\Paciente;
 use App\Models\User;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
+use App\Models\Agenda;
 
 class PacienteService
 {
-    public function listar(string $buscar = ''): LengthAwarePaginator
+    public function listar(
+        string $buscar = '',
+        bool $agenda = false
+    )
     {
         $buscar = trim($buscar);
-        $patron = '%'.str_replace(['!', '%', '_'], ['!!', '!%', '!_'], mb_strtolower($buscar)).'%';
 
-        return Paciente::query()
-            ->with('usuario:id,paciente_id,foto_perfil_ruta')
-            ->when($buscar !== '', function ($query) use ($patron) {
-                $query->where(function ($query) use ($patron) {
-                    $query->whereRaw("LOWER(nombres) LIKE ? ESCAPE '!'", [$patron])
-                        ->orWhereRaw("LOWER(cedula) LIKE ? ESCAPE '!'", [$patron])
-                        ->orWhereRaw("LOWER(codigo_paciente) LIKE ? ESCAPE '!'", [$patron]);
-                });
-            })
-            ->orderBy('created_at', 'desc')
-            ->orderBy('id', 'desc')
-            ->paginate(20)
-            ->through(fn (Paciente $paciente) => $paciente->append('foto_perfil_url'))
-            ->appends($buscar !== '' ? ['buscar' => $buscar] : []);
+        $patron = '%'
+            . str_replace(
+                ['!', '%', '_'],
+                ['!!', '!%', '!_'],
+                mb_strtolower($buscar)
+            )
+            . '%';
+
+        if (!$agenda) {
+            return Paciente::query()
+                ->with('usuario:id,paciente_id,foto_perfil_ruta')
+                ->when(
+                    $buscar !== '',
+                    function ($query) use ($patron) {
+                        $query->where(
+                            function ($query) use ($patron) {
+                                $query
+                                    ->whereRaw(
+                                        "LOWER(nombres) LIKE ? ESCAPE '!'",
+                                        [$patron]
+                                    )
+                                    ->orWhereRaw(
+                                        "LOWER(cedula) LIKE ? ESCAPE '!'",
+                                        [$patron]
+                                    )
+                                    ->orWhereRaw(
+                                        "LOWER(codigo_paciente) LIKE ? ESCAPE '!'",
+                                        [$patron]
+                                    );
+                            }
+                        );
+                    }
+                )
+                ->orderBy('created_at', 'desc')
+                ->orderBy('id', 'desc')
+                ->paginate(20)
+                ->through(
+                    fn (Paciente $paciente) =>
+                        $paciente->append('foto_perfil_url')
+                )
+                ->appends(
+                    $buscar !== ''
+                        ? ['buscar' => $buscar]
+                        : []
+                );
+        }
+
+        $pacientes = Paciente::query()
+            ->when(
+                $buscar !== '',
+                function ($query) use ($patron) {
+                    $query->where(
+                        function ($query) use ($patron) {
+                            $query
+                                ->whereRaw(
+                                    "LOWER(nombres) LIKE ? ESCAPE '!'",
+                                    [$patron]
+                                )
+                                ->orWhereRaw(
+                                    "LOWER(cedula) LIKE ? ESCAPE '!'",
+                                    [$patron]
+                                )
+                                ->orWhereRaw(
+                                    "LOWER(codigo_paciente) LIKE ? ESCAPE '!'",
+                                    [$patron]
+                                );
+                        }
+                    );
+                }
+            )
+            ->orderBy('nombres')
+            ->limit(20)
+            ->get([
+                'id',
+                'codigo_paciente',
+                'nombres',
+                'cedula',
+            ])
+            ->map(function (Paciente $paciente) {
+                return [
+                    'id' => $paciente->id,
+                    'codigo_paciente' => $paciente->codigo_paciente,
+                    'cedula' => $paciente->cedula,
+                    'nombres' => $paciente->nombres,
+                    'registrado' => true,
+                ];
+            });
+
+        $reservas = Agenda::query()
+            ->whereNotNull('nombre_reserva')
+            ->where('nombre_reserva', '!=', '')
+            ->when(
+                $buscar !== '',
+                function ($query) use ($patron) {
+                    $query->whereRaw(
+                        "LOWER(nombre_reserva) LIKE ? ESCAPE '!'",
+                        [$patron]
+                    );
+                }
+            )
+            ->select('nombre_reserva')
+            ->distinct()
+            ->orderBy('nombre_reserva')
+            ->limit(20)
+            ->get()
+            ->map(function (Agenda $agenda) {
+                return [
+                    'id' => null,
+                    'codigo_paciente' => null,
+                    'cedula' => null,
+                    'nombre_reserva' => $agenda->nombre_reserva,
+                    'registrado' => false,
+                ];
+            });
+
+        $nombresPacientes = $pacientes
+            ->pluck('nombres')
+            ->map(
+                fn ($nombre) =>
+                    mb_strtolower(trim($nombre))
+            );
+
+        $reservas = $reservas
+            ->reject(function ($reserva) use ($nombresPacientes) {
+                return $nombresPacientes->contains(
+                    mb_strtolower(
+                        trim($reserva['nombre_reserva'])
+                    )
+                );
+            });
+
+        return [
+            'data' => $pacientes
+                ->concat($reservas)
+                ->values(),
+        ];
     }
 
     public function obtenerPorId(string $id): Paciente

@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Actividad;
+use App\Models\Agenda;
 use App\Models\Paciente;
 use App\Models\User;
 use Carbon\Carbon;
@@ -14,7 +15,10 @@ class ActividadService
     public function listar(array $filtros)
     {
         $query = Actividad::query()
-            ->with('paciente');
+            ->with([
+                'paciente',
+                'agenda',
+            ]);
 
         if (!empty($filtros['fecha'])) {
             $query->whereDate(
@@ -78,8 +82,10 @@ class ActividadService
     public function obtenerPorId(
         string $id
     ): ?Actividad {
-        return Actividad::with('paciente')
-            ->find($id);
+        return Actividad::with([
+            'paciente',
+            'agenda',
+        ])->find($id);
     }
 
     public function crear(
@@ -110,7 +116,55 @@ class ActividadService
                 $detalle
             );
 
-            return $actividad->load('paciente');
+            return $actividad->load([
+                'paciente',
+                'agenda',
+            ]);
+        });
+    }
+
+    public function crearDesdeCita(
+        Agenda $cita,
+        array $datos,
+        User $user
+    ): Actividad {
+        return DB::transaction(function () use (
+            $cita,
+            $datos,
+            $user
+        ) {
+            $actividad = Actividad::create([
+                'agenda_id' => $cita->id,
+                'paciente_id' => $cita->paciente_id,
+                'fecha' => $cita->fecha->toDateString(),
+                'actividad' => $datos['actividad']
+                    ?? 'Consulta médica',
+                'precio' => $datos['precio'],
+            ]);
+
+            if ($cita->paciente_id) {
+                $cita->loadMissing('paciente');
+
+                $detalle = $user->role === 'doctora'
+                    ? "Registraste una actividad para el paciente {$cita->paciente->codigo_paciente}."
+                    : "Asistente registró una actividad para el paciente {$cita->paciente->codigo_paciente}.";
+            } else {
+                $detalle = $user->role === 'doctora'
+                    ? "Registraste una actividad para la reserva {$cita->nombre_reserva}."
+                    : "Asistente registró una actividad para la reserva {$cita->nombre_reserva}.";
+            }
+
+            AuditoriaService::registrarAccion(
+                $user,
+                'actividades',
+                'crear',
+                $detalle
+            );
+
+            return $actividad->load([
+                'paciente',
+                'agenda',
+            ]);
         });
     }
 
@@ -120,7 +174,10 @@ class ActividadService
         User $user
     ): ?Actividad {
         return DB::transaction(function () use ($id, $datos, $user) {
-            $actividad = Actividad::find($id);
+            $actividad = Actividad::with([
+                'paciente',
+                'agenda',
+            ])->find($id);
 
             if (!$actividad) {
                 return null;
@@ -128,14 +185,33 @@ class ActividadService
 
             if ($actividad->agenda_id) {
                 $errores = [];
-                if (isset($datos['codigo_paciente']) && $datos['codigo_paciente'] !== $actividad->paciente->codigo_paciente) {
-                    $errores['codigo_paciente'] = 'El paciente corresponde a la cita vinculada.';
+
+                if (isset($datos['codigo_paciente'])) {
+                    if (!$actividad->paciente) {
+                        $errores['codigo_paciente'] =
+                            'La actividad pertenece a una reserva sin paciente registrado.';
+                    } elseif (
+                        $datos['codigo_paciente']
+                        !== $actividad->paciente->codigo_paciente
+                    ) {
+                        $errores['codigo_paciente'] =
+                            'El paciente corresponde a la cita vinculada.';
+                    }
                 }
-                if (isset($datos['fecha']) && Carbon::parse($datos['fecha'])->toDateString() !== $actividad->fecha->toDateString()) {
-                    $errores['fecha'] = 'Corrige la fecha desde la cita vinculada.';
+
+                if (
+                    isset($datos['fecha']) &&
+                    Carbon::parse($datos['fecha'])->toDateString()
+                    !== $actividad->fecha->toDateString()
+                ) {
+                    $errores['fecha'] =
+                        'Corrige la fecha desde la cita vinculada.';
                 }
+
                 if ($errores) {
-                    throw ValidationException::withMessages($errores);
+                    throw ValidationException::withMessages(
+                        $errores
+                    );
                 }
             }
 
@@ -162,11 +238,22 @@ class ActividadService
 
             $actividad->save();
 
-            $actividad->load('paciente');
+            $actividad->load([
+                'paciente',
+                'agenda',
+            ]);
+
+            if ($actividad->paciente) {
+                $referencia =
+                    "paciente {$actividad->paciente->codigo_paciente}";
+            } else {
+                $referencia =
+                    "reserva {$actividad->agenda?->nombre_reserva}";
+            }
 
             $detalle = $user->role === 'doctora'
-                ? "Actualizaste una actividad del paciente {$actividad->paciente->codigo_paciente}."
-                : "Asistente actualizó una actividad del paciente {$actividad->paciente->codigo_paciente}.";
+                ? "Actualizaste una actividad de la {$referencia}."
+                : "Asistente actualizó una actividad de la {$referencia}.";
 
             AuditoriaService::registrarAccion(
                 $user,
@@ -184,21 +271,28 @@ class ActividadService
         User $user
     ): bool {
         return DB::transaction(function () use ($id, $user) {
-            $actividad = Actividad::with('paciente')
-                ->find($id);
+            $actividad = Actividad::with([
+                'paciente',
+                'agenda',
+            ])->find($id);
 
             if (!$actividad) {
                 return false;
             }
 
-            $codigoPaciente =
-                $actividad->paciente->codigo_paciente;
+            if ($actividad->paciente) {
+                $referencia =
+                    "paciente {$actividad->paciente->codigo_paciente}";
+            } else {
+                $referencia =
+                    "reserva {$actividad->agenda?->nombre_reserva}";
+            }
 
             $actividad->delete();
 
             $detalle = $user->role === 'doctora'
-                ? "Eliminaste una actividad del paciente {$codigoPaciente}."
-                : "Asistente eliminó una actividad del paciente {$codigoPaciente}.";
+                ? "Eliminaste una actividad de la {$referencia}."
+                : "Asistente eliminó una actividad de la {$referencia}.";
 
             AuditoriaService::registrarAccion(
                 $user,
