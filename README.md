@@ -65,3 +65,5 @@ cd frontend     && npm ci && npm test
 ```
 
 Para desarrollar la web o el móvil contra el sistema compartido, usa `http://100.102.99.114/api` como URL del API.
+
+Estudiante Vera Mero Jereny Jhonnayker
