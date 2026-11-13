@@ -706,6 +706,7 @@ const styles = StyleSheet.create({
   badgeInfo: { backgroundColor: palette.primarySoft },
   badgeDanger: { backgroundColor: palette.dangerSoft },
   badgeSuccess: { backgroundColor: palette.successSoft },
+  badgeDanger: { backgroundColor: palette.dangerSoft },
   badgeText: { textTransform: "capitalize", ...typography.caption },
   chip: {
     minHeight: control.touch,

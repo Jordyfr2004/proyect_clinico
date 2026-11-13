@@ -14,8 +14,12 @@ import {
 import { palette, space, type as typography } from "@/constants/theme";
 import { ApiError } from "@/api/errors";
 import {
+  canChangeAppointment,
+  cancelAppointment,
   getAppointments,
   requestAppointment,
+  rescheduleAppointment,
+  type Appointment,
 } from "@/features/patient/appointments";
 import { useRemote } from "@/hooks/use-remote";
 import { formatScheduledAppointment } from "@/features/patient/appointment-display";
@@ -233,4 +237,5 @@ const styles = StyleSheet.create({
   meta: { flexDirection: "row", alignItems: "center", gap: space.xs },
   metaText: { color: palette.textMuted, ...typography.body },
   description: { color: palette.textMuted, ...typography.body },
+  actions: { gap: space.sm },
 });

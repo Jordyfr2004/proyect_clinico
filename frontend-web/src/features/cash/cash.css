@@ -1,0 +1,45 @@
+.cash-page { width: 100%; }
+.cash-period-switch button { min-height: 40px; min-width: 65px; border-radius: 9px; padding: 0 14px; color: #365478; font-size: .875rem; font-weight: 650; transition: background .18s, color .18s, box-shadow .18s; }
+.cash-period-switch button:hover:not(.cash-period-active) { background: #e2effe; color: #0c5fc0; }
+.cash-period-switch .cash-period-active { background: linear-gradient(125deg, #2185f4, #0959cb); color: white; box-shadow: 0 4px 12px rgb(25 105 219 / 20%); }
+.cash-period-switch button:focus-visible { outline: 2px solid #0b62ce; outline-offset: 2px; }
+.cash-period-field { width: min(100%, 220px); }
+.cash-period-field .admin-input { min-height: 44px; }
+.cash-kpi { border-width: 6px; }
+.cash-kpi-income { background: linear-gradient(110deg, #fbfffd, #e9f8f1); border-color: #fff; }
+.cash-kpi-expense { background: linear-gradient(110deg, #fffdfd, #fcecf0); border-color: #fff; }
+.cash-kpi-balance { background: linear-gradient(110deg, #fdfefe, #e8f2ff); border-color: #fff; }
+.cash-kpi-income .cash-kpi-icon { background: #dbf5e9; color: #087a3d; }
+.cash-kpi-expense .cash-kpi-icon { background: #fce0e5; color: #af182b; }
+.cash-kpi-balance .cash-kpi-icon { background: #dbeaff; color: #0959cb; }
+.cash-kpi-income .cash-kpi-value { color: #087a3d; }
+.cash-kpi-expense .cash-kpi-value { color: #a81727; }
+.cash-kpi-balance .cash-kpi-value { color: #0b4fc2; }
+.cash-movements-scroll { max-height: clamp(240px, calc(100dvh - 590px), 550px); overflow-y: auto; scrollbar-gutter: stable; }
+.cash-table-head { display: none; }
+.cash-movement-row { background: #fff; }
+.cash-movement-row:nth-child(even) { background: #fbfdff; }
+.cash-movement-row:last-child { border-bottom: 0; }
+.cash-type-ingreso { background: #e5f7ed; color: #087a3d; }
+.cash-type-egreso { background: #fcebef; color: #aa1a2d; }
+.cash-movement-amount { white-space: nowrap; }
+.cash-date-note { background: #f5f9ff; border: 1px solid #dbe6f2; }
+.cash-currency-symbol { pointer-events: none; position: absolute; left: 14px; top: 50%; transform: translateY(-50%); color: #526a87; font-weight: 700; }
+@media (max-width: 1099px) {
+  .cash-period-field { width: 100%; }
+  .cash-movement-list { display: grid; gap: 8px; }
+  .cash-movement-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 7px 12px; border: 1px solid #dbe6f2; border-radius: 12px; padding: 12px; }
+  .cash-movement-date { grid-column: 1; grid-row: 1; }
+  .cash-movement-concept { grid-column: 1; grid-row: 2; }
+  .cash-movement-patient { grid-column: 1; grid-row: 3; }
+  .cash-type { grid-column: 1; grid-row: 4; }
+  .cash-movement-amount { grid-column: 2; grid-row: 2; text-align: right; }
+  .cash-movement-action { grid-column: 2; grid-row: 1; }
+}
+@media (max-width: 767px) { .cash-movements-scroll { max-height: none; overflow: visible; } }
+@media (min-width: 1100px) {
+  .cash-table-head, .cash-movement-row { display: grid; grid-template-columns: minmax(130px, 1.1fr) minmax(150px, 1.6fr) minmax(90px, .7fr) minmax(120px, 1.2fr) minmax(95px, .8fr) 62px; align-items: center; column-gap: 12px; }
+  .cash-table-head { position: sticky; top: 0; z-index: 1; min-height: 38px; border-radius: 10px 10px 0 0; background: #f0f5fb; padding: 0 14px; color: #34506f; font-size: .72rem; font-weight: 750; }
+  .cash-movement-row { min-height: 58px; border-bottom: 1px solid #e3ecf6; padding: 9px 14px; }
+}
+@media (prefers-reduced-motion: reduce) { .cash-period-switch button { transition: none; } }

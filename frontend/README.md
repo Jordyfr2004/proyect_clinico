@@ -1,3 +1,24 @@
+# App móvil del paciente (Expo)
+
+El paciente la usa para:
+- iniciar sesión y registrarse;
+- consultar, solicitar, cancelar y reprogramar sus citas;
+- ver su historia clínica y sus recetas;
+- ver y subir radiografías;
+- consultar los servicios del consultorio.
+
+Usa la misma API y la misma base de datos que la web, **siempre a través del balanceador**.
+
+## Conectarla al sistema
+
+1. Instala la app **Tailscale** en el celular e inicia sesión en la misma red del equipo.
+2. En `frontend/.env`: `EXPO_PUBLIC_API_URL=http://100.102.99.114/api` (en el aula: `http://192.168.1.10/api`).
+3. `npm ci` y `npx expo start`, y abre el proyecto con Expo Go. Si el celular no está en la misma red Wi-Fi que el computador, usa `npx expo start --tunnel`.
+
+Pruebas: `npm test` · Tipos: `npx tsc --noEmit` · Lint: `npx expo lint`
+
+---
+
 # Welcome to your Expo app 👋
 
 This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).

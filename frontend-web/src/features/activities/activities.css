@@ -1,0 +1,52 @@
+.activity-filter-enter {
+  animation: activity-filter-enter 220ms ease-out both;
+}
+
+.admin-dialog-layer:has([data-activities-dialog]) .admin-dialog-panel {
+  animation: activity-dialog-enter 280ms cubic-bezier(.2, .8, .2, 1) both;
+}
+
+.admin-dialog-layer:has([data-activities-dialog]) .admin-dialog-backdrop {
+  animation: activity-backdrop-enter 280ms ease-out both;
+}
+
+.admin-dialog-layer:has([data-activities-dialog][data-closing="true"]) .admin-dialog-panel {
+  animation: activity-dialog-exit 270ms ease-in both;
+}
+
+.admin-dialog-layer:has([data-activities-dialog][data-closing="true"]) .admin-dialog-backdrop {
+  animation: activity-backdrop-exit 270ms ease-in both;
+}
+
+@keyframes activity-filter-enter {
+  from { opacity: .7; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes activity-dialog-enter {
+  from { opacity: 0; transform: translateY(8px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes activity-dialog-exit {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(6px) scale(.99); }
+}
+
+@keyframes activity-backdrop-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes activity-backdrop-exit {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .activity-filter-enter,
+  .admin-dialog-layer:has([data-activities-dialog]) .admin-dialog-panel,
+  .admin-dialog-layer:has([data-activities-dialog]) .admin-dialog-backdrop {
+    animation: none !important;
+  }
+}

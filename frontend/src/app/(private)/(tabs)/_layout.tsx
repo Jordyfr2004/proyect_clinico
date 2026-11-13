@@ -69,6 +69,8 @@ export default function TabsLayout() {
         options={{ title: "Perfil", tabBarIcon: ProfileIcon }}
       />
       <Tabs.Screen name="history" options={{ href: null }} />
+      <Tabs.Screen name="prescriptions" options={{ href: null }} />
+      <Tabs.Screen name="documents" options={{ href: null }} />
     </Tabs>
   );
 }

@@ -42,6 +42,32 @@ export const parseAppointments = (value: unknown): Appointment[] =>
   );
 export const getAppointments = async () =>
   parseAppointments(await apiRequest("/agenda/mis-citas"));
+const messageOf = (value: unknown): string =>
+  asString(asRecord(value, "La respuesta del servidor"), "message");
+export const cancelAppointment = async (id: string): Promise<string> =>
+  messageOf(
+    await apiRequest(`/agenda/mis-citas/${encodeURIComponent(id)}/cancelar`, {
+      method: "PUT",
+    }),
+  );
+export const rescheduleAppointment = async (
+  id: string,
+  reason?: string,
+): Promise<string> =>
+  messageOf(
+    await apiRequest(
+      `/agenda/mis-citas/${encodeURIComponent(id)}/reprogramar`,
+      { method: "PUT", body: reason?.trim() ? { motivo: reason.trim() } : {} },
+    ),
+  );
+/** La cita se puede cancelar o reprogramar mientras no haya comenzado. */
+export const canChangeAppointment = (item: Appointment, now = new Date()) => {
+  if (item.status !== "pendiente" && item.status !== "programada")
+    return false;
+  if (!item.date || !item.startTime) return item.status === "pendiente";
+  const start = new Date(`${item.date.slice(0, 10)}T${item.startTime.slice(0, 5)}:00`);
+  return Number.isNaN(start.getTime()) || start > now;
+};
 export const requestAppointment = async (): Promise<string> => {
   const r = asRecord(
     await apiRequest("/agenda/solicitar-cita", { method: "POST" }),

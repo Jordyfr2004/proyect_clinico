@@ -11,9 +11,9 @@ export type PatientProfile = {
   code: string;
   names: string;
   nationalId: string;
-  phone: string;
-  address: string;
-  birthdate: string;
+  phone: string | null;
+  address: string | null;
+  birthdate: string | null;
 };
 export const parseProfile = (value: unknown): PatientProfile =>
   parseEnvelope(value, (data) => {
@@ -23,9 +23,9 @@ export const parseProfile = (value: unknown): PatientProfile =>
       code: asString(r, "codigo_paciente"),
       names: asString(r, "nombres"),
       nationalId: asString(r, "cedula"),
-      phone: asString(r, "telefono"),
-      address: asString(r, "direccion"),
-      birthdate: asString(r, "fecha_nacimiento"),
+      phone: asOptionalString(r, "telefono"),
+      address: asOptionalString(r, "direccion"),
+      birthdate: asOptionalString(r, "fecha_nacimiento"),
     };
   });
 export const getProfile = async () =>
