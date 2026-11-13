@@ -161,12 +161,22 @@ describe("patient screens", () => {
     expect(screen.queryByLabelText("Imagen de Limpieza")).toBeNull();
 
     fireEvent.press(screen.getByRole("button", { name: "Elegir categoría, Todos los servicios" }));
-    fireEvent.press(screen.getByRole("button", { name: "Tratamientos" }));
+    fireEvent.press(screen.getByRole("button", { name: "Filtrar por Tratamientos" }));
     expect(screen.queryByText("Valoración")).toBeNull();
     expect(screen.getByText("Limpieza")).toBeTruthy();
     expect(screen.getByText("Consultar precio")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Elegir categoría, Tratamientos" })).toBeTruthy();
-    expect(screen.queryByRole("button", { name: "Consulta" })).toBeNull();
+    expect(screen.queryByRole("button", { name: "Filtrar por Consulta" })).toBeNull();
+    fireEvent.changeText(screen.getByLabelText("Buscar servicio"), "  LIMPIEZA  ");
+    expect(screen.getByText("Limpieza")).toBeTruthy();
+    fireEvent.changeText(screen.getByLabelText("Buscar servicio"), "sin coincidencias");
+    expect(screen.getByText("Sin resultados")).toBeTruthy();
+    expect(screen.queryByText("Limpieza")).toBeNull();
+    fireEvent.press(screen.getByRole("button", { name: "Limpiar búsqueda" }));
+    fireEvent.press(screen.getByRole("button", { name: "Ver servicio: Limpieza" }));
+    expect(screen.getByText("Sin descripción registrada.")).toBeTruthy();
+    fireEvent.press(screen.getByRole("button", { name: "Cerrar" }));
+    expect(screen.queryByText("Sin descripción registrada.")).toBeNull();
   });
 
   test("disables appointment requests during the initial load", () => {

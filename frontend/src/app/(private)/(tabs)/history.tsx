@@ -18,7 +18,7 @@ export default function History() {
   const initialLoading = loading && data === null;
   const unavailable = Boolean(error) && data === null;
   return (
-    <Screen variant="tab">
+    <Screen variant="tab" onRefresh={() => void reload()} refreshing={loading && data !== null}>
       <AppHeader
         title="Historia clínica"
         subtitle="Información registrada por el personal autorizado."
@@ -55,12 +55,12 @@ export default function History() {
               detail="El personal autorizado todavía no ha registrado un historial para tu cuenta."
             />
           )}
-          <Button
-            title={unavailable ? "Reintentar" : "Actualizar historial"}
+          {error ? <Button
+            title="Reintentar"
             icon="refresh"
             variant="ghost"
             onPress={() => void reload()}
-          />
+          /> : null}
         </>
       )}
     </Screen>

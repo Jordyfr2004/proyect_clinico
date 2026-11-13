@@ -85,7 +85,7 @@ export default function Appointments() {
     }
   };
   return (
-    <Screen variant="tab">
+    <Screen variant="tab" onRefresh={() => void refresh()} refreshing={loading && data !== null}>
       <AppHeader
         title="Mis citas"
         subtitle="Consulta tus citas o envía una nueva solicitud."
@@ -167,14 +167,14 @@ export default function Appointments() {
           detail="Puedes enviar una solicitud desde esta pantalla."
         />
       )}
-      {initialLoading ? null : (
+      {!initialLoading && error ? (
         <Button
-          title={unavailable ? "Reintentar" : "Actualizar citas"}
+          title="Reintentar"
           icon="refresh"
           variant="ghost"
           onPress={() => void refresh()}
         />
-      )}
+      ) : null}
       {selectedSchedule ? (
         <Modal
           transparent
