@@ -7,6 +7,7 @@ use App\Models\User;
 use App\PracticaIndividual\RegistroPaciente\RegistroPacienteEntradaDto;
 use App\PracticaIndividual\RegistroPaciente\RegistroPacienteSalidaDto;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Testing\TestResponse;
 use Laravel\Sanctum\Sanctum;
 use Tests\TestCase;
 
@@ -71,27 +72,87 @@ class PracticaIndividualRegistroPacienteTest extends TestCase
         $this->assertIsString($respuesta->json('data.fecha_nacimiento'));
         $this->assertIsString($respuesta->json('data.created_at'));
         $this->assertIsString($respuesta->json('data.updated_at'));
+        $this->assertEqualsCanonicalizing(
+            ['message', 'data'],
+            array_keys($respuesta->json())
+        );
+        $this->assertEqualsCanonicalizing(
+            ['id', 'codigo_paciente', 'nombres', 'cedula', 'telefono', 'direccion', 'fecha_nacimiento', 'created_at', 'updated_at'],
+            array_keys($respuesta->json('data'))
+        );
+        foreach (['codigo_paciente', 'nombres', 'cedula', 'telefono', 'direccion'] as $campo) {
+            $this->assertIsString($respuesta->json('data.'.$campo));
+        }
+
+        $this->mostrarEvidencia(
+            'P1: registro válido',
+            $entrada->toArray(),
+            $respuesta,
+            'Coinciden message:string y data:object con los nueve campos documentados; en este caso todos son cadenas. HTTP 201.'
+        );
     }
 
     public function test_ausencia_de_nombres_devuelve_422_y_no_persiste(): void
     {
-        $this->postJson('/api/pacientes', ['cedula' => '0912345678'])
+        $solicitud = ['cedula' => '0912345678'];
+        $respuesta = $this->postJson('/api/pacientes', $solicitud)
             ->assertUnprocessable()
             ->assertJsonValidationErrors('nombres');
 
         $this->assertDatabaseCount('pacientes', 0);
         $this->assertDatabaseCount('acciones_registradas', 0);
+        $this->assertIsString($respuesta->json('message'));
+        $this->assertIsArray($respuesta->json('errors'));
+        $this->assertIsArray($respuesta->json('errors.nombres'));
+        $this->assertIsString($respuesta->json('errors.nombres.0'));
+
+        $this->mostrarEvidencia(
+            'P2: ausencia de nombres',
+            $solicitud,
+            $respuesta,
+            'Coinciden message:string y errors:object con errors.nombres:array de cadenas. HTTP 422; cero pacientes y cero acciones persistidas.'
+        );
     }
 
     public function test_telefono_numerico_devuelve_422_y_no_persiste(): void
     {
-        $this->postJson('/api/pacientes', [
+        $solicitud = [
             'nombres' => 'Ana Pérez',
             'cedula' => '0912345678',
             'telefono' => 991234567,
-        ])->assertUnprocessable()->assertJsonValidationErrors('telefono');
+        ];
+        $respuesta = $this->postJson('/api/pacientes', $solicitud)
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors('telefono');
 
         $this->assertDatabaseCount('pacientes', 0);
         $this->assertDatabaseCount('acciones_registradas', 0);
+        $this->assertIsString($respuesta->json('message'));
+        $this->assertIsArray($respuesta->json('errors'));
+        $this->assertIsArray($respuesta->json('errors.telefono'));
+        $this->assertIsString($respuesta->json('errors.telefono.0'));
+
+        $this->mostrarEvidencia(
+            'P3: telefono numérico',
+            $solicitud,
+            $respuesta,
+            'Coinciden message:string y errors:object con errors.telefono:array de cadenas. HTTP 422; cero pacientes y cero acciones persistidas.'
+        );
+    }
+
+    /** Imprime exclusivamente el cuerpo ficticio enviado y la respuesta HTTP real. */
+    private function mostrarEvidencia(
+        string $caso,
+        array $solicitud,
+        TestResponse $respuesta,
+        string $coincidencias
+    ): void {
+        $opciones = JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR;
+
+        fwrite(STDOUT, "\n=== {$caso} ===\n");
+        fwrite(STDOUT, "Solicitud JSON:\n".json_encode($solicitud, $opciones)."\n");
+        fwrite(STDOUT, "Estado HTTP real: {$respuesta->status()}\n");
+        fwrite(STDOUT, "Respuesta JSON real:\n".json_encode($respuesta->json(), $opciones)."\n");
+        fwrite(STDOUT, "Comparación con el contrato: {$coincidencias}\n");
     }
 }
