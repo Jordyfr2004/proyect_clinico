@@ -5,6 +5,7 @@ import {
   KeyboardAvoidingView,
   Platform,
   Pressable,
+  RefreshControl,
   ScrollView,
   StyleSheet,
   Text,
@@ -39,11 +40,15 @@ export function Screen({
   scroll = true,
   variant = "stack",
   contentStyle,
+  onRefresh,
+  refreshing = false,
 }: {
   children: ReactNode;
   scroll?: boolean;
   variant?: ScreenVariant;
   contentStyle?: StyleProp<ViewStyle>;
+  onRefresh?: () => void;
+  refreshing?: boolean;
 }) {
   const insets = useSafeAreaInsets();
   const paddingBottom = getScreenBottomPadding(variant, insets.bottom);
@@ -53,6 +58,15 @@ export function Screen({
       keyboardShouldPersistTaps="handled"
       keyboardDismissMode={Platform.OS === "ios" ? "interactive" : "on-drag"}
       showsVerticalScrollIndicator={false}
+      alwaysBounceVertical={Boolean(onRefresh)}
+      refreshControl={onRefresh ? (
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={palette.primary}
+          colors={[palette.primary]}
+        />
+      ) : undefined}
     >
       {children}
     </ScrollView>
@@ -409,34 +423,38 @@ export function InfoRow({
     </View>
   );
 }
+type AppointmentStatusTone = "info" | "warning" | "danger" | "success";
+export const getAppointmentStatusTone = (
+  status: string,
+): AppointmentStatusTone => {
+  switch (status.toLowerCase()) {
+    case "pendiente":
+      return "warning";
+    case "cancelada":
+      return "danger";
+    case "completada":
+      return "success";
+    default:
+      return "info";
+  }
+};
 export function StatusBadge({ status }: { status: string }) {
-  const pending = status.toLowerCase().includes("pendiente");
-  const cancelled = status.toLowerCase().includes("cancelada");
+  const tone = getAppointmentStatusTone(status);
+  const toneStyle = {
+    info: styles.badgeInfo,
+    warning: styles.badgeWarning,
+    danger: styles.badgeDanger,
+    success: styles.badgeSuccess,
+  }[tone];
+  const toneColor = {
+    info: palette.primary,
+    warning: palette.warning,
+    danger: palette.danger,
+    success: palette.success,
+  }[tone];
   return (
-    <View
-      style={[
-        styles.badge,
-        cancelled
-          ? styles.badgeDanger
-          : pending
-            ? styles.badgeWarning
-            : styles.badgeSuccess,
-      ]}
-    >
-      <Text
-        style={[
-          styles.badgeText,
-          {
-            color: cancelled
-              ? palette.danger
-              : pending
-                ? palette.warning
-                : palette.success,
-          },
-        ]}
-      >
-        {status}
-      </Text>
+    <View style={[styles.badge, toneStyle]}>
+      <Text style={[styles.badgeText, { color: toneColor }]}>{status}</Text>
     </View>
   );
 }
@@ -685,11 +703,13 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   badgeWarning: { backgroundColor: palette.warningSoft },
+  badgeInfo: { backgroundColor: palette.primarySoft },
+  badgeDanger: { backgroundColor: palette.dangerSoft },
   badgeSuccess: { backgroundColor: palette.successSoft },
   badgeDanger: { backgroundColor: palette.dangerSoft },
   badgeText: { textTransform: "capitalize", ...typography.caption },
   chip: {
-    minHeight: 40,
+    minHeight: control.touch,
     paddingHorizontal: space.md,
     alignItems: "center",
     justifyContent: "center",

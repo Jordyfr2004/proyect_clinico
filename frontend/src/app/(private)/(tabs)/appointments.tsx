@@ -1,6 +1,6 @@
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { useCallback, useState } from "react";
-import { Alert, StyleSheet, Text, View } from "react-native";
+import { Modal, Pressable, StyleSheet, Text, View } from "react-native";
 import {
   AppHeader,
   Button,
@@ -12,6 +12,7 @@ import {
   StatusBadge,
 } from "@/components/ui/patient-ui";
 import { palette, space, type as typography } from "@/constants/theme";
+import { ApiError } from "@/api/errors";
 import {
   canChangeAppointment,
   cancelAppointment,
@@ -21,69 +22,63 @@ import {
   type Appointment,
 } from "@/features/patient/appointments";
 import { useRemote } from "@/hooks/use-remote";
+import { formatScheduledAppointment } from "@/features/patient/appointment-display";
+
+const appointmentTypeLabel = (type: string) =>
+  type === "cita_medica" ? "Cita médica" : type.replaceAll("_", " ");
+
 export default function Appointments() {
   const loader = useCallback(() => getAppointments(), []);
   const { data, loading, error, reload } = useRemote(loader);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("");
   const [submitError, setSubmitError] = useState("");
-  const [changing, setChanging] = useState<string | null>(null);
-  const change = async (
-    item: Appointment,
-    action: (id: string) => Promise<string>,
-  ) => {
-    if (changing) return;
-    setChanging(item.id);
-    setMessage("");
-    setSubmitError("");
-    try {
-      setMessage(await action(item.id));
-      await reload();
-    } catch (reason) {
-      setSubmitError(
-        reason instanceof Error
-          ? reason.message
-          : "No se pudo actualizar la cita.",
+  const [refreshWarning, setRefreshWarning] = useState("");
+  const [requestConfirmed, setRequestConfirmed] = useState(false);
+  const [selectedSchedule, setSelectedSchedule] = useState<string | null>(null);
+  const hasPendingRequest =
+    data?.some((item) => item.status.toLowerCase() === "pendiente") ?? false;
+  const pendingOrConfirmed = hasPendingRequest || requestConfirmed;
+  const initialLoading = loading && data === null;
+  const unavailable = Boolean(error) && data === null;
+  const requestDisabled =
+    loading || Boolean(error) || data === null || pendingOrConfirmed;
+
+  const refresh = async () => {
+    setRefreshWarning("");
+    const result = await reload();
+    if (result.ok) {
+      setRequestConfirmed(
+        result.data.some((item) => item.status.toLowerCase() === "pendiente"),
       );
-    } finally {
-      setChanging(null);
     }
   };
-  const confirmCancel = (item: Appointment) =>
-    Alert.alert(
-      "Cancelar cita",
-      item.date
-        ? `¿Deseas cancelar tu cita del ${item.date}?`
-        : "¿Deseas cancelar tu solicitud de cita?",
-      [
-        { text: "Volver", style: "cancel" },
-        {
-          text: "Cancelar cita",
-          style: "destructive",
-          onPress: () => void change(item, cancelAppointment),
-        },
-      ],
-    );
-  const confirmReschedule = (item: Appointment) =>
-    Alert.alert(
-      "Reprogramar cita",
-      "Se liberará el horario actual y el consultorio te asignará una nueva fecha.",
-      [
-        { text: "Volver", style: "cancel" },
-        {
-          text: "Reprogramar",
-          onPress: () => void change(item, (id) => rescheduleAppointment(id)),
-        },
-      ],
-    );
+
   const request = async () => {
     setBusy(true);
     setMessage("");
     setSubmitError("");
+    setRefreshWarning("");
     try {
-      setMessage(await requestAppointment());
-      await reload();
+      const confirmation = await requestAppointment();
+      setMessage(confirmation);
+      setRequestConfirmed(true);
+      const result = await reload();
+      if (result.ok) {
+        setRequestConfirmed(
+          result.data.some(
+            (item) => item.status.toLowerCase() === "pendiente",
+          ),
+        );
+      } else {
+        setRefreshWarning(
+          "La solicitud fue registrada, pero no se pudo actualizar el listado. Reintenta la actualización antes de solicitar otra cita.",
+        );
+      }
     } catch (reason) {
+      if (reason instanceof ApiError && reason.status === 409) {
+        setRequestConfirmed(true);
+      }
       setSubmitError(
         reason instanceof Error
           ? reason.message
@@ -94,27 +89,38 @@ export default function Appointments() {
     }
   };
   return (
-    <Screen variant="tab">
+    <Screen variant="tab" onRefresh={() => void refresh()} refreshing={loading && data !== null}>
       <AppHeader
         title="Mis citas"
         subtitle="Consulta tus citas o envía una nueva solicitud."
       />
       {message ? <Notice tone="success">{message}</Notice> : null}
-      {submitError || error ? (
-        <Notice tone="error">{submitError || error}</Notice>
+      {submitError || refreshWarning || (!initialLoading && error) ? (
+        <Notice tone="error">{submitError || refreshWarning || error}</Notice>
       ) : null}
       <Button
-        title="Solicitar una cita"
+        title={pendingOrConfirmed ? "Solicitud pendiente" : "Solicitar una cita"}
         icon="calendar-plus"
         loading={busy}
+        disabled={requestDisabled}
         onPress={() => void request()}
       />
-      {loading ? (
+      {initialLoading ? (
         <LoadingState />
-      ) : data?.length ? (
+      ) : unavailable ? null : data?.length ? (
         <View style={styles.list}>
-          {data.map((item) => (
-            <Card key={item.id}>
+          {data.map((item) => {
+            const schedule = item.status.toLowerCase() === "programada"
+              ? formatScheduledAppointment(item.date, item.startTime)
+              : null;
+            return <Pressable
+              key={item.id}
+              accessibilityRole={schedule ? "button" : undefined}
+              accessibilityLabel={schedule ? `Ver cita programada, ${schedule}` : undefined}
+              disabled={!schedule}
+              onPress={() => setSelectedSchedule(schedule)}
+            >
+              <Card>
               <View style={styles.top}>
                 <View style={styles.calendar}>
                   <MaterialCommunityIcons
@@ -125,11 +131,15 @@ export default function Appointments() {
                 </View>
                 <View style={styles.copy}>
                   <Text style={styles.title}>
-                    {item.date
+                    {schedule
+                      ? "Cita programada"
+                      : item.date
                       ? `Cita del ${item.date}`
                       : "Solicitud pendiente de programación"}
                   </Text>
-                  <Text style={styles.type}>{item.type}</Text>
+                  <Text style={styles.type}>
+                    {appointmentTypeLabel(item.type)}
+                  </Text>
                 </View>
                 <StatusBadge status={item.status} />
               </View>
@@ -140,7 +150,9 @@ export default function Appointments() {
                   color={palette.textMuted}
                 />
                 <Text style={styles.metaText}>
-                  {item.startTime
+                  {schedule
+                    ? "Toca para ver día y hora"
+                    : item.startTime
                     ? `${item.startTime}${item.endTime ? ` – ${item.endTime}` : ""}`
                     : "Aún sin horario asignado"}
                 </Text>
@@ -148,34 +160,9 @@ export default function Appointments() {
               {item.description ? (
                 <Text style={styles.description}>{item.description}</Text>
               ) : null}
-              {canChangeAppointment(item) ? (
-                <View style={styles.actions}>
-                  {item.status === "programada" ? (
-                    <Button
-                      title="Reprogramar"
-                      icon="calendar-sync"
-                      variant="secondary"
-                      loading={changing === item.id}
-                      disabled={changing !== null}
-                      onPress={() => confirmReschedule(item)}
-                    />
-                  ) : null}
-                  <Button
-                    title={
-                      item.status === "pendiente"
-                        ? "Cancelar solicitud"
-                        : "Cancelar cita"
-                    }
-                    icon="calendar-remove"
-                    variant="danger"
-                    loading={changing === item.id}
-                    disabled={changing !== null}
-                    onPress={() => confirmCancel(item)}
-                  />
-                </View>
-              ) : null}
-            </Card>
-          ))}
+              </Card>
+            </Pressable>;
+          })}
         </View>
       ) : (
         <EmptyState
@@ -184,16 +171,52 @@ export default function Appointments() {
           detail="Puedes enviar una solicitud desde esta pantalla."
         />
       )}
-      <Button
-        title="Actualizar citas"
-        icon="refresh"
-        variant="ghost"
-        onPress={() => void reload()}
-      />
+      {!initialLoading && error ? (
+        <Button
+          title="Reintentar"
+          icon="refresh"
+          variant="ghost"
+          onPress={() => void refresh()}
+        />
+      ) : null}
+      {selectedSchedule ? (
+        <Modal
+          transparent
+          animationType="fade"
+          visible
+          onRequestClose={() => setSelectedSchedule(null)}
+        >
+          <View style={styles.modalBackdrop}>
+            <Pressable style={styles.modalDismiss} onPress={() => setSelectedSchedule(null)} />
+            <View style={styles.modalCard}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Cerrar"
+                onPress={() => setSelectedSchedule(null)}
+                style={styles.modalClose}
+              >
+                <MaterialCommunityIcons name="close" size={22} color={palette.textMuted} />
+              </Pressable>
+              <View style={styles.modalIcon}>
+                <MaterialCommunityIcons name="calendar-check-outline" size={28} color={palette.primary} />
+              </View>
+              <Text style={styles.modalTitle}>Cita agendada</Text>
+              <Text style={styles.modalSchedule}>{selectedSchedule}</Text>
+            </View>
+          </View>
+        </Modal>
+      ) : null}
     </Screen>
   );
 }
 const styles = StyleSheet.create({
+  modalBackdrop: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: palette.scrim, padding: space.lg },
+  modalDismiss: { position: "absolute", top: 0, right: 0, bottom: 0, left: 0 },
+  modalCard: { width: "100%", maxWidth: 340, alignItems: "center", paddingHorizontal: space.lg, paddingTop: space.xl, paddingBottom: space.xl, borderRadius: 22, backgroundColor: palette.surface },
+  modalClose: { position: "absolute", top: space.sm, right: space.sm, width: 36, height: 36, alignItems: "center", justifyContent: "center", zIndex: 1 },
+  modalIcon: { width: 58, height: 58, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: palette.primarySoft, marginBottom: space.md },
+  modalTitle: { color: palette.navy, ...typography.section, textAlign: "center", marginBottom: space.xs },
+  modalSchedule: { color: palette.textMuted, ...typography.body, textAlign: "center" },
   list: { gap: space.md },
   top: { flexDirection: "row", alignItems: "center", gap: space.sm },
   calendar: {

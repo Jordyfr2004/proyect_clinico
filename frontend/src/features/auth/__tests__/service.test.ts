@@ -4,6 +4,8 @@ import {
   login,
   logoutRemote,
   registerPatient,
+  verifyEmail,
+  resendVerificationCode,
   requestPasswordReset,
   resetPassword,
 } from '../service';
@@ -22,7 +24,7 @@ const patient = {
 };
 
 describe('authentication service', () => {
-  beforeEach(() => jest.clearAllMocks());
+  beforeEach(() => jest.resetAllMocks());
 
   test('logs in with the exact username/password contract and validates the response', async () => {
     (apiRequest as jest.Mock).mockResolvedValue({
@@ -53,15 +55,32 @@ describe('authentication service', () => {
       password_confirmation: 'password123',
     };
     (apiRequest as jest.Mock).mockResolvedValue({
-      access_token: 'token-1',
-      token_type: 'Bearer',
-      user: patient,
+      message: 'Cuenta creada correctamente.',
+      requires_verification: true,
+      email: 'ana@example.com',
     });
 
-    await registerPatient(input);
+    await expect(registerPatient(input)).resolves.toBe('ana@example.com');
     expect(apiRequest).toHaveBeenCalledWith('/auth/register-paciente', {
       method: 'POST',
       body: input,
+    });
+  });
+
+  test('verifies a code to receive a session and resends to the same email', async () => {
+    (apiRequest as jest.Mock)
+      .mockResolvedValueOnce({ access_token: 'verified-token', token_type: 'Bearer', user: patient })
+      .mockResolvedValueOnce({ message: 'Código reenviado.' });
+
+    await expect(verifyEmail('ana@example.com', '123456')).resolves.toMatchObject({
+      accessToken: 'verified-token',
+    });
+    await expect(resendVerificationCode('ana@example.com')).resolves.toBe('Código reenviado.');
+    expect(apiRequest).toHaveBeenNthCalledWith(1, '/auth/verify-email', {
+      method: 'POST', body: { email: 'ana@example.com', code: '123456' },
+    });
+    expect(apiRequest).toHaveBeenNthCalledWith(2, '/auth/resend-verification-code', {
+      method: 'POST', body: { email: 'ana@example.com' },
     });
   });
 

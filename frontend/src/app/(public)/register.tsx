@@ -37,7 +37,8 @@ export default function Register() {
     setBusy(true);
     setError("");
     try {
-      await signUp({ ...form, email: form.email.trim().toLowerCase() });
+      const email = await signUp({ ...form, email: form.email.trim().toLowerCase() });
+      router.replace({ pathname: '/(public)/verify-email', params: { email } });
     } catch (reason) {
       setError(
         reason instanceof Error

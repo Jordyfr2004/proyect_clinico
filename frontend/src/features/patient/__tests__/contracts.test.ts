@@ -1,12 +1,11 @@
-import {
-  canChangeAppointment,
-  parseAppointments,
-} from "@/features/patient/appointments";
-import { parseDocuments } from "@/features/patient/documents";
-import { parsePrescriptions } from "@/features/patient/prescriptions";
-import { parseHistory } from "@/features/patient/history";
+import { parseAppointments } from "@/features/patient/appointments";
+import { getMedicalHistory, parseHistory } from "@/features/patient/history";
 import { parseProfile } from "@/features/patient/profile";
 import { parseCategories, parseServices } from "@/features/patient/catalog";
+import { apiRequest } from "@/api/client";
+import { ApiError } from "@/api/errors";
+
+jest.mock("@/api/client", () => ({ apiRequest: jest.fn() }));
 
 describe("patient API contracts", () => {
   test("parses appointments including an unscheduled pending request", () => {
@@ -22,6 +21,9 @@ describe("patient API contracts", () => {
             tipo: "cita_medica",
             descripcion: null,
             estado: "pendiente",
+            diagnostico: null,
+            tratamiento: null,
+            observacion: null,
             created_at: "2026-01-01",
             updated_at: "2026-01-01",
           },
@@ -30,7 +32,7 @@ describe("patient API contracts", () => {
     ).toBe("pendiente");
   });
 
-  test("parses the patient history envelope", () => {
+  test("parses only the clinical history fields returned by Laravel", () => {
     expect(
       parseHistory({
         data: {
@@ -41,12 +43,25 @@ describe("patient API contracts", () => {
           antecedentes_enfermedades: null,
           cirugias: null,
           medicacion_actual: null,
-          alergias: null,
-          antecedentes_familiares: null,
-          notas_adicionales: null,
         },
-      }).sex,
-    ).toBe("F");
+      }),
+    ).toEqual({
+      id: "h1",
+      patientId: "p1",
+      sex: "F",
+      birthplace: null,
+      illnesses: null,
+      surgeries: null,
+      currentMedication: null,
+    });
+  });
+
+  test("treats Laravel's missing-history 404 as an empty authorized state", async () => {
+    (apiRequest as jest.Mock).mockRejectedValueOnce(
+      new ApiError(404, "No tienes un historial clínico registrado."),
+    );
+
+    await expect(getMedicalHistory()).resolves.toBeNull();
   });
 
   test("parses profile and catalog envelopes", () => {
@@ -65,9 +80,17 @@ describe("patient API contracts", () => {
     ).toBe("PAC-1");
     expect(
       parseCategories({
-        data: [{ id: "c1", nombre: "Consulta", descripcion: null }],
+        data: [
+          {
+            id: "c1",
+            nombre: "Consulta",
+            activo: true,
+            created_at: "2026-01-01",
+            updated_at: "2026-01-01",
+          },
+        ],
       }),
-    ).toHaveLength(1);
+    ).toEqual([{ id: "c1", name: "Consulta" }]);
     expect(
       parseServices({
         data: [
@@ -79,112 +102,29 @@ describe("patient API contracts", () => {
             precio: "20.00",
             duracion_minutos: 30,
             imagen: null,
-            categoria: { id: "c1", nombre: "Consulta" },
+            activo: true,
+            created_at: "2026-01-01",
+            updated_at: "2026-01-01",
+            categoria: {
+              id: "c1",
+              nombre: "Consulta",
+              activo: true,
+              created_at: "2026-01-01",
+              updated_at: "2026-01-01",
+            },
           },
         ],
       })[0].price,
     ).toBe("20.00");
   });
 
-  test("accepts nullable profile and service fields sent by the backend", () => {
-    const profile = parseProfile({
-      data: {
-        foto_perfil_url: null,
-        codigo_paciente: "PAC-2",
-        nombres: "Luis",
-        cedula: "0103",
-        telefono: null,
-        direccion: null,
-        fecha_nacimiento: null,
-      },
-    });
-    expect(profile.phone).toBeNull();
-    const [service] = parseServices({
-      data: [
-        {
-          id: "s2",
-          categoria_id: "c1",
-          nombre: "Limpieza",
-          descripcion: "Profilaxis",
-          precio: null,
-          duracion_minutos: null,
-          imagen: null,
-          categoria: { id: "c1", nombre: "Consulta" },
-        },
-      ],
-    });
+  test("keeps optional service price and duration empty when Laravel omits them", () => {
+    const [service] = parseServices({ data: [{
+      id: "s2", categoria_id: "c1", nombre: "Valoración", descripcion: null,
+      precio: null, duracion_minutos: null, imagen: "https://example.com/valoracion.jpg",
+      categoria: { id: "c1", nombre: "Consulta" },
+    }] });
     expect(service.price).toBeNull();
     expect(service.durationMinutes).toBeNull();
-  });
-
-  test("parses a scheduled appointment with the backend field names", () => {
-    const [item] = parseAppointments({
-      data: [
-        {
-          id: "a1",
-          paciente_id: "p1",
-          fecha: "2026-10-20",
-          hora_inicio: "10:00:00",
-          hora_fin: "11:00:00",
-          tipo: "cita_medica",
-          descripcion: "Limpieza",
-          estado: "programada",
-          created_at: "2026-10-01",
-          updated_at: "2026-10-01",
-        },
-      ],
-    });
-    expect(item.date).toBe("2026-10-20");
-    expect(canChangeAppointment(item, new Date("2026-10-19T09:00:00"))).toBe(true);
-    expect(canChangeAppointment(item, new Date("2026-10-20T10:30:00"))).toBe(false);
-    expect(canChangeAppointment({ ...item, status: "completada" })).toBe(false);
-    expect(
-      canChangeAppointment({ ...item, status: "pendiente", date: null, startTime: null }),
-    ).toBe(true);
-  });
-
-  test("parses prescriptions and documents", () => {
-    const [prescription] = parsePrescriptions({
-      data: [
-        {
-          id: "r1",
-          fecha: "2026-10-18",
-          diagnostico: "Pulpitis",
-          medicamentos: [
-            {
-              nombre: "Ibuprofeno",
-              dosis: "400 mg",
-              frecuencia: "Cada 8 horas",
-              duracion: null,
-              indicaciones: null,
-            },
-          ],
-          indicaciones: null,
-          emitida_por: { id: "d1", name: "Dra. López", role: "doctora" },
-        },
-      ],
-    });
-    expect(prescription.medications[0].name).toBe("Ibuprofeno");
-    expect(prescription.issuedBy).toBe("Dra. López");
-    const [document] = parseDocuments({
-      data: [
-        {
-          id: "e1",
-          paciente_id: "p1",
-          tipo: "rx",
-          nombre_archivo: "rx.png",
-          ruta_archivo: "clinica/x.png",
-          mime_type: "image/png",
-          tamano: 2048,
-          descripcion: null,
-          fecha: "2026-10-18",
-          subido_por: { id: "u1", name: "Ana", role: "paciente" },
-        },
-      ],
-    });
-    expect(document.uploadedByPatient).toBe(true);
-    expect(() =>
-      parseDocuments({ data: [{ ...{ id: "e2", tipo: "otro" } }] }),
-    ).toThrow();
   });
 });

@@ -21,8 +21,17 @@ export const login = async (username: string, password: string): Promise<AuthSes
     }),
   );
 
-export const registerPatient = async (input: RegisterPatientInput): Promise<AuthSession> =>
-  parseAuthSession(await apiRequest('/auth/register-paciente', { method: 'POST', body: input }));
+export const registerPatient = async (input: RegisterPatientInput): Promise<string> => {
+  const response = asRecord(await apiRequest('/auth/register-paciente', { method: 'POST', body: input }), 'La respuesta de registro');
+  if (response.requires_verification !== true) throw new Error('El servidor no confirmó la verificación pendiente.');
+  return asString(response, 'email');
+};
+
+export const verifyEmail = async (email: string, code: string): Promise<AuthSession> =>
+  parseAuthSession(await apiRequest('/auth/verify-email', { method: 'POST', body: { email, code } }));
+
+export const resendVerificationCode = async (email: string): Promise<string> =>
+  parseMessage(await apiRequest('/auth/resend-verification-code', { method: 'POST', body: { email } }));
 
 export const requestPasswordReset = async (email: string): Promise<string> =>
   parseMessage(await apiRequest('/auth/forgot-password', { method: 'POST', body: { email } }));

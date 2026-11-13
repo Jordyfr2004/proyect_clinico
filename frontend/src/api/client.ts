@@ -45,9 +45,9 @@ const parseJsonText = (text: string): unknown => {
 
 const errorDetails = (
   value: unknown,
-): { message: string; errors: Record<string, string[]> } => {
+): { message: string; errors: Record<string, string[]>; requiresVerification: boolean; verificationEmail: string | null } => {
   if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return { message: "No se pudo completar la solicitud.", errors: {} };
+    return { message: "No se pudo completar la solicitud.", errors: {}, requiresVerification: false, verificationEmail: null };
   }
   const record = value as Record<string, unknown>;
   const errors: Record<string, string[]> = {};
@@ -71,6 +71,9 @@ const errorDetails = (
         ? record.message
         : "No se pudo completar la solicitud.",
     errors,
+    requiresVerification: Array.isArray((record.errors as Record<string, unknown> | undefined)?.requires_verification)
+      && (record.errors as Record<string, unknown[]>).requires_verification[0] === true,
+    verificationEmail: errors.email?.[0] ?? null,
   };
 };
 
@@ -117,14 +120,21 @@ export const apiRequest = async <T>(
     });
 
     if (!response.ok) {
-      const parsed = parseJsonText(await response.text());
-      const details = errorDetails(parsed);
       if (response.status === 401) await unauthorizedHandler();
+      let parsed: unknown;
+      try {
+        parsed = parseJsonText(await response.text());
+      } catch {
+        parsed = undefined;
+      }
+      const details = errorDetails(parsed);
       throw new ApiError(
         response.status,
         details.message,
         details.errors,
         response.headers.get("Retry-After"),
+        details.requiresVerification,
+        details.verificationEmail,
       );
     }
 

@@ -1,9 +1,10 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { Button, Text, View } from 'react-native';
 
 import { AuthProvider, useAuth } from '../auth-context';
 import * as authService from '../service';
 import * as sessionStorage from '../session-storage';
+import { setUnauthorizedHandler } from '@/api/client';
 
 jest.mock('../service');
 jest.mock('../session-storage');
@@ -30,6 +31,8 @@ function Probe() {
       <Text testID="status">{auth.status}</Text>
       <Text testID="name">{auth.user?.name ?? 'sin usuario'}</Text>
       <Button title="Ingresar" onPress={() => auth.signIn('0102030405', 'password123')} />
+      <Button title="Registrar" onPress={() => auth.signUp({ nombres: 'Ana', cedula: '0102030405', email: 'ana@example.com', telefono: '0999999999', direccion: 'Quito', fecha_nacimiento: '1990-01-01', password: 'password123', password_confirmation: 'password123' })} />
+      <Button title="Verificar" onPress={() => auth.verifyEmail('ana@example.com', '123456')} />
       <Button title="Salir" onPress={() => auth.signOut()} />
     </View>
   );
@@ -47,7 +50,11 @@ describe('AuthProvider', () => {
     (sessionStorage.loadAccessToken as jest.Mock).mockResolvedValue('stored-token');
     (authService.getCurrentUser as jest.Mock).mockResolvedValue(user);
 
-    render(<AuthProvider><Probe /></AuthProvider>);
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
 
     expect(screen.getByTestId('status').props.children).toBe('restoring');
     await waitFor(() => expect(screen.getByTestId('status').props.children).toBe('authenticated'));
@@ -58,7 +65,11 @@ describe('AuthProvider', () => {
     (sessionStorage.loadAccessToken as jest.Mock).mockResolvedValue('expired-token');
     (authService.getCurrentUser as jest.Mock).mockRejectedValue(new Error('Unauthorized'));
 
-    render(<AuthProvider><Probe /></AuthProvider>);
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
 
     await waitFor(() => expect(screen.getByTestId('status').props.children).toBe('anonymous'));
     expect(sessionStorage.clearAccessToken).toHaveBeenCalledTimes(1);
@@ -73,7 +84,11 @@ describe('AuthProvider', () => {
     });
     (authService.logoutRemote as jest.Mock).mockRejectedValue(new Error('Offline'));
 
-    render(<AuthProvider><Probe /></AuthProvider>);
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
     await waitFor(() => expect(screen.getByTestId('status').props.children).toBe('anonymous'));
 
     fireEvent.press(screen.getByText('Ingresar'));
@@ -83,5 +98,47 @@ describe('AuthProvider', () => {
     fireEvent.press(screen.getByText('Salir'));
     await waitFor(() => expect(screen.getByTestId('status').props.children).toBe('anonymous'));
     expect(sessionStorage.clearAccessToken).toHaveBeenCalled();
+  });
+
+  test('registration stays anonymous until the code is verified', async () => {
+    (authService.registerPatient as jest.Mock).mockResolvedValue('ana@example.com');
+    (authService.verifyEmail as jest.Mock).mockResolvedValue({ accessToken: 'verified-token', tokenType: 'Bearer', user });
+    render(<AuthProvider><Probe /></AuthProvider>);
+    await waitFor(() => expect(screen.getByTestId('status').props.children).toBe('anonymous'));
+
+    fireEvent.press(screen.getByText('Registrar'));
+    await waitFor(() => expect(authService.registerPatient).toHaveBeenCalled());
+    expect(screen.getByTestId('status').props.children).toBe('anonymous');
+    expect(sessionStorage.saveAccessToken).not.toHaveBeenCalled();
+
+    fireEvent.press(screen.getByText('Verificar'));
+    await waitFor(() => expect(screen.getByTestId('status').props.children).toBe('authenticated'));
+    expect(sessionStorage.saveAccessToken).toHaveBeenCalledWith('verified-token');
+  });
+
+  test('drops the in-memory session after a 401 even if SecureStore deletion fails', async () => {
+    (authService.login as jest.Mock).mockResolvedValue({
+      accessToken: 'token-1',
+      tokenType: 'Bearer',
+      user,
+    });
+
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>,
+    );
+    await waitFor(() => expect(screen.getByTestId('status').props.children).toBe('anonymous'));
+    fireEvent.press(screen.getByText('Ingresar'));
+    await waitFor(() => expect(screen.getByTestId('status').props.children).toBe('authenticated'));
+
+    (sessionStorage.clearAccessToken as jest.Mock).mockRejectedValueOnce(new Error('SecureStore unavailable'));
+    const unauthorized = (setUnauthorizedHandler as jest.Mock).mock.calls.at(-1)?.[0];
+
+    await act(async () => {
+      await expect(unauthorized()).resolves.toBeUndefined();
+    });
+    await waitFor(() => expect(screen.getByTestId('status').props.children).toBe('anonymous'));
+    expect(screen.getByTestId('name').props.children).toBe('sin usuario');
   });
 });

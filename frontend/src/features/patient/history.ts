@@ -1,4 +1,5 @@
 import { apiRequest } from "@/api/client";
+import { ApiError } from "@/api/errors";
 import {
   asOptionalString,
   asRecord,
@@ -14,9 +15,6 @@ export type MedicalHistory = {
   illnesses: string | null;
   surgeries: string | null;
   currentMedication: string | null;
-  allergies: string | null;
-  familyHistory: string | null;
-  notes: string | null;
 };
 export const parseHistory = (value: unknown): MedicalHistory =>
   parseEnvelope(value, (data) => {
@@ -29,10 +27,13 @@ export const parseHistory = (value: unknown): MedicalHistory =>
       illnesses: asOptionalString(r, "antecedentes_enfermedades"),
       surgeries: asOptionalString(r, "cirugias"),
       currentMedication: asOptionalString(r, "medicacion_actual"),
-      allergies: asOptionalString(r, "alergias"),
-      familyHistory: asOptionalString(r, "antecedentes_familiares"),
-      notes: asOptionalString(r, "notas_adicionales"),
     };
   });
-export const getMedicalHistory = async () =>
-  parseHistory(await apiRequest("/paciente/mi-historial"));
+export const getMedicalHistory = async (): Promise<MedicalHistory | null> => {
+  try {
+    return parseHistory(await apiRequest("/paciente/mi-historial"));
+  } catch (error) {
+    if (error instanceof ApiError && error.status === 404) return null;
+    throw error;
+  }
+};

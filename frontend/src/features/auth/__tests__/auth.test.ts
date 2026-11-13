@@ -38,16 +38,18 @@ describe('authentication contracts', () => {
   });
 
   test('rejects staff roles and inactive or unlinked patient accounts', () => {
-    expect(() => parsePatientUser({ ...patient, role: 'doctora' })).toThrow(
-      'exclusiva para pacientes',
-    );
+    expect(() => parsePatientUser({ ...patient, role: 'doctora' })).toThrow('exclusiva para pacientes');
     expect(() => parsePatientUser({ ...patient, activo: false })).toThrow('desactivada');
     expect(() => parsePatientUser({ ...patient, paciente_id: null })).toThrow('vinculada');
   });
 
   test('parses the direct Laravel login response without inventing fields', () => {
     expect(
-      parseAuthSession({ access_token: 'token-1', token_type: 'Bearer', user: patient }),
+      parseAuthSession({
+        access_token: 'token-1',
+        token_type: 'Bearer',
+        user: patient,
+      }),
     ).toEqual({
       accessToken: 'token-1',
       tokenType: 'Bearer',
@@ -61,5 +63,14 @@ describe('authentication contracts', () => {
     await clearAccessToken();
     await expect(loadAccessToken()).resolves.toBeNull();
     expect(SecureStore.setItemAsync).toHaveBeenCalledWith('clinic.patient.access-token', 'token-1');
+  });
+
+  test('invalidates the stored token if SecureStore cannot delete it', async () => {
+    await saveAccessToken('token-1');
+    (SecureStore.deleteItemAsync as jest.Mock).mockRejectedValueOnce(new Error('Keystore temporarily unavailable'));
+
+    await expect(clearAccessToken()).resolves.toBeUndefined();
+    expect(SecureStore.setItemAsync).toHaveBeenLastCalledWith('clinic.patient.access-token', '');
+    await expect(loadAccessToken()).resolves.toBeNull();
   });
 });

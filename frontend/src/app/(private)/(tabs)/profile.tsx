@@ -12,6 +12,7 @@ import {
   Screen,
   Section,
 } from "@/components/ui/patient-ui";
+import { formatDateForDisplay } from "@/components/ui/date-field";
 import {
   elevation,
   palette,
@@ -25,12 +26,35 @@ import {
   uploadProfilePhoto,
 } from "@/features/patient/profile";
 import { useRemote } from "@/hooks/use-remote";
+
+const supportedPhotoMime = new Set(["image/jpeg", "image/png", "image/webp"]);
+const photoMimeByExtension: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+};
+const resolvePhotoMime = (asset: ImagePicker.ImagePickerAsset) => {
+  if (asset.mimeType) {
+    const mime =
+      asset.mimeType.toLowerCase() === "image/jpg"
+        ? "image/jpeg"
+        : asset.mimeType.toLowerCase();
+    return supportedPhotoMime.has(mime) ? mime : null;
+  }
+  const name = asset.fileName ?? asset.uri;
+  const extension = /\.([a-z0-9]+)(?:[?#].*)?$/i.exec(name)?.[1].toLowerCase();
+  return extension ? (photoMimeByExtension[extension] ?? null) : null;
+};
+
 export default function Profile() {
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const loader = useCallback(() => getProfile(), []);
   const { data, loading, error, reload } = useRemote(loader);
   const [busy, setBusy] = useState(false);
   const [feedback, setFeedback] = useState("");
+  const initialLoading = loading && data === null;
+  const unavailable = Boolean(error) && data === null;
   const choosePhoto = async () => {
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permission.granted)
@@ -43,15 +67,14 @@ export default function Profile() {
     });
     if (result.canceled) return;
     const asset = result.assets[0];
-    const allowed = new Set(["image/jpeg", "image/png", "image/webp"]);
-    if (asset.mimeType && !allowed.has(asset.mimeType))
-      return setFeedback("La foto debe ser JPG, PNG o WebP.");
+    const mimeType = resolvePhotoMime(asset);
+    if (!mimeType) return setFeedback("La foto debe ser JPG, PNG o WebP.");
     if (asset.fileSize && asset.fileSize > 5 * 1024 * 1024)
       return setFeedback("La foto no puede superar 5 MB.");
     setBusy(true);
     setFeedback("");
     try {
-      await uploadProfilePhoto(asset.uri, asset.mimeType ?? "image/jpeg");
+      await uploadProfilePhoto(asset.uri, mimeType);
       setFeedback("Foto actualizada.");
       await reload();
     } catch (reason) {
@@ -101,7 +124,7 @@ export default function Profile() {
         title="Mi perfil"
         subtitle="Administra tu identidad y sesión."
       />
-      {error ? <Notice tone="error">{error}</Notice> : null}
+      {!initialLoading && error ? <Notice tone="error">{error}</Notice> : null}
       {feedback ? (
         <Notice
           tone={
@@ -113,7 +136,7 @@ export default function Profile() {
           {feedback}
         </Notice>
       ) : null}
-      {loading ? (
+      {initialLoading ? (
         <LoadingState />
       ) : data ? (
         <>
@@ -156,6 +179,9 @@ export default function Profile() {
               icon="card-account-details-outline"
             />
             <InfoRow label="Teléfono" value={data.phone} icon="phone-outline" />
+            {user?.email ? (
+              <InfoRow label="Correo" value={user.email} icon="email-outline" />
+            ) : null}
             <InfoRow
               label="Dirección"
               value={data.address}
@@ -163,7 +189,7 @@ export default function Profile() {
             />
             <InfoRow
               label="Fecha de nacimiento"
-              value={data.birthdate}
+              value={formatDateForDisplay(data.birthdate)}
               icon="calendar-outline"
               last
             />
@@ -185,6 +211,13 @@ export default function Profile() {
             />
           ) : null}
         </>
+      ) : unavailable ? (
+        <Button
+          title="Reintentar"
+          icon="refresh"
+          variant="ghost"
+          onPress={() => void reload()}
+        />
       ) : null}
       <Button
         title="Cerrar sesión"
@@ -220,9 +253,9 @@ const styles = StyleSheet.create({
     position: "absolute",
     bottom: 0,
     right: 0,
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     backgroundColor: palette.primary,
     borderWidth: 3,
     borderColor: palette.surface,

@@ -11,7 +11,7 @@ import {
 
 import { setAccessTokenProvider, setUnauthorizedHandler } from '@/api/client';
 
-import { getCurrentUser, login, logoutRemote, registerPatient } from './service';
+import { getCurrentUser, login, logoutRemote, registerPatient, verifyEmail as verifyEmailRemote } from './service';
 import { clearAccessToken, loadAccessToken, saveAccessToken } from './session-storage';
 import type { AuthSession, PatientUser, RegisterPatientInput } from './types';
 
@@ -21,7 +21,8 @@ type AuthContextValue = {
   status: AuthStatus;
   user: PatientUser | null;
   signIn: (username: string, password: string) => Promise<void>;
-  signUp: (input: RegisterPatientInput) => Promise<void>;
+  signUp: (input: RegisterPatientInput) => Promise<string>;
+  verifyEmail: (email: string, code: string) => Promise<void>;
   signOut: () => Promise<void>;
 };
 
@@ -34,9 +35,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const clearSession = useCallback(async () => {
     tokenRef.current = null;
-    await clearAccessToken();
     setUser(null);
     setStatus('anonymous');
+    try {
+      await clearAccessToken();
+    } catch {
+      // Memory access is revoked even if the platform keystore is temporarily unavailable.
+    }
   }, []);
 
   useEffect(() => {
@@ -61,10 +66,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setStatus('authenticated');
       } catch {
         tokenRef.current = null;
-        await clearAccessToken();
         if (active) {
           setUser(null);
           setStatus('anonymous');
+        }
+        try {
+          await clearAccessToken();
+        } catch {
+          // A storage failure must not keep protected routes rendered in memory.
         }
       }
     })();
@@ -86,7 +95,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [acceptSession]);
 
   const signUp = useCallback(async (input: RegisterPatientInput) => {
-    await acceptSession(await registerPatient(input));
+    return registerPatient(input);
+  }, []);
+
+  const verifyEmail = useCallback(async (email: string, code: string) => {
+    await acceptSession(await verifyEmailRemote(email, code));
   }, [acceptSession]);
 
   const signOut = useCallback(async () => {
@@ -100,8 +113,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [clearSession]);
 
   const value = useMemo(
-    () => ({ status, user, signIn, signUp, signOut }),
-    [status, user, signIn, signUp, signOut],
+    () => ({ status, user, signIn, signUp, verifyEmail, signOut }),
+    [status, user, signIn, signUp, verifyEmail, signOut],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

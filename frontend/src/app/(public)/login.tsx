@@ -11,6 +11,7 @@ import {
   TextLink,
 } from "@/components/ui/patient-ui";
 import { useAuth } from "@/features/auth/auth-context";
+import { ApiError } from "@/api/errors";
 
 export default function Login() {
   const { signIn } = useAuth();
@@ -26,6 +27,10 @@ export default function Login() {
     try {
       await signIn(username.trim(), password);
     } catch (reason) {
+      if (reason instanceof ApiError && reason.requiresVerification && reason.verificationEmail) {
+        router.push({ pathname: '/(public)/verify-email', params: { email: reason.verificationEmail } });
+        return;
+      }
       setError(
         reason instanceof Error ? reason.message : "No se pudo iniciar sesión.",
       );
