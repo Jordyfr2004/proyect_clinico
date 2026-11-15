@@ -2,6 +2,7 @@
 
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use App\PracticaNormalizacionHache\NormalizacionPacienteController;
 
 use App\Http\Controllers\Api\Auth\AuthController;
 use App\Http\Controllers\Api\Auth\PasswordController;
@@ -45,6 +46,12 @@ use App\Http\Controllers\Api\Receta\PlantillaRecetaController;
 
 // Estado de la instancia (usado por el balanceador y las pruebas de fallo)
 Route::get('/health', SaludController::class);
+
+// Práctica individual: solo traduce JSON; no registra pacientes.
+Route::prefix('practica-normalizacion-hache')->group(function () {
+    Route::post('/web', [NormalizacionPacienteController::class, 'web']);
+    Route::post('/externo', [NormalizacionPacienteController::class, 'externo']);
+});
 
 Route::get('/user', function (Request $request) {
     return $request->user();
