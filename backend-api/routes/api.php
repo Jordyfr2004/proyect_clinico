@@ -35,6 +35,7 @@ use App\Http\Controllers\Api\Configuracion\AuditoriaController;
 
 use App\Http\Controllers\Api\Servicio\CategoriaServicioController;
 use App\Http\Controllers\Api\Servicio\ServicioConsultorioController;
+use App\Academic\NormalizacionServicios\ControladorNormalizacionServicio;
 
 use App\Http\Controllers\Api\Sistema\SaludController;
 
@@ -296,6 +297,11 @@ Route::prefix('categorias-servicios')->group(function () {
 
 
 // Servicios del consultorio
+Route::prefix('practica-normalizacion-servicios')->group(function () {
+    Route::post('/formulario-web', [ControladorNormalizacionServicio::class, 'formularioWeb']);
+    Route::post('/servicio-externo', [ControladorNormalizacionServicio::class, 'servicioExterno']);
+});
+
 Route::prefix('servicios-consultorio')->group(function () {
 
     // Consulta para pacientes
