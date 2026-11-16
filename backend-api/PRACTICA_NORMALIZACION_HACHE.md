@@ -1,5 +1,12 @@
 # Tema 2.3: traducción y normalización de pacientes
 
+- **Estudiante:** Vera Mero Jereny Jhonnayker
+- **GitHub:** `jerenyvera09`
+- **Asignatura:** Integración e Implementación de Software
+- **Práctica:** Tema 2.3 – Patrones de traducción y normalización
+
+El módulo `PracticaNormalizacionHache` es el desarrollo individual del estudiante, realizado en la rama independiente `practica-normalizacion`.
+
 ## Mapeo al contrato del backend
 
 | Formulario web | Servicio externo | Contrato común | Regla |
@@ -27,11 +34,13 @@ flowchart LR
 Desde `backend-api`:
 
 ```powershell
-php artisan test --filter=PracticaNormalizacionHacheTest
+Copy-Item .env.testing.example .env.testing
+php artisan key:generate --env=testing
+php artisan test tests/Feature/PracticaNormalizacionHacheTest.php --display-warnings
 php artisan route:list --path=practica-normalizacion-hache
 ```
 
-El archivo local `.env.testing` contiene únicamente una clave fija de prueba y configura SQLite en memoria. Se utiliza solo con `APP_ENV=testing`; no contiene credenciales reales ni requiere una base de datos externa.
+Prepara `.env.testing` una sola vez a partir de la plantilla. `key:generate` crea una clave local para las pruebas; la plantilla no incluye ninguna clave activa. `.env.testing` está excluido de Git y SQLite funciona en memoria, sin base de datos externa.
 
 Las rutas de demostración son `POST /api/practica-normalizacion-hache/web` y `POST /api/practica-normalizacion-hache/externo`. Aceptan los JSON del enunciado y devuelven directamente los cinco campos del contrato común. Solo ejecutan el traductor; no llaman al registro de pacientes ni escriben en la base de datos.
 
@@ -44,6 +53,3 @@ Antes de añadir `.env.testing`, PHPUnit mostró 8 advertencias porque esta copi
 ## Reflexión individual
 
 Separar la traducción por origen permite aceptar nombres y formatos distintos sin alterar el contrato clínico. Validar antes de devolver los datos evita pérdidas silenciosas, especialmente en cédulas y teléfonos con ceros iniciales y fechas ambiguas. La ruta aislada demuestra la integración en Laravel sin crear pacientes reales.
-
-
-Vera Mero Jereny Jhonnayker
