@@ -1,0 +1,21 @@
+{
+    "resourceType": "OperationOutcome",
+    "issue": [
+        {
+            "severity": "error",
+            "code": "code-invalid",
+            "diagnostics": "El estado 'arrived-late' no tiene equivalente en la agenda del consultorio.",
+            "expression": [
+                "Appointment.status"
+            ]
+        },
+        {
+            "severity": "error",
+            "code": "value",
+            "diagnostics": "'2026-11-20 10:00' no es un instante FHIR válido: debe incluir segundos y zona horaria (Z o ±hh:mm).",
+            "expression": [
+                "Appointment.start"
+            ]
+        }
+    ]
+}

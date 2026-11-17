@@ -20,7 +20,7 @@ Esta guía explica cómo cada integrante levanta su servicio desde su casa y có
  ┌────────┐ ┌──────────┐
  │ 4 · BD │ │ 5 · FTP  │
  │ (Luis) │ │ (Andriw) │
- │ :5432  │ │ :2121    │
+ │ :5433  │ │ :2121    │
  └────────┘ └──────────┘
 ```
 
@@ -280,7 +280,7 @@ Guía interactiva: `infraestructura/pruebas/fallos.sh` (la ejecuta Andrés y va 
 | Recuperar instancia | Jordy | `.\instancia.ps1 -Numero 2` | En ~15 s vuelve a repartir entre las dos |
 | Cae el FTP | Andriw | `.\detener.ps1` | `/api/health` → "degradado"; todo funciona salvo los archivos (503 con mensaje) |
 | Cae la base de datos | Luis | `Get-Service postgresql* \| Stop-Service` | 503 "La base de datos no está disponible" en menos de 1 s |
-| Puerto mal configurado | Jordy | `DB_PORT=5433` en `.env` y reiniciar instancias | `/api/health` lo señala; el log dice el puerto que falló |
+| Puerto mal configurado | Jordy | `DB_PORT=5499` en `.env` y reiniciar instancias | `/api/health` lo señala; el log dice el puerto que falló |
 
 ---
 
@@ -310,7 +310,7 @@ Guía interactiva: `infraestructura/pruebas/fallos.sh` (la ejecuta Andrés y va 
 | Balanceador | 80 | Cualquier cliente de la red |
 | Web | 8080 | Balanceador |
 | Backend | 8001, 8002 | Balanceador |
-| PostgreSQL | 5432 | Backend (y `-AdminIP` durante el mantenimiento) |
+| PostgreSQL | 5433 | Backend (y `-AdminIP` durante el mantenimiento) |
 | FTP | 2121, 60000-60100 | Backend |
 
 **Ante fallos:** NGINX aparta durante 15 s una instancia que no responde. Las peticiones GET que fallan al conectar se reintentan en la otra; POST, PUT y DELETE no se reintentan, para no duplicar citas ni pagos. Si caen las dos instancias, NGINX responde 503 en JSON.

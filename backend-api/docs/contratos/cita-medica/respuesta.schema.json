@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "proyect_clinico/contratos/cita-medica/respuesta",
+  "title": "Registrar cita médica – respuesta 201",
+  "type": "object",
+  "required": ["message", "data"],
+  "properties": {
+    "message": { "type": "string" },
+    "data": {
+      "type": "object",
+      "required": ["id", "tipo", "estado", "paciente_id", "paciente", "nombre_reserva", "fecha", "hora_inicio", "hora_fin", "descripcion", "creado_en"],
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "tipo": { "const": "cita_medica" },
+        "estado": { "enum": ["programada"] },
+        "paciente_id": { "type": ["string", "null"], "format": "uuid" },
+        "paciente": { "type": ["object", "null"], "properties": { "codigo_paciente": { "type": "string" }, "nombres": { "type": "string" } } },
+        "nombre_reserva": { "type": ["string", "null"] },
+        "fecha": { "type": "string", "format": "date" },
+        "hora_inicio": { "type": "string", "pattern": "^\\d{2}:\\d{2}$" },
+        "hora_fin": { "type": "string", "pattern": "^\\d{2}:\\d{2}$" },
+        "descripcion": { "type": ["string", "null"] },
+        "creado_en": { "type": "string", "format": "date-time" }
+      }
+    }
+  }
+}

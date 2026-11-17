@@ -47,11 +47,11 @@ paso "   Recuperación" "En la Laptop 4: Get-Service postgresql* | Start-Service
 estado
 
 paso "4. Dirección o puerto inválido" \
-     "En la Laptop 3: cambiar DB_PORT=5433 en backend-api\\.env y reiniciar las dos ventanas de instancias (.\\detener.ps1 y .\\iniciar.ps1)"
+     "En la Laptop 3: cambiar DB_PORT=5499 en backend-api\\.env y reiniciar las dos ventanas de instancias (.\\detener.ps1 y .\\iniciar.ps1)"
 estado
 echo "Diagnóstico: /api/health muestra base_datos \"caido\" y el log de Laravel"
 echo "(backend-api\\storage\\logs\\ en la Laptop 3) registra el error de conexión con la instancia y el request_id."
-paso "   Recuperación" "Restaurar DB_PORT=5432 y reiniciar las dos instancias (.\\detener.ps1 y .\\iniciar.ps1)."
+paso "   Recuperación" "Restaurar DB_PORT=5433 y reiniciar las dos instancias (.\\detener.ps1 y .\\iniciar.ps1)."
 estado
 
 echo "Pruebas de fallo terminadas."

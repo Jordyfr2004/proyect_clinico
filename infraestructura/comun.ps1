@@ -50,6 +50,29 @@ function Assert-Administrador {
     }
 }
 
+function Get-PgBin {
+    <#
+      Carpeta bin de PostgreSQL que contiene $Ejecutable. Con varias versiones instaladas
+      (p. ej. 14 y 18) prefiere la que atiende BD_PORT de red.env, para que pg_dump y
+      pg_restore coincidan con el servidor; si no la reconoce, usa la más reciente.
+    #>
+    param([string] $Ejecutable = 'psql')
+
+    $candidatos = @(Get-ChildItem "C:\Program Files\PostgreSQL\*\bin\$Ejecutable.exe" -ErrorAction SilentlyContinue |
+        Sort-Object { [version](($_.Directory.Parent.Name -replace '[^\d.]', '') + '.0') } -Descending)
+    if (-not $candidatos) { return $null }
+
+    $puerto = (Import-Red).BD_PORT
+    foreach ($exe in $candidatos) {
+        $conf = Join-Path $exe.Directory.Parent.FullName 'data\postgresql.conf'
+        if (-not (Test-Path $conf)) { continue }
+        # La última línea "port = ..." no comentada es la que vale.
+        $linea = Select-String -Path $conf -Pattern '^\s*port\s*=\s*(\d+)' | Select-Object -Last 1
+        if ($linea -and $linea.Matches[0].Groups[1].Value -eq $puerto) { return $exe.DirectoryName }
+    }
+    return $candidatos[0].DirectoryName
+}
+
 function Add-ReglaFirewall {
     <# Permite un puerto TCP de entrada solo desde las IPs indicadas. Se puede ejecutar varias veces. #>
     param([string] $Nombre, [string] $Puerto, [string[]] $Desde)

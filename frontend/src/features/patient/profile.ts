@@ -40,7 +40,11 @@ export const uploadProfilePhoto = async (
     name: `perfil.${mimeType.split("/")[1] ?? "jpg"}`,
     type: mimeType,
   } as unknown as Blob);
-  await apiRequest("/perfil/foto", { method: "POST", body: form });
+  await apiRequest("/perfil/foto", {
+    method: "POST",
+    body: form,
+    timeoutMs: 60000,
+  });
 };
 export const deleteProfilePhoto = async () => {
   await apiRequest("/perfil/foto", { method: "DELETE" });
