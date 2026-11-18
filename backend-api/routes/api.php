@@ -10,6 +10,8 @@ use App\Http\Controllers\Api\Usuario\UsuarioController;
 use App\Http\Controllers\Api\Usuario\RolController;
 
 use App\Http\Controllers\Api\Paciente\PacienteController;
+use App\Http\Controllers\Api\Integracion\NormalizacionPacienteController;
+use App\Http\Controllers\Api\Integracion\ResumenSolicitudController;
 
 use App\Http\Controllers\Api\Clinica\HistorialClinicoController;
 use App\Http\Controllers\Api\Clinica\DiagnosticoController;
@@ -125,6 +127,14 @@ Route::middleware('auth:sanctum','role:doctora,asistente')->prefix('pacientes')-
     Route::post('/', [PacienteController::class, 'store']);
     Route::put('/{id}', [PacienteController::class, 'update']);
 });
+
+// Tema 2.3 - Normalización de pacientes (origen: web | externo)
+Route::middleware('auth:sanctum','role:doctora,asistente')
+    ->post('/integracion/pacientes/{origen}', [NormalizacionPacienteController::class, 'normalizar']);
+
+// Orquestación - consulta usuarios y estados y responde un resumen unificado
+Route::get('/resumen-solicitud/{id}', [ResumenSolicitudController::class, 'show'])
+    ->whereNumber('id');
 
 // Perfil del paciente
 Route::middleware('auth:sanctum','role:paciente')->prefix('paciente')->group(function () {
