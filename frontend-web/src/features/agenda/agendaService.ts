@@ -11,8 +11,18 @@ const agendaEntrySchema = z.object({
 })
 const listSchema = z.object({ data: z.array(agendaEntrySchema) })
 const messageSchema = z.object({ message: z.string() })
+const appointmentSummarySchema = z.object({
+  data: z.object({
+    cita: z.object({
+      id: z.string().min(1), fecha: z.iso.date(), hora_inicio: z.string().regex(/^\d{2}:\d{2}(?::\d{2})?$/),
+      hora_fin: z.string().regex(/^\d{2}:\d{2}(?::\d{2})?$/), estado: z.string().min(1), descripcion: z.string().nullable(),
+    }),
+    paciente: z.object({ codigo_paciente: z.string().min(1), nombres: z.string().min(1) }),
+  }).nullable(),
+})
 
 export type AgendaEntry = z.infer<typeof agendaEntrySchema>
+export type AppointmentSummary = NonNullable<z.infer<typeof appointmentSummarySchema>['data']>
 export type AgendaSlot = { fecha: string; hora_inicio: string; hora_fin: string }
 export type PersonalEntryPayload = AgendaSlot & { descripcion: string }
 export type MedicalAppointmentPayload = AgendaSlot & { codigo_paciente: string; descripcion: string | null }
@@ -34,6 +44,12 @@ export async function getPendingRequests(signal?: AbortSignal): Promise<AgendaEn
   requireApiBaseUrl()
   const { data } = await apiClient.get<unknown>('/agenda', { params: { estado: 'pendiente' }, ...(signal ? { signal } : {}) })
   return listSchema.parse(data).data
+}
+
+export async function getAppointmentSummary(id: string, signal?: AbortSignal): Promise<AppointmentSummary | null> {
+  requireApiBaseUrl()
+  const { data } = await apiClient.get<unknown>(`/resumen-cita/${encodeURIComponent(id)}`, signal ? { signal } : undefined)
+  return appointmentSummarySchema.refine((response) => response.data === null || response.data.cita.id === id, { message: 'El ID de la cita no coincide' }).parse(data).data
 }
 
 async function post(path: string, values: PersonalEntryPayload | MedicalAppointmentPayload): Promise<string> {

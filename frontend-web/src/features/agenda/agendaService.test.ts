@@ -1,12 +1,35 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { apiClient } from '../../services/apiClient'
-import { cancelAppointment, completeAppointment, createMedicalAppointment, createPersonalEntry, deleteAgendaEntry, getAgendaMonth, getPendingRequests, programRequest, registerClinicalData, updateAgendaEntry } from './agendaService'
+import { cancelAppointment, completeAppointment, createMedicalAppointment, createPersonalEntry, deleteAgendaEntry, getAgendaMonth, getAppointmentSummary, getPendingRequests, programRequest, registerClinicalData, updateAgendaEntry } from './agendaService'
 
 const originalBaseURL = apiClient.defaults.baseURL
 const entry = { id: 'entry-id', paciente_id: null, fecha: '2026-10-05', hora_inicio: '10:00:00', hora_fin: '11:00:00', tipo: 'personal', descripcion: 'Bloque', estado: null, diagnostico: null, tratamiento: null, observacion: null, paciente: null }
 afterEach(() => { apiClient.defaults.baseURL = originalBaseURL; vi.restoreAllMocks() })
 
 describe('agendaService', () => {
+  it('requests and validates the proposed orchestrated summary contract', async () => {
+    apiClient.defaults.baseURL = 'https://api.clinica.test/api'
+    const summary = { cita: { id: 'cita/1', fecha: '2026-10-05', hora_inicio: '10:00', hora_fin: '11:00', estado: 'programada', descripcion: 'Control' }, paciente: { codigo_paciente: '001', nombres: 'Paciente recibido' } }
+    const get = vi.spyOn(apiClient, 'get').mockResolvedValue({ data: { data: summary } })
+    const controller = new AbortController()
+    expect(await getAppointmentSummary('cita/1', controller.signal)).toEqual(summary)
+    expect(get).toHaveBeenCalledWith('/resumen-cita/cita%2F1', { signal: controller.signal })
+  })
+
+  it('rejects a summary without real patient data and accepts an explicit empty result', async () => {
+    apiClient.defaults.baseURL = 'https://api.clinica.test/api'
+    vi.spyOn(apiClient, 'get').mockResolvedValueOnce({ data: { data: { cita: { id: '1' }, paciente: null } } }).mockResolvedValueOnce({ data: { data: null } })
+    await expect(getAppointmentSummary('1')).rejects.toThrow()
+    await expect(getAppointmentSummary('1')).resolves.toBeNull()
+  })
+
+  it('rejects a summary for another appointment or with an invalid date', async () => {
+    apiClient.defaults.baseURL = 'https://api.clinica.test/api'
+    const valid = { cita: { id: 'other', fecha: '2026-10-05', hora_inicio: '10:00', hora_fin: '11:00', estado: 'programada', descripcion: null }, paciente: { codigo_paciente: '001', nombres: 'Paciente recibido' } }
+    vi.spyOn(apiClient, 'get').mockResolvedValueOnce({ data: { data: valid } }).mockResolvedValueOnce({ data: { data: { ...valid, cita: { ...valid.cita, id: '1', fecha: 'not-a-date' } } } })
+    await expect(getAppointmentSummary('1')).rejects.toThrow()
+    await expect(getAppointmentSummary('1')).rejects.toThrow()
+  })
   it('loads a month and undated pending requests separately', async () => {
     apiClient.defaults.baseURL = 'https://api.clinica.test/api'
     const get = vi.spyOn(apiClient, 'get').mockResolvedValueOnce({ data: { data: [entry] } }).mockResolvedValueOnce({ data: { data: [{ ...entry, tipo: 'cita_medica', estado: 'pendiente', fecha: null, hora_inicio: null, hora_fin: null }] } })

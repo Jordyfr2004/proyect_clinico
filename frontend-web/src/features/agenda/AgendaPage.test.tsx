@@ -2,13 +2,13 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { AgendaPage } from './AgendaPage'
-import { createMedicalAppointment, createPersonalEntry, getAgendaMonth, getPendingRequests, updateAgendaEntry } from './agendaService'
+import { createMedicalAppointment, createPersonalEntry, getAgendaMonth, getAppointmentSummary, getPendingRequests, updateAgendaEntry } from './agendaService'
 import { AuthContext } from '../auth/authContext'
 import { getPatients } from '../patients/patientService'
 import type { UserRole } from '../auth/authService'
 import * as clinicalQuery from '../../services/clinicalQuery'
 
-vi.mock('./agendaService', () => ({ getAgendaMonth: vi.fn(), getPendingRequests: vi.fn(), createMedicalAppointment: vi.fn(), createPersonalEntry: vi.fn(), updateAgendaEntry: vi.fn() }))
+vi.mock('./agendaService', () => ({ getAgendaMonth: vi.fn(), getAppointmentSummary: vi.fn(), getPendingRequests: vi.fn(), createMedicalAppointment: vi.fn(), createPersonalEntry: vi.fn(), updateAgendaEntry: vi.fn() }))
 vi.mock('../patients/patientService', () => ({ getPatients: vi.fn() }))
 const personal = { id: 'personal-1', paciente_id: null, fecha: '2026-10-05', hora_inicio: '10:00', hora_fin: '11:00', tipo: 'personal' as const, descripcion: 'Reunión', estado: null, diagnostico: null, tratamiento: null, observacion: null, paciente: null }
 const medical = { ...personal, id: 'medical-1', tipo: 'cita_medica' as const, estado: 'programada' as const, descripcion: 'Control recibido', paciente_id: 'patient-1', paciente: { codigo_paciente: '001', nombres: 'Paciente recibido' } }
@@ -34,6 +34,18 @@ async function choosePatient(form: HTMLElement, search = 'Paciente', option = /P
 }
 
 describe('AgendaPage consultation', () => {
+  it('opens the orchestrated summary only for a medical appointment', async () => {
+    vi.mocked(getAppointmentSummary).mockResolvedValue(null)
+    renderAgenda('asistente')
+    selectOctober()
+    const bookings = screen.getByRole('region', { name: 'Registros agendados' })
+    expect(await within(bookings).findByText('Control recibido')).toBeInTheDocument()
+    expect(within(bookings).getAllByRole('button', { name: 'Consultar resumen de cita' })).toHaveLength(1)
+    fireEvent.click(within(bookings).getByRole('button', { name: 'Consultar resumen de cita' }))
+    expect(await screen.findByRole('dialog', { name: 'Resumen de cita' })).toBeInTheDocument()
+    expect(await screen.findByText(/No hay información de resumen/)).toBeInTheDocument()
+    expect(getAppointmentSummary).toHaveBeenCalledWith('medical-1', expect.any(AbortSignal))
+  })
   it('invalidates the Dashboard total after editing a medical appointment', async () => {
     const stale = vi.spyOn(clinicalQuery, 'markClinicalQueriesStale')
     vi.mocked(updateAgendaEntry).mockResolvedValue('Cita actualizada')

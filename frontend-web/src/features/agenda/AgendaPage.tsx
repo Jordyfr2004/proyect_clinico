@@ -12,6 +12,7 @@ import { markClinicalQueriesStale, useClinicalQuery } from '../../services/clini
 import { useClinicalViewState } from '../../services/clinicalViewState'
 import type { Patient } from '../patients/patientService'
 import { AgendaPatientSearch } from './AgendaPatientSearch'
+import { AppointmentSummary } from './AppointmentSummary'
 import './agenda.css'
 
 type AgendaState = { kind: 'loading' } | { kind: 'ready'; entries: AgendaEntry[] } | { kind: 'error'; message: string }
@@ -103,6 +104,7 @@ export function AgendaPage() {
   const [entryDialog, setEntryDialog] = useState<{ kind: 'edit' | 'delete'; entry: AgendaEntry } | null>(null)
   const [entryBusy, setEntryBusy] = useState(false)
   const [entryError, setEntryError] = useState<string | null>(null)
+  const [summaryId, setSummaryId] = useState<string | null>(null)
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const [menuAbove, setMenuAbove] = useState(false)
   const [pickerStep, setPickerStep] = useState<'years' | 'months' | 'days'>('days')
@@ -115,6 +117,7 @@ export function AgendaPage() {
   const recordsContent = useRef<HTMLDivElement | null>(null)
   const appointmentPending = useRef(false)
   const appointmentTrigger = useRef<HTMLButtonElement | null>(null)
+  const summaryTrigger = useRef<HTMLButtonElement | null>(null)
   useEffect(() => {
     if (location.state?.dashboardAction !== 'programar-cita' || user?.role !== 'doctora') return
     const timer = window.setTimeout(() => {
@@ -238,6 +241,7 @@ export function AgendaPage() {
     {appointmentSuccess ? <p className="admin-success rounded-xl p-4 text-sm" role="status">{appointmentSuccess}</p> : null}
     {appointmentOpen ? <AccessibleDialog busy={appointmentBusy} onClose={closeAppointment} title={appointmentKind === 'medical' ? 'Agendar cita médica' : 'Agendar actividad personal'} titleId="agenda-appointment-title"><AgendaForm busy={appointmentBusy} date={selectedDate} error={appointmentError} onCancel={closeAppointment} onKindChange={(next) => { setAppointmentKind(next); setAppointmentError(null) }} onSave={(choice) => { void saveAppointment(choice) }}/></AccessibleDialog> : null}
     {entryDialog ? <AccessibleDialog busy={entryBusy} onClose={() => { if (!entryBusy) { setEntryDialog(null); setEntryError(null) } }} title={entryDialog.kind === 'edit' ? 'Editar registro de agenda' : 'Eliminar registro'} titleId="agenda-entry-dialog-title"><AgendaEntryDialog busy={entryBusy} entry={entryDialog.entry} error={entryError} kind={entryDialog.kind} onCancel={() => { setEntryDialog(null); setEntryError(null) }} onSave={(values) => { void saveEntryAction(values) }}/></AccessibleDialog> : null}
+    {summaryId ? <AccessibleDialog onClose={() => { setSummaryId(null); summaryTrigger.current?.focus() }} title="Resumen de cita" titleId="agenda-summary-title"><AppointmentSummary id={summaryId}/></AccessibleDialog> : null}
     <div className="grid items-start gap-5 xl:grid-cols-[minmax(0,400px)_minmax(0,1fr)]">
       <section aria-label={`Calendario de ${monthLabel}`} className="admin-surface w-full max-w-[420px] min-w-0 rounded-[22px] p-4 shadow-[0_12px_30px_rgba(19,55,108,0.06)] sm:p-5 xl:sticky xl:top-6 xl:max-w-none" ref={calendarCard}>
         <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
@@ -280,6 +284,7 @@ export function AgendaPage() {
               <time className="shrink-0 rounded-xl bg-[#e8f2ff] px-3 py-2 text-sm font-bold whitespace-nowrap text-ink-950">{entry.hora_inicio?.slice(0, 5) ?? 'Hora no disponible'}{entry.hora_fin ? ` – ${entry.hora_fin.slice(0, 5)}` : ''}</time>
               <div className="min-w-[135px] flex-1 border-l border-[#c9daec] pl-3"><span className="admin-pill admin-pill-ready">{entry.tipo === 'personal' ? 'Actividad personal' : 'Cita médica'}</span><p className="mt-1 break-words text-sm font-semibold text-ink-950">{entry.descripcion || (entry.tipo === 'cita_medica' ? entry.paciente?.nombres ?? 'Cita médica' : 'Actividad personal')}</p>{entry.paciente ? <p className="admin-muted mt-0.5 break-words text-sm">{entry.paciente.nombres}</p> : null}</div>
               {entry.estado ? <span aria-label={`Estado: ${entry.estado}`} className={`rounded-full px-3 py-1.5 text-xs font-semibold capitalize ${entry.estado === 'completada' ? 'bg-emerald-50 text-emerald-800' : entry.estado === 'cancelada' ? 'bg-red-50 text-red-700' : 'bg-sky-50 text-clinic-700'}`}>{entry.estado}</span> : null}
+              {entry.tipo === 'cita_medica' ? <button className="admin-secondary min-h-10 rounded-lg px-3 text-sm font-semibold" onClick={(event) => { summaryTrigger.current = event.currentTarget; setSummaryId(entry.id) }} type="button">Consultar resumen de cita</button> : null}
               {user?.role === 'doctora' ? <div className="relative ml-auto"><button aria-expanded={openMenuId === entry.id} aria-label={`Más opciones para ${entry.descripcion || entry.paciente?.nombres || 'registro'}`} className="admin-secondary grid size-10 place-items-center rounded-xl" onClick={(event) => { if (openMenuId === entry.id) { setOpenMenuId(null); return } const bottom = Math.min(recordsList.current?.getBoundingClientRect().bottom ?? window.innerHeight, window.innerHeight); setMenuAbove(bottom - event.currentTarget.getBoundingClientRect().bottom < 110); setOpenMenuId(entry.id) }} type="button"><MoreVertical aria-hidden="true" size={18}/></button>{openMenuId === entry.id ? <div className={`absolute right-0 z-10 min-w-36 rounded-xl border border-[#dbe6f2] bg-white p-1 shadow-lg ${menuAbove ? 'bottom-full mb-1' : 'top-full mt-1'}`}><button className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-ink-950 hover:bg-sky-50" onClick={() => { setOpenMenuId(null); setEntryError(null); setEntryDialog({ kind: 'edit', entry }) }} type="button">Editar</button><button className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-red-700 hover:bg-red-50" onClick={() => { setOpenMenuId(null); setEntryError(null); setEntryDialog({ kind: 'delete', entry }) }} type="button">Eliminar</button></div> : null}</div> : null}
             </li>)}</ul>
           </div>)}</div>}
