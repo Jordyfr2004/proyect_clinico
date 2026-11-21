@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\Usuario\RolController;
 use App\Http\Controllers\Api\Paciente\PacienteController;
 use App\Http\Controllers\Api\Integracion\NormalizacionPacienteController;
 use App\Http\Controllers\Api\Integracion\ResumenSolicitudController;
+use App\Http\Controllers\Api\Integracion\NotificacionCitaController;
 
 use App\Http\Controllers\Api\Clinica\HistorialClinicoController;
 use App\Http\Controllers\Api\Clinica\DiagnosticoController;
@@ -135,6 +136,17 @@ Route::middleware('auth:sanctum','role:doctora,asistente')
 // Orquestación - consulta usuarios y estados y responde un resumen unificado
 Route::get('/resumen-solicitud/{id}', [ResumenSolicitudController::class, 'show'])
     ->whereNumber('id');
+
+
+
+// Tema 3.1 - Comunicación asíncrona: notificación de cita (productor → cola → consumidor)
+Route::middleware('auth:sanctum', 'role:doctora,asistente')->prefix('notificaciones-cita')->group(function () {
+    Route::post('/', [NotificacionCitaController::class, 'encolar']);
+    Route::post('/sincrono', [NotificacionCitaController::class, 'sincrono']);
+    Route::get('/{messageId}', [NotificacionCitaController::class, 'estado']);
+});
+
+
 
 // Perfil del paciente
 Route::middleware('auth:sanctum','role:paciente')->prefix('paciente')->group(function () {

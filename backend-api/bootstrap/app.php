@@ -33,6 +33,12 @@ return Application::configure(basePath: dirname(__DIR__))
             'role' => RoleMiddleware::class,
         ]);
 
+        // Tema 2.4: la API no tiene pantalla de login; a un cliente sin token
+        // se le responde 401 en JSON en vez de intentar redirigirlo (evita un 500).
+        $middleware->redirectGuestsTo(
+            fn (Request $request) => $request->is('api/*') ? null : '/'
+        );
+
         // Los proxies de confianza se leen de config/trustedproxy.php (TRUSTED_PROXIES).
         $middleware->prepend(IdentificarInstancia::class);
 
@@ -41,6 +47,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->appendToPriorityList(Authenticate::class, ContextoAuditoria::class);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        // Tema 2.4: las rutas /api/* siempre responden JSON (401/403 sin páginas HTML ni trazas),
+        // aunque el cliente no envíe el encabezado Accept: application/json.
+        $exceptions->shouldRenderJsonWhen(
+            fn (Request $request) => $request->is('api/*') || $request->expectsJson()
+        );
+
         // Respuestas controladas cuando cae un servicio externo, en lugar de un 500 genérico.
         $exceptions->render(function (QueryException $e, Request $request) {
             // SQLSTATE clase 08: errores de conexión con la base de datos. Al fallar la
