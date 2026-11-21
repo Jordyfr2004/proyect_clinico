@@ -1,0 +1,58 @@
+@keyframes medical-panel-enter {
+  from { opacity: .35; transform: translateX(32px); }
+  to { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes medical-panel-exit {
+  from { opacity: 1; transform: translateX(0); }
+  to { opacity: 0; transform: translateX(32px); }
+}
+
+@keyframes medical-backdrop-enter {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes medical-backdrop-exit {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+@keyframes medical-dialog-enter {
+  from { opacity: .55; transform: translateY(6px) scale(.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes medical-tab-enter {
+  from { opacity: .65; transform: translateY(5px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.medical-appointment-panel { animation: medical-panel-enter 290ms ease-out both; }
+.medical-appointment-backdrop { animation: medical-backdrop-enter 290ms ease-out both; }
+.medical-appointment-panel[data-exiting="true"] { animation: medical-panel-exit 290ms ease-in both; }
+.medical-appointment-backdrop[data-exiting="true"] { animation: medical-backdrop-exit 290ms ease-in both; }
+
+.admin-dialog-panel:has(.medical-appointment-form) { animation: medical-dialog-enter 250ms ease-out both; }
+.medical-appointment-tab-panel { animation: medical-tab-enter 225ms ease-out both; }
+
+.medical-appointment-card { transition: border-color 225ms ease, box-shadow 225ms ease; }
+.medical-appointment-card:hover,
+.medical-appointment-card:focus-within,
+.medical-appointment-card[data-selected="true"] {
+  border-color: #bcd2eb;
+  box-shadow: 0 5px 18px rgba(19, 55, 108, .09);
+}
+
+.admin-dialog-panel:has(.medical-appointment-edit),
+.admin-dialog-panel:has(.medical-appointment-clinical) { max-width: 550px; }
+
+.medical-appointment-form-actions > button { flex: 1 1 170px; }
+
+@media (prefers-reduced-motion: reduce) {
+  .medical-appointment-panel,
+  .medical-appointment-backdrop,
+  .admin-dialog-panel:has(.medical-appointment-form),
+  .medical-appointment-tab-panel { animation: none; }
+  .medical-appointment-card { transition: none; }
+}

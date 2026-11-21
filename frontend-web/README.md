@@ -1,0 +1,41 @@
+# Frontend web — Clínica Dental
+
+SPA web para la gestión clínica y administrativa. El portal web es administrativo para doctora y asistente. El rol paciente se reconoce en autenticación, pero no entra al shell administrativo; su cuenta, identidad y perfil pertenecen al flujo móvil. Está construida con React, TypeScript, Vite, React Router, Axios, Tailwind CSS, React Hook Form, Zod y Lucide React.
+
+## Desarrollo
+
+```bash
+npm install
+Copy-Item .env.example .env.local
+npm run dev
+```
+
+Configura `VITE_API_BASE_URL` localmente en `.env.local` con la base de la API confirmada por backend. `.env` y `.env.local` no se versionan. La autenticación actual es real: Axios usa un token Bearer de Laravel Sanctum, restaura el usuario con `GET /user` y distingue respuestas 401/403.
+
+## Comandos
+
+```bash
+npm test
+npm run lint
+npm run build
+```
+
+## Arquitectura
+
+- `src/app`: routing y protección de rutas.
+- `src/layouts`: shell público y área administrativa responsive.
+- `src/features`: módulos funcionales por dominio.
+- `src/components`: controles y estados reutilizables.
+- `src/services`: cliente HTTP y futuros servicios por recurso.
+
+El frontend no contiene datos simulados en runtime ni contratos de API inventados. Integra login/sesión y recuperación de contraseña reales; la doctora gestiona varias cuentas de asistentes mediante rutas por ID. Pacientes administrativos para doctora/asistente usa GET listado paginado con búsqueda del servidor, GET detalle, POST y PUT. El resumen muestra los seis campos confirmados. `POST /pacientes` usa `nombres`, `cedula`, `telefono`, `direccion` y `fecha_nacimiento`; tras un 201 vuelve a consultar el listado. PUT paciente actualiza solo los campos permitidos y vuelve a consultar el detalle.
+
+Historial clínico está integrado en el expediente web: doctora/asistente consultan por paciente y solo doctora registra y actualiza los cinco campos confirmados. El historial propio del paciente pertenece al móvil. Agenda muestra el calendario y sus registros existentes. Citas médicas permite a la doctora consultar el mes, gestionar citas y programar solicitudes pendientes; allí se registran diagnóstico, tratamiento y observación de cada cita. Actividades para doctora/asistente permanece separada de los registros personales de Agenda. Las vistas clínicas independientes del expediente carecen de contrato confirmado. Usuarios incluye la gestión real de cuentas de pacientes para doctora, recorriendo las páginas del listado antes de filtrar el rol. Caja consume el resumen y los egresos reales; Configuración consulta acciones y sesiones y permite ocultar acciones, solo para doctora. Reportes y Dashboard de doctora consumen respuestas reales del backend. El catálogo de categorías y servicios usa contratos reales; eliminar categorías queda bloqueado por un defecto de relación en Laravel. La foto de perfil protegida se carga con Bearer mediante Axios. El expediente muestra metadatos de evidencias clínicas en lectura para doctora/asistente. Su escritura y apertura quedan pendientes del contrato de archivos; el odontograma requiere definir la estructura interna de `datos`. El web no expone registro ni perfil de paciente.
+
+Las pruebas automatizadas y el QA de navegador con respuestas aisladas de prueba no equivalen a E2E contra Laravel. No hay una prueba E2E autenticada documentada para estas integraciones; la eliminación real de asistente y los cambios reales del historial requieren prueba manual autorizada. Antes de integrar, volver a inspeccionar `origin/backend` actualizado; no asumir que un SHA histórico representa el contrato actual.
+
+El expediente navega por Historial clínico, Diagnósticos y Evidencias clínicas. Los datos generales se muestran junto al historial; Tratamientos y Odontograma son apartados internos de Diagnósticos y esperan un contrato de consulta clínica suficiente. Agenda permite a la doctora registrar una cita desde el día seleccionado mediante el contrato existente. El perfil propio y su fotografía están en el encabezado; las fotos de pacientes vinculados se obtienen con Bearer desde Laravel. Recetas y Planes/presupuestos se retiraron de la navegación web por decisión de la doctora.
+
+## Contexto para desarrollo
+
+Antes de implementar funcionalidades, revisa [el contexto operativo](docs/frontend-context.md) y [las decisiones del frontend](docs/frontend-decisions.md). El código no debe adelantarse a contratos reales del backend ni rellenarse con datos simulados.

@@ -1,0 +1,183 @@
+.public-home { --public-ink: #102b3d; --public-deep: #062b3a; --public-teal: #087f82; --public-mint: #b9efdf; color: var(--public-ink); background: #f7faf9; overflow: clip; }
+.public-home * { box-sizing: border-box; }
+.public-home :is(a, button):focus-visible { outline: 3px solid #32d6c3; outline-offset: 4px; }
+.public-home a { text-decoration: none; }
+.public-container { width: min(100% - 80px, 1320px); margin-inline: auto; }
+.public-skip-link { position: fixed; z-index: 100; top: -80px; left: 20px; padding: 12px 18px; color: #062b3a; background: white; border-radius: 8px; }
+.public-skip-link:focus { top: 16px; }
+
+.public-header { position: sticky; z-index: 50; top: 0; height: 88px; background: rgb(250 253 252 / 95%); border-bottom: 1px solid rgb(13 66 78 / 8%); box-shadow: 0 8px 35px rgb(9 45 59 / 4%); backdrop-filter: blur(18px); }
+.public-header-inner { display: flex; align-items: center; justify-content: space-between; gap: 36px; width: min(100% - 80px, 1320px); height: 100%; margin: auto; }
+.public-brand-link { display: inline-flex; min-width: 0; flex: none; color: var(--public-deep); }
+.public-brand { display: inline-flex; align-items: center; gap: 10px; min-width: 0; }
+.public-brand-symbol { display: grid; place-items: center; width: 49px; height: 49px; flex: none; color: #0d8f99; filter: drop-shadow(0 5px 7px rgb(32 169 174 / 17%)); }
+.public-brand-symbol svg { width: 33px; height: 38px; }
+.public-brand-copy { display: grid; gap: 1px; }
+.public-brand-copy strong { font-size: 17px; font-weight: 800; letter-spacing: -.045em; white-space: nowrap; }
+.public-brand-copy small { color: #6d8490; font-size: 10px; font-weight: 650; letter-spacing: .09em; text-transform: uppercase; white-space: nowrap; }
+.public-navigation { display: flex; align-items: center; gap: clamp(18px, 2vw, 34px); }
+.public-navigation > a { position: relative; display: inline-flex; align-items: center; gap: 5px; min-height: 44px; color: #355463; font-size: 13px; font-weight: 650; white-space: nowrap; transition: color .2s ease; }
+.public-navigation > a:not(.public-nav-login)::after { content: ''; position: absolute; right: 0; bottom: 5px; left: 0; height: 2px; background: #11a3a7; border-radius: 2px; transform: scaleX(0); transform-origin: left; transition: transform .2s ease; }
+.public-navigation > a:not(.public-nav-login):hover::after, .public-navigation > a:not(.public-nav-login):focus-visible::after { transform: scaleX(1); }
+.public-navigation > a:hover { color: #087f82; }
+.public-navigation > .public-nav-login { gap: 8px; margin-left: 8px; padding: 0 17px; color: #fff; background: #076c78; border: 1px solid #076c78; border-radius: 999px; box-shadow: 0 8px 20px rgb(5 109 117 / 15%); transition: background .2s ease, transform .2s ease, box-shadow .2s ease; }
+.public-navigation > .public-nav-login:hover { color: white; background: #064c5b; box-shadow: 0 11px 24px rgb(5 109 117 / 21%); transform: translateY(-2px); }
+.public-menu-toggle { display: none; }
+
+.public-hero { position: relative; isolation: isolate; display: flex; align-items: center; min-height: min(700px, calc(100svh - 88px)); overflow: hidden; color: white; background: #07374b; }
+.public-hero-image, .public-hero-shade { position: absolute; z-index: -2; inset: 0; width: 100%; height: 100%; }
+.public-hero-image { object-fit: cover; object-position: center 47%; }
+.public-hero-shade { z-index: -1; background: linear-gradient(90deg, rgb(2 32 48 / 97%) 0%, rgb(3 43 57 / 91%) 29%, rgb(3 48 61 / 54%) 52%, rgb(4 36 49 / 7%) 76%), linear-gradient(0deg, rgb(2 29 42 / 22%), transparent 40%); }
+.public-hero-content { position: relative; padding-block: 84px 120px; }
+.public-eyebrow { display: inline-flex; align-items: center; gap: 11px; color: #058c91; font-size: 11px; font-weight: 800; letter-spacing: .2em; line-height: 1.5; text-transform: uppercase; }
+.public-eyebrow-light { color: #a4f2de; }
+.public-hero .public-eyebrow > span { width: 24px; height: 1px; background: currentColor; }
+.public-hero h1 { max-width: 670px; margin: 24px 0 20px; font-size: clamp(48px, 5.2vw, 77px); font-weight: 790; letter-spacing: -.065em; line-height: 1.03; text-wrap: balance; }
+.public-hero-content > p { max-width: 545px; color: #d6e7e9; font-size: clamp(16px, 1.35vw, 19px); line-height: 1.72; }
+.public-hero-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 13px; margin-top: 34px; }
+.public-button { display: inline-flex; align-items: center; justify-content: center; gap: 11px; min-height: 54px; padding: 0 23px; border-radius: 999px; font-size: 14px; font-weight: 760; transition: background .2s ease, color .2s ease, box-shadow .2s ease, transform .2s ease; }
+.public-button:hover { transform: translateY(-3px); }
+.public-button-primary { color: #062f36; background: #a4efda; box-shadow: 0 15px 35px rgb(0 21 27 / 21%); }
+.public-button-primary:hover { color: #062f36; background: #d1fff1; box-shadow: 0 18px 40px rgb(0 21 27 / 27%); }
+.public-button-quiet { color: white; border: 1px solid rgb(222 250 248 / 55%); background: rgb(9 48 59 / 20%); }
+.public-button-quiet:hover { color: white; background: rgb(255 255 255 / 14%); }
+.public-hero-caption { position: absolute; right: max(40px, calc((100vw - 1320px) / 2)); bottom: 74px; display: flex; align-items: center; gap: 12px; color: rgb(255 255 255 / 86%); font-size: 10px; font-weight: 760; letter-spacing: .2em; text-shadow: 0 1px 8px rgb(0 32 42 / 40%); }
+.public-hero-caption span { width: 28px; height: 1px; background: currentColor; }
+
+.public-trust-wrap { position: relative; z-index: 2; margin-top: -49px; }
+.public-trust-strip { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); padding: 22px 25px; background: #fff; border: 1px solid #e0ebeb; border-radius: 19px; box-shadow: 0 22px 55px rgb(15 66 76 / 11%); }
+.public-trust-strip > div { display: flex; align-items: center; gap: 16px; padding-inline: clamp(14px, 2vw, 28px); color: #244a58; font-size: 14px; font-weight: 680; line-height: 1.4; }
+.public-trust-strip > div + div { border-left: 1px solid #e5eeee; }
+.public-trust-strip svg { width: 29px; height: 29px; flex: none; color: #079e9c; stroke-width: 1.6; }
+
+.public-section { scroll-margin-top: 112px; }
+.public-clinic { display: grid; grid-template-columns: 1.08fr .92fr; align-items: center; gap: clamp(55px, 7vw, 114px); padding-block: 135px; }
+.public-clinic-photo-wrap { position: relative; min-height: 530px; }
+.public-clinic-photo { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 39% center; border-radius: 22px 22px 110px 22px; box-shadow: 0 28px 65px rgb(12 62 70 / 13%); }
+.public-photo-accent { position: absolute; z-index: -1; right: -22px; bottom: -22px; width: 56%; height: 51%; border: 2px solid #a3ddd4; border-radius: 28px 28px 115px 28px; }
+.public-clinic-copy h2, .public-patient-heading h2 { max-width: 650px; margin: 20px 0 23px; font-size: clamp(36px, 3.4vw, 55px); font-weight: 780; letter-spacing: -.06em; line-height: 1.12; text-wrap: balance; }
+.public-clinic-copy p, .public-patient-heading p { max-width: 560px; color: #627986; font-size: 17px; line-height: 1.85; }
+.public-text-link { display: inline-flex; align-items: center; gap: 7px; margin-top: 26px; padding-bottom: 5px; color: #087f82; border-bottom: 1px solid #087f82; font-size: 14px; font-weight: 780; transition: gap .2s ease, color .2s ease; }
+.public-text-link:hover { gap: 13px; color: #05565e; }
+
+.public-experience { position: relative; isolation: isolate; scroll-margin-top: 88px; overflow: hidden; color: #fff; background: radial-gradient(circle at 94% 10%, rgb(24 180 172 / 27%), transparent 32%), linear-gradient(115deg, #042b3b, #0a4050 68%, #0b5963); }
+.public-experience-inner { position: relative; z-index: 1; display: grid; grid-template-columns: 1.15fr .85fr; align-items: end; gap: 80px; padding-block: 100px; }
+.public-experience h2 { margin-top: 22px; font-size: clamp(37px, 4vw, 61px); font-weight: 780; letter-spacing: -.06em; line-height: 1.14; }
+.public-experience h2 em { color: #9cebd8; font-style: normal; }
+.public-experience-copy { padding-bottom: 7px; }
+.public-experience-copy p { max-width: 450px; color: #cee4e5; font-size: 16px; line-height: 1.8; }
+.public-experience-copy a { display: inline-flex; align-items: center; gap: 10px; margin-top: 22px; color: #b5f3e1; font-size: 14px; font-weight: 750; transition: gap .2s ease; }
+.public-experience-copy a:hover { gap: 17px; }
+.public-experience-orbit { position: absolute; z-index: -1; right: -150px; bottom: -320px; width: 750px; height: 750px; border: 1px solid rgb(157 233 220 / 14%); border-radius: 50%; box-shadow: 0 0 0 85px rgb(188 248 235 / 3%), 0 0 0 170px rgb(188 248 235 / 2%); }
+
+.public-patient { display: grid; grid-template-columns: .95fr 1.05fr; align-items: start; gap: clamp(50px, 8vw, 130px); padding-block: 135px 140px; }
+.public-patient-heading { position: sticky; top: 130px; }
+.public-patient-list { display: grid; border-top: 1px solid #dce8e9; }
+.public-patient-list > div { display: flex; align-items: center; gap: 20px; min-height: 132px; padding: 23px 6px; border-bottom: 1px solid #dce8e9; }
+.public-patient-icon { display: grid; place-items: center; width: 58px; height: 58px; flex: none; color: #078f93; background: #e2f5ef; border-radius: 17px; }
+.public-patient-icon svg { width: 26px; height: 26px; stroke-width: 1.7; }
+.public-patient-list h3 { font-size: 19px; font-weight: 750; letter-spacing: -.03em; }
+.public-patient-list p { margin-top: 5px; color: #637a86; font-size: 14px; line-height: 1.5; }
+.public-patient-index { align-self: flex-start; margin-left: auto; color: #9ab8bd; font-size: 12px; font-weight: 750; }
+
+.public-contact { position: relative; display: flex; align-items: center; justify-content: space-between; gap: 40px; padding: 60px clamp(28px, 5vw, 72px); color: white; background: linear-gradient(110deg, #0b6670, #107f80 70%, #159496); border-radius: 28px; box-shadow: 0 28px 60px rgb(9 85 90 / 16%); scroll-margin-top: 115px; }
+.public-contact::after { content: ''; position: absolute; right: 18%; bottom: 0; width: 180px; height: 180px; border: 1px solid rgb(207 255 243 / 14%); border-radius: 50%; pointer-events: none; }
+.public-contact h2 { max-width: 640px; margin: 15px 0 12px; font-size: clamp(32px, 3.3vw, 50px); font-weight: 770; letter-spacing: -.055em; line-height: 1.14; }
+.public-contact p { color: #d5f3ee; font-size: 15px; line-height: 1.6; }
+.public-button-contact { position: relative; z-index: 1; flex: none; color: #0c4851; background: #fff; box-shadow: 0 12px 26px rgb(0 48 54 / 18%); }
+.public-button-contact:hover { color: #0c4851; background: #e7fcf7; }
+
+.public-footer { margin-top: 90px; color: #d3e6e8; background: #072d3d; }
+.public-footer-main { display: flex; justify-content: space-between; gap: 35px; padding-block: 64px 57px; }
+.public-footer .public-brand-copy strong { color: white; }
+.public-footer .public-brand-copy small { color: #94bec4; }
+.public-footer-main p { max-width: 300px; margin-top: 16px; color: #9fc2c8; font-size: 13px; line-height: 1.7; }
+.public-footer-links { display: grid; grid-template-columns: repeat(2, auto); align-content: start; gap: 15px 42px; }
+.public-footer-links a { color: #d3e6e8; font-size: 13px; font-weight: 650; transition: color .2s ease; }
+.public-footer-links a:hover { color: #92ead6; }
+.public-footer-bottom { display: flex; justify-content: space-between; gap: 18px; padding-block: 22px 27px; border-top: 1px solid rgb(185 232 226 / 15%); color: #8eb3b9; font-size: 12px; line-height: 1.5; }
+.public-whatsapp-float { position: fixed; z-index: 45; right: 24px; bottom: 24px; display: grid; place-items: center; width: 56px; height: 56px; color: white; background: #11a57b; border: 3px solid white; border-radius: 50%; box-shadow: 0 10px 25px rgb(4 73 61 / 24%); transition: transform .2s ease, box-shadow .2s ease; }
+.public-whatsapp-float:hover { color: white; transform: translateY(-4px); box-shadow: 0 15px 30px rgb(4 73 61 / 30%); }
+
+@media (max-width: 1050px) {
+  .public-header-inner, .public-container { width: min(100% - 48px, 1320px); }
+  .public-header-inner { gap: 20px; }
+  .public-navigation { gap: 14px; }
+  .public-navigation > a { font-size: 12px; }
+  .public-brand-copy strong { font-size: 15px; }
+  .public-hero h1 { max-width: 575px; }
+  .public-clinic { gap: 55px; }
+}
+
+@media (max-width: 800px) {
+  .public-header { height: 72px; }
+  .public-header-inner, .public-container { width: min(100% - 40px, 1320px); }
+  .public-menu-toggle { display: grid; place-items: center; width: 44px; height: 44px; margin-left: auto; color: #0d4d5a; background: #eaf5f3; border: 0; border-radius: 12px; }
+  .public-navigation { position: absolute; top: 71px; right: 0; left: 0; display: none; flex-direction: column; align-items: stretch; gap: 2px; padding: 16px 20px 22px; background: #fff; border-bottom: 1px solid #e0eeee; box-shadow: 0 22px 40px rgb(9 45 59 / 12%); }
+  .public-navigation.is-open { display: flex; }
+  .public-navigation > a { width: 100%; min-height: 48px; padding-inline: 12px; font-size: 15px; }
+  .public-navigation > a:not(.public-nav-login)::after { display: none; }
+  .public-navigation > .public-nav-login { justify-content: center; width: auto; margin: 12px 0 0; font-size: 14px; }
+  .public-hero { min-height: 680px; }
+  .public-hero-image { object-position: 62% center; }
+  .public-hero-shade { background: linear-gradient(90deg, rgb(2 32 48 / 94%) 0%, rgb(3 42 53 / 75%) 53%, rgb(4 36 49 / 21%) 100%), linear-gradient(0deg, rgb(3 37 48 / 57%), transparent 65%); }
+  .public-hero-content { padding-block: 80px 100px; }
+  .public-hero-caption { right: 24px; bottom: 67px; }
+  .public-trust-strip { padding: 18px 15px; }
+  .public-trust-strip > div { gap: 11px; padding-inline: 12px; font-size: 12px; }
+  .public-trust-strip svg { width: 25px; height: 25px; }
+  .public-clinic { gap: 42px; padding-block: 100px; }
+  .public-clinic-photo-wrap { min-height: 440px; }
+  .public-experience-inner { gap: 38px; padding-block: 80px; }
+  .public-patient { gap: 42px; padding-block: 100px; }
+}
+
+@media (max-width: 640px) {
+  .public-header-inner, .public-container { width: min(100% - 32px, 1320px); }
+  .public-brand-symbol { width: 41px; height: 41px; }
+  .public-brand-symbol svg { width: 29px; }
+  .public-brand-copy strong { font-size: 15px; }
+  .public-brand-copy small { font-size: 8px; }
+  .public-hero { align-items: end; min-height: 670px; }
+  .public-hero-image { object-position: 85% center; }
+  .public-hero-shade { background: linear-gradient(0deg, rgb(2 32 45 / 96%) 0%, rgb(2 34 47 / 82%) 39%, rgb(2 32 45 / 18%) 82%), linear-gradient(90deg, rgb(2 32 45 / 24%), transparent); }
+  .public-hero-content { padding-block: 190px 95px; }
+  .public-hero h1 { max-width: 480px; margin-top: 17px; font-size: clamp(42px, 10vw, 55px); }
+  .public-hero-content > p { font-size: 15px; line-height: 1.6; }
+  .public-hero-actions { align-items: stretch; margin-top: 25px; }
+  .public-button { min-height: 51px; padding-inline: 17px; font-size: 13px; }
+  .public-hero-caption { display: none; }
+  .public-trust-wrap { margin-top: -23px; }
+  .public-trust-strip { grid-template-columns: 1fr; padding: 8px 18px; border-radius: 17px; }
+  .public-trust-strip > div { min-height: 65px; padding-inline: 3px; font-size: 13px; }
+  .public-trust-strip > div + div { border-top: 1px solid #e5eeee; border-left: 0; }
+  .public-clinic { display: flex; flex-direction: column; gap: 38px; padding-block: 83px 90px; }
+  .public-clinic-photo-wrap { width: 100%; min-height: 390px; }
+  .public-clinic-photo { border-radius: 16px 16px 80px 16px; object-position: 37% center; }
+  .public-photo-accent { right: -10px; bottom: -10px; }
+  .public-clinic-copy h2, .public-patient-heading h2 { margin-top: 14px; font-size: clamp(35px, 9vw, 47px); }
+  .public-clinic-copy p, .public-patient-heading p { font-size: 15px; line-height: 1.7; }
+  .public-experience-inner { display: block; padding-block: 74px; }
+  .public-experience h2 { font-size: clamp(35px, 8vw, 48px); }
+  .public-experience-copy { margin-top: 32px; }
+  .public-experience-copy p { font-size: 15px; }
+  .public-patient { display: block; padding-block: 85px 93px; }
+  .public-patient-heading { position: static; }
+  .public-patient-list { margin-top: 36px; }
+  .public-patient-list > div { gap: 14px; min-height: 115px; padding-block: 16px; }
+  .public-patient-icon { width: 50px; height: 50px; }
+  .public-patient-list h3 { font-size: 16px; }
+  .public-patient-list p { font-size: 12px; }
+  .public-contact { display: block; padding: 42px 25px; border-radius: 20px; }
+  .public-contact h2 { font-size: 34px; }
+  .public-button-contact { width: fit-content; margin-top: 27px; }
+  .public-footer { margin-top: 70px; }
+  .public-footer-main { display: block; padding-block: 55px 42px; }
+  .public-footer-links { justify-content: start; gap: 15px 30px; margin-top: 36px; }
+  .public-footer-bottom { display: grid; gap: 10px; font-size: 11px; }
+  .public-whatsapp-float { right: 16px; bottom: 16px; width: 50px; height: 50px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .public-home *, .public-home *::before, .public-home *::after { scroll-behavior: auto !important; transition-duration: .01ms !important; animation-duration: .01ms !important; }
+}

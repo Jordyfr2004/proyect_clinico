@@ -1,0 +1,22 @@
+# Servicio systemd del servidor de archivos (Laptop 5).
+# Instalación: ver README.md de servidor_ftp.
+[Unit]
+Description=Servidor de archivos FTP - Proyecto Clinico
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=clinica-ftp
+Group=clinica-ftp
+WorkingDirectory=/opt/clinica/servidor_ftp
+ExecStart=/opt/clinica/servidor_ftp/.venv/bin/python server.py
+Restart=on-failure
+RestartSec=5
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

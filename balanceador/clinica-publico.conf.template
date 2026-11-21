@@ -1,0 +1,40 @@
+# ==============================================================================
+# Laptop 1 - Acceso público al API para la web publicada en Vercel.
+# Solo escucha en 127.0.0.1: Tailscale Funnel lo publica en internet con HTTPS.
+# Expone únicamente /api/ (ni la web ni /nginx_status). Opcional: instalar.sh --publico
+# instalar.sh lo agrega al final de clinica.conf (necesita sus upstreams y su log_format).
+# ==============================================================================
+server {
+    listen 127.0.0.1:${PUBLICO_PORT};
+    server_name _;
+
+    access_log /var/log/nginx/clinica_publico_access.log clinica;
+    error_log  /var/log/nginx/clinica_publico_error.log warn;
+
+    client_max_body_size 20m;
+
+    # Funnel entrega la conexión desde 127.0.0.1; la IP del cliente viene en X-Forwarded-For.
+    set_real_ip_from 127.0.0.1;
+    real_ip_header X-Forwarded-For;
+
+    location ^~ /api/auth/ {
+        limit_req zone=clinica_auth burst=10 nodelay;
+        limit_req_status 429;
+        include /etc/nginx/snippets/clinica-backend.conf;
+    }
+
+    location ^~ /api/ {
+        include /etc/nginx/snippets/clinica-backend.conf;
+    }
+
+    location @backend_no_disponible {
+        default_type application/json;
+        add_header Retry-After 30 always;
+        add_header Access-Control-Allow-Origin * always;
+        return 503 '{"message":"El servicio no está disponible en este momento. Intenta nuevamente en unos minutos."}';
+    }
+
+    location / {
+        return 404;
+    }
+}
