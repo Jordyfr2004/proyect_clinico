@@ -6,6 +6,7 @@ use App\Events\CitaCambioEstado;
 use App\Listeners\RegistrarEventoDeCita;
 use App\Models\Agenda;
 use App\Observers\AgendaObserver;
+use App\Routing\EnrutadorSeguimientoAndres;
 use Brevo\Brevo;
 use GuzzleHttp\Client;
 use Illuminate\Cache\RateLimiting\Limit;
@@ -52,6 +53,7 @@ class AppServiceProvider extends ServiceProvider
         // y cada consumidor se suscribe aquí, sin que el productor lo conozca.
         Agenda::observe(AgendaObserver::class);
         Event::listen(CitaCambioEstado::class, RegistrarEventoDeCita::class);
+        Event::listen(CitaCambioEstado::class, EnrutadorSeguimientoAndres::class);
 
         RateLimiter::for('password-forgot', function (Request $request): array {
             $email = $request->input('email');
