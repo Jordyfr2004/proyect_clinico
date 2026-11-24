@@ -1,41 +1,45 @@
 # Frontend web — Clínica Dental
 
-SPA web para la gestión clínica y administrativa. El portal web es administrativo para doctora y asistente. El rol paciente se reconoce en autenticación, pero no entra al shell administrativo; su cuenta, identidad y perfil pertenecen al flujo móvil. Está construida con React, TypeScript, Vite, React Router, Axios, Tailwind CSS, React Hook Form, Zod y Lucide React.
+Portal administrativo para doctora y asistente construido con React, TypeScript, Vite, React Router, Axios, Zod y Tailwind. El paciente utiliza la aplicación móvil; su rol autenticado no accede al área administrativa web.
 
 ## Desarrollo
 
-```bash
+```powershell
 npm install
 Copy-Item .env.example .env.local
 npm run dev
 ```
 
-Configura `VITE_API_BASE_URL` localmente en `.env.local` con la base de la API confirmada por backend. `.env` y `.env.local` no se versionan. La autenticación actual es real: Axios usa un token Bearer de Laravel Sanctum, restaura el usuario con `GET /user` y distingue respuestas 401/403.
+Configura `VITE_API_BASE_URL` con la base confirmada de Laravel, sin barra final. Los archivos `.env` y `.env.local` no se versionan. Las variables `VITE_*` son públicas y no deben contener secretos. Axios envía el Bearer Sanctum vigente. Solo el token se conserva en `sessionStorage`; los datos clínicos y las consultas permanecen en memoria y se eliminan al cerrar o cambiar de sesión.
 
-## Comandos
-
-```bash
-npm test
+```powershell
 npm run lint
+npm test
 npm run build
+git diff --check
 ```
 
-## Arquitectura
+El build ejecuta `tsc -b` antes de Vite. No existe un script TypeScript separado. Las pruebas Vitest usan mocks de contratos; no equivalen a E2E autenticado contra Laravel.
 
-- `src/app`: routing y protección de rutas.
-- `src/layouts`: shell público y área administrativa responsive.
-- `src/features`: módulos funcionales por dominio.
-- `src/components`: controles y estados reutilizables.
-- `src/services`: cliente HTTP y futuros servicios por recurso.
+## Módulos integrados
 
-El frontend no contiene datos simulados en runtime ni contratos de API inventados. Integra login/sesión y recuperación de contraseña reales; la doctora gestiona varias cuentas de asistentes mediante rutas por ID. Pacientes administrativos para doctora/asistente usa GET listado paginado con búsqueda del servidor, GET detalle, POST y PUT. El resumen muestra los seis campos confirmados. `POST /pacientes` usa `nombres`, `cedula`, `telefono`, `direccion` y `fecha_nacimiento`; tras un 201 vuelve a consultar el listado. PUT paciente actualiza solo los campos permitidos y vuelve a consultar el detalle.
+- Autenticación, recuperación de contraseña y fotografía protegida del perfil propio.
+- Dashboard, Agenda y Citas médicas: pacientes registrados y reservas por nombre, sin datos clínicos para reservas; completado con actividad y precio; generación económica confirmada por Laravel.
+- Actividades y Caja: relaciones de paciente nulas, edición parcial de actividades vinculadas o anónimas existentes, ingresos solo generados por el servidor y gestión de egresos.
+- Pacientes y expediente: paginación/búsqueda, alta/edición, historial clínico, odontograma persistente y evidencias JPG/JPEG/PNG/WebP/PDF de hasta 20 MB con descarga autenticada.
+- Diagnósticos y tratamientos: lectura desde citas oficiales, filtro local por UUID exacto, exclusivamente doctora. La asistente consulta historial, odontograma y evidencias, según Laravel.
+- Mis servicios, Reportes, Usuarios y Configuración. Historial de cambios con filtros reales, hasta 200 registros, detalle anterior/nuevo y secretos enmascarados; se conservan Acciones y Sesiones.
 
-Historial clínico está integrado en el expediente web: doctora/asistente consultan por paciente y solo doctora registra y actualiza los cinco campos confirmados. El historial propio del paciente pertenece al móvil. Agenda muestra el calendario y sus registros existentes. Citas médicas permite a la doctora consultar el mes, gestionar citas y programar solicitudes pendientes; allí se registran diagnóstico, tratamiento y observación de cada cita. Actividades para doctora/asistente permanece separada de los registros personales de Agenda. Las vistas clínicas independientes del expediente carecen de contrato confirmado. Usuarios incluye la gestión real de cuentas de pacientes para doctora, recorriendo las páginas del listado antes de filtrar el rol. Caja consume el resumen y los egresos reales; Configuración consulta acciones y sesiones y permite ocultar acciones, solo para doctora. Reportes y Dashboard de doctora consumen respuestas reales del backend. El catálogo de categorías y servicios usa contratos reales; eliminar categorías queda bloqueado por un defecto de relación en Laravel. La foto de perfil protegida se carga con Bearer mediante Axios. El expediente muestra metadatos de evidencias clínicas en lectura para doctora/asistente. Su escritura y apertura quedan pendientes del contrato de archivos; el odontograma requiere definir la estructura interna de `datos`. El web no expone registro ni perfil de paciente.
+Los borradores clínicos se protegen ante cierre, navegación interna, Atrás/Adelante, recarga y cierre voluntario de sesión. Los formularios conservan cambios tras errores. El odontograma preserva JSON ajeno; los formatos heredados incompatibles quedan en consulta. Se utiliza `datos.frontend_web_v1.teeth` para las condiciones y observaciones editables, sin migrar estructuras de otros clientes.
 
-Las pruebas automatizadas y el QA de navegador con respuestas aisladas de prueba no equivalen a E2E contra Laravel. No hay una prueba E2E autenticada documentada para estas integraciones; la eliminación real de asistente y los cambios reales del historial requieren prueba manual autorizada. Antes de integrar, volver a inspeccionar `origin/backend` actualizado; no asumir que un SHA histórico representa el contrato actual.
+Recetas y plantillas se retiraron porque el backend oficial eliminó sus rutas y tablas. No hay integración de WebSockets. La [práctica académica 3.3](docs/practica-3-3-orquestacion-frontend-hache.md) se conserva; `/resumen-cita/{id}` solo se habilita con `VITE_ENABLE_ACADEMIC_ORCHESTRATION=true` y una API académica que realmente publique esa ruta. Mantener la opción en `false` para el backend oficial.
 
-El expediente navega por Historial clínico, Diagnósticos y Evidencias clínicas. Los datos generales se muestran junto al historial; Tratamientos y Odontograma son apartados internos de Diagnósticos y esperan un contrato de consulta clínica suficiente. Agenda permite a la doctora registrar una cita desde el día seleccionado mediante el contrato existente. El perfil propio y su fotografía están en el encabezado; las fotos de pacientes vinculados se obtienen con Bearer desde Laravel. Recetas y Planes/presupuestos se retiraron de la navegación web por decisión de la doctora.
+## Auditoría y límites de validación
 
-## Contexto para desarrollo
+Consulta la [matriz completa de endpoints, permisos, payloads y resultados](docs/integration-audit.md), el [registro de ejecución](docs/integration-plan.md) y el [inventario de cambios](docs/integration-files.md).
 
-Antes de implementar funcionalidades, revisa [el contexto operativo](docs/frontend-context.md) y [las decisiones del frontend](docs/frontend-decisions.md). El código no debe adelantarse a contratos reales del backend ni rellenarse con datos simulados.
+Referencia auditada: `origin/backend` en `7ea26c5181f8881d6487513ef1e883c31431bf30`, tras `git fetch origin`. Laravel es la autoridad de datos, permisos y totales. No se agregan endpoints, ingresos, estadísticas ni datos clínicos simulados en producción.
+
+La API configurada no estuvo accesible durante esta integración. La persistencia real y los flujos autenticados deben validarse en una base de pruebas aislada. El QA local con Playwright y respuestas de prueba se documenta separadamente de Laravel real.
+
+Bloqueo del servidor: la eliminación de categorías usa una relación `servicios()` inexistente en el modelo oficial, por lo que no se ofrece en la web. El odontograma comprueba la última versión antes de PUT/DELETE; una garantía atómica frente a concurrencia requiere versionado del backend.

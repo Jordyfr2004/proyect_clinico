@@ -144,6 +144,7 @@ describe('ClinicalHistorySection', () => {
   })
 
   it('populates the edit form with real values and cancels without PUT', async () => {
+    vi.spyOn(window, 'confirm').mockReturnValue(true)
     vi.mocked(getClinicalHistoryByPatient).mockResolvedValue(history)
     renderHistory()
     const trigger = await screen.findByRole('button', { name: 'Editar historial' })
@@ -207,4 +208,16 @@ describe('ClinicalHistorySection', () => {
     expect(screen.getByRole('alert')).toHaveTextContent('La respuesta del servidor no permite verificar los cambios.')
     expect(getClinicalHistoryByPatient).toHaveBeenCalledTimes(2)
   })
+})
+
+it('keeps unsaved clinical history when discard is declined', async () => {
+ vi.mocked(getClinicalHistoryByPatient).mockResolvedValue(history)
+ const confirm = vi.spyOn(window,'confirm').mockReturnValue(false)
+ renderHistory()
+ fireEvent.click(await screen.findByRole('button',{name:'Editar historial'}))
+ fireEvent.change(screen.getByLabelText('Sexo'),{target:{value:'Cambio pendiente'}})
+ fireEvent.click(screen.getByRole('button',{name:'Cancelar'}))
+ expect(screen.getByLabelText('Sexo')).toHaveValue('Cambio pendiente')
+ expect(confirm).toHaveBeenCalled()
+ confirm.mockRestore()
 })

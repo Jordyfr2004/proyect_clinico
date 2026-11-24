@@ -24,8 +24,6 @@ const PatientEvidenceSection = lazy(() => import('../features/evidence/PatientEv
 const UsersPage = lazy(() => import('../features/assistant/UsersPage').then((module) => ({ default: module.UsersPage })))
 const SystemActivityPage = lazy(() => import('../features/audit/SystemActivityPage').then((module) => ({ default: module.SystemActivityPage })))
 const ReportsPage = lazy(() => import('../features/reports/ReportsPage').then((module) => ({ default: module.ReportsPage })))
-const PatientPrescriptionsSection = lazy(() => import('../features/prescriptions/PatientPrescriptionsSection').then((module) => ({ default: module.PatientPrescriptionsSection })))
-const PrescriptionTemplatesPage = lazy(() => import('../features/prescriptions/PrescriptionTemplatesPage').then((module) => ({ default: module.PrescriptionTemplatesPage })))
 const CatalogPage = lazy(() => import('../features/catalog/CatalogPage').then((module) => ({ default: module.CatalogPage })))
 
 function ProtectedRouteContent() {
@@ -75,7 +73,7 @@ function ProtectedArea() {
         <div className="mx-auto flex max-w-[1450px] flex-wrap items-center gap-x-5 gap-y-2"><div className="flex-1"><h2 className="font-semibold">Acceso no autorizado</h2><p className="mt-1 text-sm leading-6">No tienes permiso para completar esta operación.</p></div><button className="min-h-11 rounded-[10px] border border-[#83b7eb] px-4 text-sm font-semibold hover:bg-[#dceeff] focus-visible:outline-2 focus-visible:outline-offset-2" onClick={() => setForbidden(false)} type="button">Cerrar aviso</button></div>
       </div>
     ) : null}
-    <AppLayout/>
+    <AppLayout key={`${user?.id}:${user?.role}`}/>
   </>
 }
 
@@ -113,14 +111,10 @@ export function AppRouter() {
             <Route element={<Navigate replace to="../diagnosticos?apartado=tratamientos"/>} path="tratamientos"/>
             <Route element={<Navigate replace to="../diagnosticos?apartado=odontograma"/>} path="odontograma"/>
             <Route element={<PatientEvidenceSection/>} path="radiografias"/>
-            <Route element={<PatientPrescriptionsSection/>} path="recetas"/>
           </Route>
         </Route>
         <Route element={<RestrictedRoute area="reportes"/>}>
           <Route element={<ReportsPage/>} path="reportes"/>
-        </Route>
-        <Route element={<RestrictedRoute area="recetas"/>}>
-          <Route element={<PrescriptionTemplatesPage/>} path="plantillas-recetas"/>
         </Route>
         <Route element={<RestrictedRoute area="usuarios"/>}>
           <Route element={<UsersPage/>} path="usuarios"/>

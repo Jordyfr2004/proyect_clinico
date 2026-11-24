@@ -33,3 +33,10 @@ describe('activityService', () => {
     expect(remove).toHaveBeenCalledWith('/actividades/activity-id')
   })
 })
+
+it('preserves nullable patient and reservation relation from Laravel', async () => {
+  apiClient.defaults.baseURL = 'https://api.clinica.test/api'
+  const reservation = { ...activity, paciente_id: null, paciente: null, agenda_id: 'agenda-id', agenda: { id: 'agenda-id', nombre_reserva: 'Reserva recibida' } }
+  vi.spyOn(apiClient, 'get').mockResolvedValue({ data: { data: [reservation] } })
+  expect(await getActivities()).toEqual([reservation])
+})

@@ -30,6 +30,31 @@ beforeEach(() => {
 })
 
 describe('AuthProvider', () => {
+  it('does not restore a login response after local logout', async () => {
+    let resolveLogin!: (response: Awaited<ReturnType<typeof authService.login>>) => void
+    vi.mocked(authService.login).mockReturnValue(new Promise((resolve) => { resolveLogin = resolve }))
+    vi.mocked(authService.logout).mockResolvedValue()
+    render(<AuthProvider><SessionProbe/></AuthProvider>)
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Logout' }))
+    await act(async () => { resolveLogin({ message: 'OK', token_type: 'Bearer', access_token: 'late-token', user: confirmedUser }) })
+    expect(screen.getByTestId('auth-status')).toHaveTextContent('guest')
+    expect(getAccessToken()).toBeNull()
+  })
+
+  it('does not clear a new account when an earlier logout finishes', async () => {
+    let resolveLogout!: () => void
+    vi.mocked(authService.logout).mockReturnValue(new Promise((resolve) => { resolveLogout = resolve }))
+    vi.mocked(authService.login).mockResolvedValue({ message: 'OK', token_type: 'Bearer', access_token: 'new-token', user: confirmedUser })
+    render(<AuthProvider><SessionProbe/></AuthProvider>)
+    fireEvent.click(screen.getByRole('button', { name: 'Logout' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Login' }))
+    expect(await screen.findByText('authenticated')).toBeInTheDocument()
+    await act(async () => { resolveLogout() })
+    expect(screen.getByTestId('auth-status')).toHaveTextContent('authenticated')
+    expect(getAccessToken()).toBe('new-token')
+  })
+
   it('restores a patient without exposing the administrative shell and allows real logout', async () => {
     setAccessToken('token-existente')
     vi.mocked(authService.getCurrentUser).mockResolvedValue({ ...confirmedUser, role: 'paciente', paciente_id: 'patient-id' })

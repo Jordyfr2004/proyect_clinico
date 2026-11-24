@@ -20,8 +20,10 @@ export function createApiClient(baseURL: string | undefined, readToken: () => st
   client.interceptors.response.use(
     (response) => response,
     (error: AxiosError) => {
-      if (typeof window !== 'undefined') {
-        if (error.response?.status === 401 && readToken()) window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT))
+      const token = readToken()
+      const currentSession = !error.config || error.config.headers.get('Authorization') === (token ? `Bearer ${token}` : undefined)
+      if (typeof window !== 'undefined' && currentSession) {
+        if (error.response?.status === 401 && token) window.dispatchEvent(new Event(AUTH_UNAUTHORIZED_EVENT))
         if (error.response?.status === 403) window.dispatchEvent(new Event(AUTH_FORBIDDEN_EVENT))
       }
       return Promise.reject(error)

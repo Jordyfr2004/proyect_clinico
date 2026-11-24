@@ -49,4 +49,17 @@ describe('createApiClient', () => {
     expect(listener).not.toHaveBeenCalled()
     window.removeEventListener(AUTH_UNAUTHORIZED_EVENT, listener)
   })
+
+  it.each([[401, AUTH_UNAUTHORIZED_EVENT], [403, AUTH_FORBIDDEN_EVENT]])('ignores stale %i events from the previous account', async (status, eventName) => {
+    let token = 'previous-token'
+    const listener = vi.fn()
+    window.addEventListener(eventName, listener)
+    const client = createApiClient(undefined, () => token)
+    await expect(client.get('/resource', { adapter: (config) => {
+      token = 'new-session-token'
+      return Promise.reject({ config, response: { status } })
+    } })).rejects.toBeDefined()
+    expect(listener).not.toHaveBeenCalled()
+    window.removeEventListener(eventName, listener)
+  })
 })

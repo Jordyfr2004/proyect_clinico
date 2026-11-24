@@ -10,7 +10,7 @@ import { AccessibleDialog } from '../../components/ui/AccessibleDialog'
 import { IncrementalList } from '../../components/ui/IncrementalList'
 import { formatCurrency, formatDate } from '../../utils/displayFormat'
 import { useAuth } from '../auth/authContext'
-import { createActivity, deleteActivity, getActivities, getActivityTotal, lookupPatientByCode, updateActivity, type Activity, type ActivityFilters, type ActivityPayload, type ActivityPeriod } from './activityService'
+import { createActivity, deleteActivity, getActivities, getActivityTotal, lookupPatientByCode, updateActivity, type Activity, type ActivityFilters, type ActivityPayload, type ActivityUpdate, type ActivityPeriod } from './activityService'
 import { markClinicalQueriesStale, useClinicalQuery } from '../../services/clinicalQuery'
 import { useClinicalViewState } from '../../services/clinicalViewState'
 import './activities.css'
@@ -59,8 +59,14 @@ function periodLabel(period: ActivityPeriod): string {
   return `${month} de ${period.anio}`
 }
 
-function ActivityForm({ record, busy, error, onSave, onCancel }: { record?: Activity; busy: boolean; error: string | null; onSave: (values: ActivityPayload) => Promise<void>; onCancel: () => void }) {
-  const [code, setCode] = useState(record?.paciente.codigo_paciente ?? '')
+function activityName(record: Activity): string {
+  return record.paciente?.nombres || record.agenda?.nombre_reserva || 'Sin paciente registrado'
+}
+
+function ActivityForm({ record, busy, error, onSave, onCancel }: { record?: Activity; busy: boolean; error: string | null; onSave: (values: ActivityUpdate) => Promise<void>; onCancel: () => void }) {
+  const linked = Boolean(record?.agenda_id)
+  const fixedIdentity = linked || Boolean(record && !record.paciente_id)
+  const [code, setCode] = useState(record?.paciente?.codigo_paciente ?? '')
   const [date, setDate] = useState(() => {
     if (record) return record.fecha.slice(0, 10)
     const today = new Date()
@@ -90,25 +96,25 @@ function ActivityForm({ record, busy, error, onSave, onCancel }: { record?: Acti
   }
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    if (!code.trim() || !date || !activity.trim() || price.trim() === '') { setValidation('Completa el código, la fecha, la actividad y el precio.'); return }
+    if ((!fixedIdentity && !code.trim()) || !date || !activity.trim() || price.trim() === '') { setValidation('Completa el código, la fecha, la actividad y el precio.'); return }
     if (Number(price) < 0) { setValidation('El precio no puede ser negativo.'); return }
     if (!/^\d+(?:\.\d{1,2})?$/.test(price)) { setValidation('El precio debe ser un número en USD con máximo dos decimales.'); return }
     if (Number(price) > 99999999.99) { setValidation('El precio no puede superar 99.999.999,99 USD.'); return }
-    if (!patient || patient.codigo_paciente !== code.trim()) { setValidation('Confirma el paciente con Buscar paciente antes de guardar.'); return }
+    if (!fixedIdentity && (!patient || patient.codigo_paciente !== code.trim())) { setValidation('Confirma el paciente con Buscar paciente antes de guardar.'); return }
     if (lookupError) return
     setValidation(null)
-    void onSave({ codigo_paciente: code.trim(), fecha: date, actividad: activity.trim(), precio: Number(price) })
+    void onSave(fixedIdentity ? { actividad: activity.trim(), precio: Number(price) } : { codigo_paciente: code.trim(), fecha: date, actividad: activity.trim(), precio: Number(price) })
   }
   return <form aria-label="Datos de actividad" noValidate onSubmit={submit}>
     <div className="grid gap-4 sm:grid-cols-2">
-      <div className="min-w-0 sm:col-span-2">
+      {fixedIdentity && record ? <div className="min-w-0 sm:col-span-2 rounded-xl border border-[#dbe6f2] bg-[#f4f9ff] p-3"><p className="text-sm font-semibold text-ink-950">{activityName(record)}</p><p className="admin-muted mt-1 text-xs">{linked ? 'Paciente y fecha corresponden a la cita vinculada.' : 'Actividad sin paciente registrado. Se conserva su referencia original.'}</p></div> : <div className="min-w-0 sm:col-span-2">
         <label className="text-sm font-semibold text-ink-950" htmlFor="activity-code">Código de paciente</label>
         <div className="mt-1.5 flex flex-col gap-2 sm:flex-row"><input className="admin-input min-w-0 flex-1 text-sm" data-dialog-initial id="activity-code" onChange={(event) => { lookupVersion.current += 1; setCode(event.target.value); setPatient(null); setLookupError(null); setLookingUp(false) }} placeholder="Ej. 001" value={code}/><button className="admin-secondary inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-4 text-sm font-semibold disabled:opacity-60" disabled={lookingUp || busy} onClick={() => { void lookup() }} type="button"><Search aria-hidden="true" size={16}/>{lookingUp ? 'Buscando…' : 'Buscar paciente'}</button></div>
         {patient ? <div className="mt-3 flex min-w-0 items-center gap-3 rounded-xl border border-[#dbe6f2] bg-[#f4f9ff] px-3 py-2.5" role="status"><span aria-hidden="true" className="grid size-9 shrink-0 place-items-center rounded-lg bg-[#e1f0ff] text-clinic-600"><UserRound size={18}/></span><div className="min-w-0"><p className="admin-muted text-xs font-semibold">Paciente confirmado</p><p className="truncate text-sm font-semibold text-ink-950">{patient.nombres}</p><p className="admin-muted text-xs">Código: {patient.codigo_paciente}</p></div></div> : null}
         {lookupError ? <p className="mt-2 text-sm text-red-700" role="alert">{lookupError}</p> : null}
-      </div>
-      <label className="min-w-0 text-sm font-semibold text-ink-950 sm:col-span-2">Fecha<input className="admin-input mt-1.5 w-full text-sm" onChange={(event) => setDate(event.target.value)} type="date" value={date}/></label>
-      <label className="min-w-0 text-sm font-semibold text-ink-950">Actividad<input className="admin-input mt-1.5 w-full text-sm" maxLength={255} onChange={(event) => setActivity(event.target.value)} placeholder="Ej. Limpieza dental" value={activity}/></label>
+      </div>}
+      <label className="min-w-0 text-sm font-semibold text-ink-950 sm:col-span-2">Fecha<input className="admin-input mt-1.5 w-full text-sm" disabled={fixedIdentity} onChange={(event) => setDate(event.target.value)} type="date" value={date}/></label>
+      <label className="min-w-0 text-sm font-semibold text-ink-950">Actividad<input className="admin-input mt-1.5 w-full text-sm" data-dialog-initial={fixedIdentity ? true : undefined} maxLength={255} onChange={(event) => setActivity(event.target.value)} placeholder="Ej. Limpieza dental" value={activity}/></label>
       <div className="min-w-0"><label className="text-sm font-semibold text-ink-950" htmlFor="activity-price">Precio (USD)</label><span className="relative mt-1.5 block"><span aria-hidden="true" className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 font-semibold text-[#526a87]">$</span><input className="admin-input w-full text-sm" id="activity-price" inputMode="decimal" max="99999999.99" min="0" onChange={(event) => setPrice(event.target.value)} placeholder="0.00" step="0.01" style={{ paddingLeft: '2.5rem' }} type="number" value={price}/></span></div>
     </div>
     {validation || error ? <p className="mt-4 text-sm text-red-700" role="alert">{validation ?? error}</p> : null}
@@ -233,15 +239,16 @@ export function ActivitiesPage() {
   }
   const closeDialog = () => { if (!pendingMutation.current) beginDialogClose() }
   const rememberScroll = () => { savedScrollTop.current = recordsScroll.current?.scrollTop ?? null }
-  const mutate = async (values?: ActivityPayload) => {
+  const mutate = async (values?: ActivityUpdate) => {
     if (!dialog || dialogClosing || pendingMutation.current) return
     pendingMutation.current = true; setBusy(true); setActionError(null)
     try {
       let message: string
-      if (dialog.kind === 'create' && values) message = await createActivity(values)
+      if (dialog.kind === 'create' && values) message = await createActivity(values as ActivityPayload)
       else if (dialog.kind === 'edit' && dialog.record && values) message = await updateActivity(dialog.record.id, values)
       else if (dialog.kind === 'delete' && dialog.record) message = await deleteActivity(dialog.record.id)
       else return
+      void markClinicalQueriesStale(['cash'])
       void markClinicalQueriesStale(['dashboard-report'])
       void markClinicalQueriesStale(['reports'])
       if (await load()) { setSuccess(message); beginDialogClose() }
@@ -273,11 +280,11 @@ export function ActivitiesPage() {
       <div aria-label="Lista de actividades" className="min-h-0 min-w-0 flex-1 overflow-y-auto overscroll-contain pb-1 pt-2 pr-1 sm:pr-2" data-activity-scroll ref={recordsScroll} role="region" tabIndex={0}>
         <div ref={recordsContent}><IncrementalList className="space-y-2" items={recordsQuery.data} renderItem={(record) => <li className="grid min-w-0 grid-cols-[40px_minmax(0,1fr)_auto] items-start gap-x-3 gap-y-2 rounded-xl border border-[#dbe6f2] bg-white p-3 shadow-[0_3px_12px_rgba(19,55,108,0.035)] focus-within:border-[#bbd6f4] sm:flex sm:flex-wrap sm:items-center sm:gap-3 lg:grid lg:grid-cols-[40px_minmax(140px,1.1fr)_minmax(130px,1fr)_auto_40px]" key={record.id}>
           <span aria-hidden="true" className="col-start-1 row-start-1 grid size-10 shrink-0 place-items-center rounded-xl bg-[#eaf4ff] text-clinic-600"><CalendarDays size={19}/></span>
-          <div className="col-start-2 row-start-1 min-w-0 sm:flex-1 sm:basis-[170px]"><p className="text-sm font-semibold text-ink-950">{record.paciente.nombres}</p><p className="admin-muted mt-0.5 text-xs">Código: {record.paciente.codigo_paciente}</p></div>
-          <div className="col-span-2 row-start-2 min-w-0 sm:flex-1 sm:basis-[170px] lg:col-span-1 lg:col-start-3 lg:row-start-1"><p className="text-sm font-semibold text-ink-950">{record.actividad}</p><p className="admin-muted mt-0.5 text-xs">{formatDate(record.fecha)}</p></div>
+          <div className="col-start-2 row-start-1 min-w-0 sm:flex-1 sm:basis-[170px]"><p className="text-sm font-semibold text-ink-950">{activityName(record)}</p><p className="admin-muted mt-0.5 text-xs">{record.paciente ? `Código: ${record.paciente.codigo_paciente}` : record.agenda?.nombre_reserva ? 'Reserva' : 'Sin paciente registrado'}</p></div>
+          <div className="col-span-2 row-start-2 min-w-0 sm:flex-1 sm:basis-[170px] lg:col-span-1 lg:col-start-3 lg:row-start-1"><p className="text-sm font-semibold text-ink-950">{record.actividad}</p><p className="admin-muted mt-0.5 text-xs">{formatDate(record.fecha)}</p><p className="admin-meta mt-0.5 text-xs">{record.agenda_id ? 'Vinculada a cita' : 'Sin cita vinculada'}</p></div>
           <strong className="col-start-3 row-start-2 shrink-0 self-start whitespace-nowrap text-base font-bold text-clinic-700 sm:self-auto lg:col-start-4 lg:row-start-1">{formatCurrency(record.precio)}</strong>
           {doctor ? <div className="col-start-3 row-start-1 ml-auto shrink-0 lg:col-start-5" data-activity-menu>
-            <button aria-expanded={openMenuId === record.id} aria-haspopup="menu" aria-label={`Opciones de actividad para ${record.paciente.nombres}`} className="admin-secondary grid size-10 place-items-center rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" data-menu-trigger onClick={(event) => { const button = event.currentTarget; if (openMenuId === record.id) { setOpenMenuId(null); return } menuTrigger.current = button; setMenuPosition(actionMenuPosition(button)); setOpenMenuId(record.id) }} onKeyDown={onMenuKeyDown} type="button"><MoreVertical aria-hidden="true" size={18}/></button>
+            <button aria-expanded={openMenuId === record.id} aria-haspopup="menu" aria-label={`Opciones de actividad para ${activityName(record)}`} className="admin-secondary grid size-10 place-items-center rounded-lg focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" data-menu-trigger onClick={(event) => { const button = event.currentTarget; if (openMenuId === record.id) { setOpenMenuId(null); return } menuTrigger.current = button; setMenuPosition(actionMenuPosition(button)); setOpenMenuId(record.id) }} onKeyDown={onMenuKeyDown} type="button"><MoreVertical aria-hidden="true" size={18}/></button>
           </div> : null}
         </li>}/></div>
       </div>
@@ -290,7 +297,7 @@ export function ActivitiesPage() {
     </div>, document.body) : null}
     {dialog ? <AccessibleDialog busy={busy || dialogClosing} onClose={closeDialog} title={dialog.kind === 'create' ? 'Registrar actividad' : dialog.kind === 'edit' ? 'Editar actividad' : 'Eliminar actividad'} titleId="activity-dialog-title"><div data-activities-dialog data-closing={dialogClosing ? 'true' : undefined}>{dialog.kind === 'delete' && dialog.record ? <div>
       <p className="admin-body text-sm">Revisa la actividad antes de eliminarla. Esta acción requiere confirmación.</p>
-      <div className="mt-4 rounded-xl border border-[#dbe6f2] bg-[#f6faff] p-4"><div className="flex items-center gap-3"><span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#e1f0ff] text-clinic-600"><UserRound size={19}/></span><div className="min-w-0"><p className="font-semibold text-ink-950">{dialog.record.paciente.nombres}</p><p className="admin-muted text-sm">Código: {dialog.record.paciente.codigo_paciente}</p></div></div><dl className="mt-4 grid gap-3 border-t border-[#dbe6f2] pt-4 sm:grid-cols-2"><div><dt className="admin-muted text-xs">Fecha</dt><dd className="mt-0.5 text-sm font-semibold text-ink-950">{formatDate(dialog.record.fecha)}</dd></div><div><dt className="admin-muted text-xs">Precio</dt><dd className="mt-0.5 text-sm font-semibold text-clinic-700">{formatCurrency(dialog.record.precio)}</dd></div><div className="sm:col-span-2"><dt className="admin-muted text-xs">Actividad</dt><dd className="mt-0.5 text-sm font-semibold text-ink-950">{dialog.record.actividad}</dd></div></dl></div>
+      <div className="mt-4 rounded-xl border border-[#dbe6f2] bg-[#f6faff] p-4"><div className="flex items-center gap-3"><span aria-hidden="true" className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#e1f0ff] text-clinic-600"><UserRound size={19}/></span><div className="min-w-0"><p className="font-semibold text-ink-950">{activityName(dialog.record)}</p><p className="admin-muted text-sm">{dialog.record.paciente ? `Código: ${dialog.record.paciente.codigo_paciente}` : dialog.record.agenda?.nombre_reserva ? 'Reserva' : 'Sin paciente registrado'}</p></div></div><dl className="mt-4 grid gap-3 border-t border-[#dbe6f2] pt-4 sm:grid-cols-2"><div><dt className="admin-muted text-xs">Fecha</dt><dd className="mt-0.5 text-sm font-semibold text-ink-950">{formatDate(dialog.record.fecha)}</dd></div><div><dt className="admin-muted text-xs">Precio</dt><dd className="mt-0.5 text-sm font-semibold text-clinic-700">{formatCurrency(dialog.record.precio)}</dd></div><div className="sm:col-span-2"><dt className="admin-muted text-xs">Actividad</dt><dd className="mt-0.5 text-sm font-semibold text-ink-950">{dialog.record.actividad}</dd></div></dl></div>
       {actionError ? <p className="mt-4 text-sm text-red-700" role="alert">{actionError}</p> : null}
       <div className="mt-5 flex flex-col-reverse gap-3 border-t border-[#e3ecf6] pt-4 sm:flex-row sm:justify-end"><button className="admin-secondary min-h-11 rounded-[10px] px-5 text-sm font-semibold disabled:opacity-60" data-dialog-initial disabled={busy || dialogClosing} onClick={closeDialog} type="button">Cancelar</button><button className="min-h-11 rounded-[10px] bg-red-700 px-5 text-sm font-semibold text-white hover:bg-red-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-700 disabled:opacity-60" disabled={busy || dialogClosing} onClick={() => { void mutate() }} type="button">{busy ? 'Eliminando…' : 'Confirmar eliminación'}</button></div>
     </div> : <ActivityForm busy={busy || dialogClosing} error={actionError} key={dialog.record?.id ?? 'new'} onCancel={closeDialog} onSave={mutate} record={dialog.record}/>}</div></AccessibleDialog> : null}

@@ -3,13 +3,16 @@ import { apiClient } from '../../services/apiClient'
 
 const patientSchema = z.object({ codigo_paciente: z.string(), nombres: z.string() })
 const activitySchema = z.object({
-  id: z.string(), paciente_id: z.string(), fecha: z.string(), actividad: z.string(),
-  precio: z.union([z.string(), z.number()]), paciente: patientSchema,
+  id: z.string(), paciente_id: z.string().nullable(), fecha: z.string(), actividad: z.string(),
+  precio: z.union([z.string(), z.number()]), paciente: patientSchema.nullable(),
+  agenda_id: z.string().nullable().optional(),
+  agenda: z.object({ id: z.string(), nombre_reserva: z.string().nullable().optional() }).nullable().optional(),
 })
 const messageSchema = z.object({ message: z.string() })
 
 export type Activity = z.infer<typeof activitySchema>
 export type ActivityPayload = { codigo_paciente: string; fecha: string; actividad: string; precio: number }
+export type ActivityUpdate = Partial<ActivityPayload>
 export type ActivityFilters = { fecha?: string; semana?: string; mes?: number; anio?: number; codigo_paciente?: string }
 export type ActivityPeriod = { periodo: 'dia' | 'semana'; fecha: string } | { periodo: 'mes'; mes: number; anio: number } | { periodo: 'anio'; anio: number }
 
@@ -41,7 +44,7 @@ export async function createActivity(values: ActivityPayload): Promise<string> {
   return messageSchema.parse(data).message
 }
 
-export async function updateActivity(id: string, values: ActivityPayload): Promise<string> {
+export async function updateActivity(id: string, values: ActivityUpdate): Promise<string> {
   requireApiBaseUrl()
   const { data } = await apiClient.put<unknown>(`/actividades/${encodeURIComponent(id)}`, values)
   return messageSchema.parse(data).message

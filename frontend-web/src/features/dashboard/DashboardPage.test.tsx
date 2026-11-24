@@ -50,6 +50,13 @@ function LocationProbe() {
 }
 
 describe('DashboardPage', () => {
+  it('shows the real reservation name on the dashboard without a patient relationship', async () => {
+    vi.mocked(getAgendaMonth).mockResolvedValue([{ ...appointment, paciente_id: null, paciente: null, nombre_reserva: 'Ana Reserva' }])
+    renderDashboard('doctora')
+    expect(await screen.findByText('Ana Reserva')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Ver cita de Ana Reserva' })).toHaveAttribute('href', '/citas-medicas')
+  })
+
   it.each([
     ['Citas programadas', '/citas-medicas'],
     ['Pacientes registrados', '/pacientes'],

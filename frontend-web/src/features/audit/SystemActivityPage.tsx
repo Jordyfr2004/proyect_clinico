@@ -10,6 +10,7 @@ import { formatDateTime } from '../../utils/displayFormat'
 import { getRecordedActions, getRecordedSessions, hideRecordedAction, type RecordedAction, type RecordedSession } from './auditService'
 import { markClinicalQueriesStale, useClinicalQuery } from '../../services/clinicalQuery'
 import { useClinicalViewState } from '../../services/clinicalViewState'
+import { ChangeHistorySection } from './ChangeHistorySection'
 
 type AuditState = { kind: 'loading' } | { kind: 'actions'; records: RecordedAction[] } | { kind: 'sessions'; records: RecordedSession[] } | { kind: 'error'; message: string }
 const errorMessage = (error: unknown) => {
@@ -22,7 +23,7 @@ const errorMessage = (error: unknown) => {
 }
 
 export function SystemActivityPage() {
-  const [view, setView] = useState<'home' | 'actions' | 'sessions'>('home')
+  const [view, setView] = useState<'home' | 'actions' | 'sessions' | 'changes'>('home')
   const [search, setSearch] = useState('')
   const [date, setDate] = useClinicalViewState('audit.date', () => '')
   const [appliedDate, setAppliedDate] = useClinicalViewState('audit.appliedDate', () => '')
@@ -51,6 +52,7 @@ export function SystemActivityPage() {
     finally { pending.current = false; setBusy(false) }
   }
   const matches = (label: string) => label.toLocaleLowerCase('es').includes(search.trim().toLocaleLowerCase('es'))
+  if (view === 'changes') return <div className="admin-reveal max-w-[1260px] space-y-6"><button className="admin-secondary inline-flex min-h-11 items-center gap-2 rounded-lg px-4 text-sm font-semibold" onClick={() => setView('home')} type="button"><ArrowLeft aria-hidden="true" size={17}/>Volver a Configuración</button><ChangeHistorySection/></div>
   return <div className="admin-reveal max-w-[1260px] space-y-6"><header><p className="admin-kicker">Administración</p><h1 className="admin-page-title mt-2">Configuración</h1><p className="admin-body mt-2">Encuentra las herramientas disponibles para administrar el consultorio.</p></header>
     {view === 'home' ? <>
       <div className="admin-surface relative max-w-xl rounded-[20px] p-4"><label className="admin-meta block text-xs font-semibold" htmlFor="settings-search">Buscar en configuración</label><div className="relative mt-2"><Search aria-hidden="true" className="admin-meta pointer-events-none absolute left-3 top-1/2 -translate-y-1/2" size={18}/><input className="admin-input admin-search-input w-full text-sm" id="settings-search" onChange={(event) => setSearch(event.target.value)} placeholder="Buscar opciones disponibles" type="search" value={search}/></div></div>
@@ -58,7 +60,8 @@ export function SystemActivityPage() {
         {matches('Actividad del sistema acciones registradas') ? <button className="admin-surface admin-interactive flex min-h-28 items-center gap-4 rounded-[20px] p-5 text-left hover:border-clinic-300 hover:bg-sky-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" onClick={() => setView('actions')} type="button"><span aria-hidden="true" className="admin-module-icon grid size-11 shrink-0 place-items-center rounded-xl"><ClipboardList size={21}/></span><span className="min-w-0 flex-1"><strong className="block text-base text-ink-950">Actividad del sistema</strong><small className="admin-muted mt-1 block text-sm">Consultar acciones registradas.</small></span><ChevronRight aria-hidden="true" className="shrink-0 text-clinic-600" size={18}/></button> : null}
         {matches('Sesiones registradas') ? <button className="admin-surface admin-interactive flex min-h-28 items-center gap-4 rounded-[20px] p-5 text-left hover:border-clinic-300 hover:bg-sky-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" onClick={() => setView('sessions')} type="button"><span aria-hidden="true" className="admin-module-icon grid size-11 shrink-0 place-items-center rounded-xl"><MonitorCheck size={21}/></span><span className="min-w-0 flex-1"><strong className="block text-base text-ink-950">Sesiones</strong><small className="admin-muted mt-1 block text-sm">Consultar las sesiones registradas.</small></span><ChevronRight aria-hidden="true" className="shrink-0 text-clinic-600" size={18}/></button> : null}
       </div></section> : null}
-      {!matches('Actividad del sistema acciones registradas') && !matches('Sesiones registradas') ? <p className="admin-muted text-sm">No hay opciones que coincidan con la búsqueda.</p> : null}
+      {matches('Historial de cambios valores anteriores nuevos') ? <button className="admin-surface admin-interactive flex min-h-28 w-full items-center gap-4 rounded-[20px] p-5 text-left hover:border-clinic-300 hover:bg-sky-50 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-clinic-600" onClick={() => setView('changes')} type="button"><span aria-hidden="true" className="admin-module-icon grid size-11 shrink-0 place-items-center rounded-xl"><ClipboardList size={21}/></span><span className="min-w-0 flex-1"><strong className="block text-base text-ink-950">Historial de cambios</strong><small className="admin-muted mt-1 block text-sm">Consultar valores anteriores y nuevos de los registros.</small></span><ChevronRight aria-hidden="true" className="shrink-0 text-clinic-600" size={18}/></button> : null}
+      {!matches('Actividad del sistema acciones registradas') && !matches('Sesiones registradas') && !matches('Historial de cambios valores anteriores nuevos') ? <p className="admin-muted text-sm">No hay opciones que coincidan con la búsqueda.</p> : null}
     </> : <>
     <button className="admin-secondary inline-flex min-h-11 items-center gap-2 rounded-lg px-4 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-offset-2" onClick={() => setView('home')} type="button"><ArrowLeft aria-hidden="true" size={17}/>Volver a Configuración</button>
     <div><p className="admin-kicker">Registro y seguimiento</p><h2 className="mt-2 text-xl font-semibold text-ink-950">{view === 'actions' ? 'Actividad del sistema' : 'Sesiones'}</h2><p className="admin-body mt-2">{view === 'actions' ? 'Consulta acciones registradas.' : 'Consulta sesiones registradas.'}</p></div>

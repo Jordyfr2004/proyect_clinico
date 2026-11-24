@@ -12,7 +12,7 @@ import { PatientEditForm } from './PatientEditForm'
 import { getPatient, updatePatient, type Patient, type UpdatePatientPayload } from './patientService'
 import { patientLoadError } from './patientLoadError'
 
-const sections = [['historial', 'Historial clínico'], ['diagnosticos', 'Diagnósticos'], ['radiografias', 'Evidencias clínicas'], ['recetas', 'Recetas']]
+const sections = [['historial', 'Historial clínico'], ['diagnosticos', 'Diagnósticos'], ['radiografias', 'Evidencias clínicas']]
 type PatientState = { kind: 'loading' } | { kind: 'ready'; patient: Patient } | { kind: 'missing' } | { kind: 'error'; message: string }
 
 function PatientDetail({ patientId }: { patientId: string }) {
@@ -21,6 +21,7 @@ function PatientDetail({ patientId }: { patientId: string }) {
   const [editing, setEditing] = useState(false)
   const [editError, setEditError] = useState<string | null>(null)
   const [editBusy, setEditBusy] = useState(false)
+  const [editDirty, setEditDirty] = useState(false)
   const [success, setSuccess] = useState<string | null>(null)
   const editPending = useRef(false)
   const editTrigger = useRef<HTMLButtonElement>(null)
@@ -43,7 +44,9 @@ function PatientDetail({ patientId }: { patientId: string }) {
 
   const closeEdit = () => {
     if (editPending.current) return
+    if (editDirty && !window.confirm('Hay cambios sin guardar. ¿Descartar los cambios?')) return
     setEditing(false)
+    setEditDirty(false)
     setEditError(null)
     editTrigger.current?.focus()
   }
@@ -89,7 +92,7 @@ function PatientDetail({ patientId }: { patientId: string }) {
     <div className="admin-reveal min-w-0 max-w-[1330px]">
       <Link className="mb-5 inline-flex min-h-9 items-center gap-2 text-sm font-semibold text-clinic-700 hover:underline focus-visible:outline-2 focus-visible:outline-offset-2" to="/pacientes"><ArrowLeft aria-hidden="true" size={16}/>Pacientes</Link>
       {success ? <p className="admin-success mb-5 rounded-xl p-4 text-sm" role="status">{success}</p> : null}
-      {editing ? <AccessibleDialog busy={editBusy} onClose={closeEdit} title="Editar datos del paciente" titleId="edit-patient-title"><PatientEditForm error={editError} onCancel={closeEdit} onSave={saveEdit} patient={state.patient}/></AccessibleDialog> : null}
+      {editing ? <AccessibleDialog busy={editBusy} onClose={closeEdit} title="Editar datos del paciente" titleId="edit-patient-title"><PatientEditForm error={editError} onCancel={closeEdit} onDirtyChange={setEditDirty} onSave={saveEdit} patient={state.patient}/></AccessibleDialog> : null}
       <div className="admin-surface-raised overflow-hidden rounded-[22px]">
         <div className="admin-record-hero p-6 sm:p-8">
           <div className="flex flex-wrap items-center gap-4 sm:gap-5">

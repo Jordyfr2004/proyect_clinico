@@ -8,15 +8,17 @@ import { ClinicalHistorySection } from '../clinical-history/ClinicalHistorySecti
 import { createPatient, getPatient, getPatients, updatePatient } from './patientService'
 import { AuthContext } from '../auth/authContext'
 import type { UserRole } from '../auth/authService'
+import { getOdontogram } from './odontogramService'
 
 vi.mock('./patientService', () => ({ getPatients: vi.fn(), getPatient: vi.fn(), createPatient: vi.fn(), updatePatient: vi.fn() }))
 vi.mock('../clinical-history/clinicalHistoryService', () => ({ getClinicalHistoryByPatient: vi.fn(() => Promise.reject({ isAxiosError: true, response: { status: 404 } })) }))
+vi.mock('./odontogramService', async (original) => ({ ...await original<typeof import('./odontogramService')>(), getOdontogram: vi.fn() }))
 
 const patient = { id: 'patient-id', codigo_paciente: '001', nombres: 'Nombre recibido', cedula: '0912345678', telefono: null, direccion: null, fecha_nacimiento: '1990-01-01' }
 const pageOf = (data: typeof patient[], current_page = 1, last_page = 1) => ({ data, current_page, last_page, per_page: 20, total: data.length, next_page_url: current_page < last_page ? '/pacientes?page=2' : null, prev_page_url: current_page > 1 ? '/pacientes?page=1' : null })
 const httpError = (status: number, message: string) => ({ isAxiosError: true, response: { status, data: { message } } })
 
-beforeEach(() => vi.resetAllMocks())
+beforeEach(() => { vi.resetAllMocks(); vi.mocked(getOdontogram).mockResolvedValue(null) })
 
 function LocationDisplay() {
   const location = useLocation()
@@ -236,11 +238,11 @@ describe('patient views', () => {
     expect(await screen.findByRole('heading', { name: 'Nombre recibido' })).toBeInTheDocument()
     expect(getPatient).toHaveBeenCalledWith('patient-id')
     const tabs = screen.getByRole('navigation', { name: 'Secciones del expediente' })
-    expect(within(tabs).getAllByRole('link')).toHaveLength(4)
+    expect(within(tabs).getAllByRole('link')).toHaveLength(3)
     expect(within(tabs).getByRole('link', { name: 'Historial clínico' })).toBeInTheDocument()
     expect(within(tabs).getByRole('link', { name: 'Diagnósticos' })).toBeInTheDocument()
     expect(within(tabs).getByRole('link', { name: 'Evidencias clínicas' })).toBeInTheDocument()
-    expect(within(tabs).getByRole('link', { name: 'Recetas' })).toBeInTheDocument()
+    expect(within(tabs).queryByRole('link', { name: 'Recetas' })).not.toBeInTheDocument()
     expect(within(tabs).queryByText(/Planes|Tratamientos|Odontograma|Resumen/)).not.toBeInTheDocument()
   })
 
@@ -253,15 +255,15 @@ describe('patient views', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Odontograma' }))
     expect(screen.getByRole('button', { name: 'Odontograma' })).toHaveAttribute('aria-pressed', 'true')
     expect(screen.getByTestId('location')).toHaveTextContent('/pacientes/patient-id/diagnosticos')
-    expect(screen.getByRole('status')).toHaveTextContent('temporales')
+    expect(await screen.findByText('Sin evaluación registrada')).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Guardar odontograma' })).toBeDisabled()
     fireEvent.click(screen.getByRole('button', { name: 'Pieza 18' }))
     const detail = screen.getByRole('complementary', { name: 'Detalle de la pieza 18' })
     fireEvent.click(within(detail).getByRole('radio', { name: 'Caries' }))
     fireEvent.change(within(detail).getByRole('textbox', { name: 'Observación' }), { target: { value: 'Ejemplo local' } })
     expect(screen.getByText('1 pieza marcada')).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Guardar odontograma' })).toBeDisabled()
-    expect(within(screen.getByRole('navigation', { name: 'Secciones del expediente' })).getAllByRole('link')).toHaveLength(4)
+    expect(screen.getByRole('button', { name: 'Guardar odontograma' })).toBeEnabled()
+    expect(within(screen.getByRole('navigation', { name: 'Secciones del expediente' })).getAllByRole('link')).toHaveLength(3)
   })
 
   it('opens Odontograma first when Diagnósticos has no explicit apartado', async () => {
@@ -284,14 +286,15 @@ describe('patient views', () => {
   it.each([
     ['doctora', 'diagnosticos', true],
     ['asistente', 'diagnosticos', false],
-  ] as const)('keeps %s %s preview separate from the authorized Citas médicas route', async (role, path, canOpenAppointments) => {
+  ] as const)('keeps %s %s permissions aligned with the authorized Citas médicas route', async (role, path, canOpenAppointments) => {
     vi.mocked(getPatient).mockResolvedValue(patient)
     renderDetail(`/pacientes/patient-id/${path}`, role)
     expect(await screen.findByRole('heading', { name: 'Evaluación clínica' })).toBeInTheDocument()
     expect(screen.getByRole('group', { name: 'Apartados de evaluación clínica' })).toBeInTheDocument()
-    expect(screen.getByRole('status')).toHaveTextContent('temporales')
+    expect(await screen.findByText('Sin evaluación registrada')).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Diagnóstico' }))
-    expect(screen.getByRole('status')).toHaveTextContent('Integración pendiente')
+    if (role === 'asistente') expect(await screen.findByText(/La consulta de diagnósticos y tratamientos está disponible para la doctora/)).toBeInTheDocument()
+    else expect(await screen.findByRole('alert')).toHaveTextContent('No fue posible consultar los datos clínicos')
     const action = screen.queryByRole('link', { name: 'Ir a Citas médicas' })
     if (canOpenAppointments) expect(action).toHaveAttribute('href', '/citas-medicas')
     else expect(action).not.toBeInTheDocument()
@@ -361,6 +364,22 @@ describe('patient views', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Guardar cambios' }))
     expect(await screen.findByRole('alert')).toHaveTextContent('Cédula duplicada.')
     expect(screen.getByRole('heading', { name: 'Nombre recibido' })).toBeInTheDocument()
+  })
+
+  it('keeps unsaved patient edits when dismissal is declined', async () => {
+    vi.mocked(getPatient).mockResolvedValue(patient)
+    const confirm = vi.spyOn(window, 'confirm').mockReturnValue(false)
+    renderDetail()
+    fireEvent.click(await screen.findByRole('button', { name: 'Editar datos' }))
+    fireEvent.change(screen.getByLabelText('Nombres'), { target: { value: 'Cambio pendiente' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(confirm).toHaveBeenCalled()
+    expect(screen.getByLabelText('Nombres')).toHaveValue('Cambio pendiente')
+    confirm.mockReturnValue(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(updatePatient).not.toHaveBeenCalled()
+    confirm.mockRestore()
   })
 
 })

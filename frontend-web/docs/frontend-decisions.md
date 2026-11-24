@@ -77,3 +77,13 @@ QA Playwright de baseline: login, Dashboard, Agenda, Pacientes, detalle (resumen
 - El expediente muestra tres secciones principales: Historial clínico (incluidos datos generales), Diagnósticos (con Diagnóstico, Tratamientos y Odontograma internos) y Evidencias clínicas. Las rutas antiguas de Resumen, Tratamientos y Odontograma redirigen a su ubicación actual. Recetas y Planes/presupuestos se retiran de la navegación web.
 - La doctora agenda citas desde el día seleccionado mediante `POST /agenda/cita-medica`. La consulta longitudinal de diagnóstico/tratamiento y la estructura clínica del odontograma permanecen en preparación; no se crean registros independientes ni estructuras de dientes sin contrato.
 - El perfil y cierre de sesión se concentran en el encabezado. La foto propia y las de pacientes vinculados se descargan con Bearer; Laravel no autoriza leer fotos de otras cuentas del personal, que conservan iniciales.
+
+
+## 2026-11-23 - Official backend integration
+
+- The current contract source is origin/backend 7ea26c5181f8881d6487513ef1e883c31431bf30, verified after fetch. See integration-audit.md for the authoritative current matrix; older pending-integration statements above describe historical decisions.
+- Reservations use either a registered patient code or a reservation name. Clinical data remains exclusive to registered patients; Laravel owns completion and financial calculations.
+- Odontogram data preserves foreign JSON. The editable namespace is frontend_web_v1.teeth; incompatible legacy values are read-only. PUT and DELETE compare a fresh read against the loaded baseline. Atomic concurrency protection requires backend version support.
+- Clinical drafts are protected through a data router blocker, unload/cancel confirmation and voluntary logout confirmation. Forced session expiry still clears clinical state immediately.
+- Prescription code, permissions and routes are removed. Academic orchestration remains available only with an explicit opt-in flag and a separately confirmed academic API.
+- Live Laravel verification remains pending due to network unavailability. Playwright QA uses isolated responses and is documented as such.

@@ -27,18 +27,21 @@ function summaryError(error: unknown): string {
 }
 
 export function AppointmentSummary({ id }: { id: string }) {
+  const academicEnabled = import.meta.env.VITE_ENABLE_ACADEMIC_ORCHESTRATION === 'true'
   const [attempt, setAttempt] = useState(0)
   const [state, setState] = useState<SummaryState>({ kind: 'loading' })
 
   useEffect(() => {
+    if (!academicEnabled) return
     const controller = new AbortController()
     getAppointmentSummary(id, controller.signal).then(
       (summary) => { if (!controller.signal.aborted) setState(summary ? { kind: 'success', id, summary } : { kind: 'empty', id }) },
       (error: unknown) => { if (!controller.signal.aborted) setState({ kind: 'error', id, message: summaryError(error) }) },
     )
     return () => controller.abort()
-  }, [id, attempt])
+  }, [id, attempt, academicEnabled])
 
+  if (!academicEnabled) return <p className="admin-muted text-sm" role="status">La orquestación académica está deshabilitada.</p>
   if (state.kind === 'loading' || state.id !== id) return <LoadingState label="Cargando resumen de cita…"/>
   if (state.kind === 'empty') return <p className="admin-muted text-sm" role="status">No hay información de resumen para esta cita.</p>
   if (state.kind === 'error') return <ErrorState description={state.message} onRetry={() => { setState({ kind: 'loading' }); setAttempt((value) => value + 1) }}/>

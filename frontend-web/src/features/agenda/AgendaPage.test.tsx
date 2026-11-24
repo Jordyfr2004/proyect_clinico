@@ -1,15 +1,15 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MemoryRouter } from 'react-router-dom'
 import { AgendaPage } from './AgendaPage'
 import { createMedicalAppointment, createPersonalEntry, getAgendaMonth, getAppointmentSummary, getPendingRequests, updateAgendaEntry } from './agendaService'
 import { AuthContext } from '../auth/authContext'
-import { getPatients } from '../patients/patientService'
+import { searchAgendaPatients as getPatients } from './agendaService'
 import type { UserRole } from '../auth/authService'
 import * as clinicalQuery from '../../services/clinicalQuery'
 
-vi.mock('./agendaService', () => ({ getAgendaMonth: vi.fn(), getAppointmentSummary: vi.fn(), getPendingRequests: vi.fn(), createMedicalAppointment: vi.fn(), createPersonalEntry: vi.fn(), updateAgendaEntry: vi.fn() }))
-vi.mock('../patients/patientService', () => ({ getPatients: vi.fn() }))
+vi.mock('./agendaService', () => ({ getAgendaMonth: vi.fn(), searchAgendaPatients: vi.fn(), getAppointmentSummary: vi.fn(), getPendingRequests: vi.fn(), createMedicalAppointment: vi.fn(), createPersonalEntry: vi.fn(), updateAgendaEntry: vi.fn() }))
+
 const personal = { id: 'personal-1', paciente_id: null, fecha: '2026-10-05', hora_inicio: '10:00', hora_fin: '11:00', tipo: 'personal' as const, descripcion: 'Reunión', estado: null, diagnostico: null, tratamiento: null, observacion: null, paciente: null }
 const medical = { ...personal, id: 'medical-1', tipo: 'cita_medica' as const, estado: 'programada' as const, descripcion: 'Control recibido', paciente_id: 'patient-1', paciente: { codigo_paciente: '001', nombres: 'Paciente recibido' } }
 beforeEach(() => { vi.resetAllMocks(); vi.mocked(getAgendaMonth).mockResolvedValue([personal, medical]); vi.mocked(getPatients).mockResolvedValue({ data: [{ id: 'patient-1', codigo_paciente: '001', nombres: 'Paciente recibido', cedula: '0912345678', telefono: null, direccion: null, fecha_nacimiento: null }], current_page: 1, last_page: 1, per_page: 20, total: 1, next_page_url: null, prev_page_url: null }) })
@@ -33,8 +33,48 @@ async function choosePatient(form: HTMLElement, search = 'Paciente', option = /P
   fireEvent.click(await within(form).findByRole('option', { name: option }))
 }
 
+afterEach(() => vi.unstubAllEnvs())
+
 describe('AgendaPage consultation', () => {
-  it('opens the orchestrated summary only for a medical appointment', async () => {
+  it('keeps the unofficial summary absent by default', async () => {
+    vi.stubEnv('VITE_ENABLE_ACADEMIC_ORCHESTRATION', '')
+    renderAgenda()
+    selectOctober()
+    await screen.findByText('Control recibido')
+    expect(screen.queryByRole('button', { name: 'Consultar resumen de cita' })).not.toBeInTheDocument()
+    expect(getAppointmentSummary).not.toHaveBeenCalled()
+  })
+
+  it('reuses an existing unregistered reservation from agenda search', async () => {
+    vi.mocked(getPatients).mockResolvedValue({ data: [{ id: null, codigo_paciente: null, nombre_reserva: 'Ana Reserva', registrado: false }] })
+    vi.mocked(createMedicalAppointment).mockResolvedValue('Reserva registrada')
+    renderAgenda()
+    selectOctober()
+    fireEvent.click(screen.getByRole('button', { name: /Seleccionar 5 de octubre/ }))
+    const form = screen.getByRole('form', { name: 'Agendar cita médica' })
+    await choosePatient(form, 'Ana', /Ana Reserva.*Reserva sin registro/)
+    fireEvent.change(within(form).getByLabelText('Hora de inicio'), { target: { value: '09:00' } })
+    fireEvent.change(within(form).getByLabelText('Hora de fin'), { target: { value: '10:00' } })
+    fireEvent.submit(form)
+    await waitFor(() => expect(createMedicalAppointment).toHaveBeenCalledWith({ nombre_reserva: 'Ana Reserva', fecha: '2026-10-05', hora_inicio: '09:00', hora_fin: '10:00', descripcion: null }))
+  })
+
+  it('creates a named reservation and never sends a registered patient code', async () => {
+    vi.mocked(createMedicalAppointment).mockResolvedValue('Reserva registrada')
+    renderAgenda()
+    selectOctober()
+    fireEvent.click(screen.getByRole('button', { name: /Seleccionar 5 de octubre/ }))
+    const form = screen.getByRole('form', { name: 'Agendar cita médica' })
+    fireEvent.click(within(form).getByRole('button', { name: 'Nueva reserva sin registro' }))
+    fireEvent.change(within(form).getByLabelText('Nombre de la reserva'), { target: { value: ' Ana Reserva ' } })
+    fireEvent.change(within(form).getByLabelText('Hora de inicio'), { target: { value: '09:00' } })
+    fireEvent.change(within(form).getByLabelText('Hora de fin'), { target: { value: '10:00' } })
+    fireEvent.submit(form)
+    await waitFor(() => expect(createMedicalAppointment).toHaveBeenCalledWith({ nombre_reserva: 'Ana Reserva', fecha: '2026-10-05', hora_inicio: '09:00', hora_fin: '10:00', descripcion: null }))
+  })
+
+  it('opens the orchestrated summary only when explicitly enabled', async () => {
+    vi.stubEnv('VITE_ENABLE_ACADEMIC_ORCHESTRATION', 'true')
     vi.mocked(getAppointmentSummary).mockResolvedValue(null)
     renderAgenda('asistente')
     selectOctober()
@@ -58,6 +98,9 @@ describe('AgendaPage consultation', () => {
     fireEvent.submit(screen.getByRole('form', { name: 'Editar registro de agenda' }))
     await waitFor(() => expect(updateAgendaEntry).toHaveBeenCalledOnce())
     expect(stale).toHaveBeenCalledWith(['dashboard-report'])
+    expect(stale).toHaveBeenCalledWith(['cash'])
+    expect(stale).toHaveBeenCalledWith(['activities'])
+    expect(stale).toHaveBeenCalledWith(['activities-total'])
     stale.mockRestore()
   })
 
@@ -215,7 +258,7 @@ describe('AgendaPage consultation', () => {
     fireEvent.click(screen.getByRole('button', { name: /Seleccionar 5 de octubre/ }))
     const form = screen.getByRole('form', { name: 'Agendar cita médica' })
     fireEvent.change(within(form).getByRole('combobox', { name: 'Buscar paciente' }), { target: { value: 'Paciente' } })
-    await waitFor(() => expect(getPatients).toHaveBeenCalledWith({ buscar: 'Paciente', page: 1 }, expect.any(AbortSignal)))
+    await waitFor(() => expect(getPatients).toHaveBeenCalledWith({ buscar: 'Paciente' }, expect.any(AbortSignal)))
     fireEvent.click(await within(form).findByRole('option', { name: /Paciente recibido.*001/ }))
     expect(within(form).getByRole('status')).toHaveTextContent('Paciente seleccionado: Paciente recibido · Código: 001')
     fireEvent.change(within(form).getByLabelText('Hora de inicio'), { target: { value: '09:00' } })
@@ -268,7 +311,7 @@ describe('AgendaPage consultation', () => {
     const form = screen.getByRole('form', { name: 'Agendar cita médica' })
     const search = within(form).getByRole('combobox', { name: 'Buscar paciente' })
     fireEvent.change(search, { target: { value: '001' } })
-    await waitFor(() => expect(getPatients).toHaveBeenCalledWith({ buscar: '001', page: 1 }, expect.any(AbortSignal)))
+    await waitFor(() => expect(getPatients).toHaveBeenCalledWith({ buscar: '001' }, expect.any(AbortSignal)))
     await within(form).findByRole('option', { name: /Paciente recibido.*001/ })
     fireEvent.keyDown(search, { key: 'Enter' })
     expect(within(form).getByRole('status')).toHaveTextContent('Paciente seleccionado: Paciente recibido · Código: 001')
@@ -297,9 +340,9 @@ describe('AgendaPage consultation', () => {
     fireEvent.click(screen.getByRole('button', { name: /Seleccionar 5 de octubre/ }))
     const search = screen.getByRole('combobox', { name: 'Buscar paciente' })
     fireEvent.change(search, { target: { value: 'viejo' } })
-    await waitFor(() => expect(getPatients).toHaveBeenCalledWith({ buscar: 'viejo', page: 1 }, expect.any(AbortSignal)))
+    await waitFor(() => expect(getPatients).toHaveBeenCalledWith({ buscar: 'viejo' }, expect.any(AbortSignal)))
     fireEvent.change(search, { target: { value: 'nuevo' } })
-    await waitFor(() => expect(getPatients).toHaveBeenCalledWith({ buscar: 'nuevo', page: 1 }, expect.any(AbortSignal)))
+    await waitFor(() => expect(getPatients).toHaveBeenCalledWith({ buscar: 'nuevo' }, expect.any(AbortSignal)))
     expect(signals.find((request) => request.term === 'viejo')?.signal.aborted).toBe(true)
     finishOld({ data: [{ id: 'old', codigo_paciente: '099', nombres: 'Resultado viejo', cedula: '0912345678', telefono: null, direccion: null, fecha_nacimiento: null }], current_page: 1, last_page: 1, per_page: 20, total: 1, next_page_url: null, prev_page_url: null })
     expect(await screen.findByText('Sin coincidencias. Prueba otro nombre o código.')).toBeInTheDocument()
@@ -325,12 +368,12 @@ describe('AgendaPage consultation', () => {
     const form = screen.getByRole('form', { name: 'Agendar cita médica' })
     const search = within(form).getByRole('combobox', { name: 'Buscar paciente' })
     fireEvent.click(within(form).getByRole('button', { name: 'Desplegar pacientes' }))
-    await waitFor(() => expect(getPatients).toHaveBeenCalledWith({ page: 1 }, expect.any(AbortSignal)))
+    await waitFor(() => expect(getPatients).toHaveBeenCalledWith({}, expect.any(AbortSignal)))
     fireEvent.change(search, { target: { value: 'María' } })
     expect(await within(form).findByRole('alert')).toHaveTextContent('No fue posible buscar pacientes')
     fireEvent.click(within(form).getByRole('button', { name: 'Reintentar' }))
     expect(await within(form).findByRole('option', { name: /María Dos.*002/ })).toBeInTheDocument()
-    expect(within(form).getByText(/Se muestra la primera página/)).toBeInTheDocument()
+    expect(within(form).queryByText(/primera página/)).not.toBeInTheDocument()
     fireEvent.keyDown(search, { key: 'ArrowDown' })
     fireEvent.keyDown(search, { key: 'Enter' })
     expect(within(form).getByRole('status')).toHaveTextContent('María Dos · Código: 002')

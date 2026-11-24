@@ -1,5 +1,7 @@
 # Práctica 3.3: Orquestación y composición de capacidades
 
+> Actualización del 23 de noviembre de 2026: se conserva este aporte académico, pero `origin/backend` `7ea26c5` no publica `/resumen-cita/{id}`. El botón y el servicio están deshabilitados salvo `VITE_ENABLE_ACADEMIC_ORCHESTRATION=true` en una API académica configurada expresamente. Los apartados siguientes documentan la práctica original; no certifican disponibilidad en el backend oficial.
+
 **Fecha:** 21 de noviembre de 2026. **Rama de entrega:** `frontend-web`. La práctica se desarrolló en `practica-3-3-orquestacion-frontend-hache` y se trasladó a la rama oficial conservando los cambios remotos del equipo.
 
 ## Necesidad funcional y aporte individual

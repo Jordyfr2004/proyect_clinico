@@ -5,6 +5,7 @@ const expenseSchema = z.object({ id: z.string(), fecha: z.string(), concepto: z.
 const movementSchema = z.object({
   id: z.string(), tipo: z.enum(['ingreso', 'egreso']), fecha: z.string(), concepto: z.string(),
   ingreso: z.union([z.string(), z.number()]), egreso: z.union([z.string(), z.number()]),
+  agenda_id: z.string().nullable().optional(),
   codigo_paciente: z.string().nullable().optional(), nombres: z.string().nullable().optional(),
 })
 const summarySchema = z.object({ periodo: z.enum(['dia', 'semana', 'mes', 'anio']), ingresos: z.string(), egresos: z.string(), saldo: z.string(), movimientos: z.array(movementSchema) })

@@ -1,13 +1,21 @@
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { AppointmentSummary } from './AppointmentSummary'
 import { getAppointmentSummary } from './agendaService'
 
 vi.mock('./agendaService', () => ({ getAppointmentSummary: vi.fn() }))
 
-beforeEach(() => vi.resetAllMocks())
+beforeEach(() => { vi.resetAllMocks(); vi.stubEnv('VITE_ENABLE_ACADEMIC_ORCHESTRATION', 'true') })
+afterEach(() => vi.unstubAllEnvs())
 
 describe('AppointmentSummary', () => {
+  it('does not request academic summaries when the flag is absent', async () => {
+    vi.stubEnv('VITE_ENABLE_ACADEMIC_ORCHESTRATION', '')
+    render(<AppointmentSummary id="cita-1"/>)
+    expect(await screen.findByText('La orquestación académica está deshabilitada.')).toBeInTheDocument()
+    expect(getAppointmentSummary).not.toHaveBeenCalled()
+  })
+
   it('hides the previous appointment immediately when the requested ID changes', async () => {
     let finishSecond!: (value: Awaited<ReturnType<typeof getAppointmentSummary>>) => void
     vi.mocked(getAppointmentSummary).mockImplementation((id) => id === 'cita-1'

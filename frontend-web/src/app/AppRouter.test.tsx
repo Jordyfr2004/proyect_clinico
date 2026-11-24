@@ -60,6 +60,16 @@ function openHeaderPhotoDialog() {
 }
 
 describe('AppRouter', () => {
+  it('unmounts the previous account patient workspace when the session identity changes', async () => {
+    vi.mocked(getPatient).mockResolvedValueOnce({ id: 'patient-id', codigo_paciente: '001', nombres: 'Previous clinical identity', cedula: 'QA', telefono: null, direccion: null, fecha_nacimiento: null }).mockReturnValueOnce(new Promise(() => {}))
+    const Session = ({ id }: { id: string }) => <AuthContext.Provider value={{ status: 'authenticated', user: { ...authenticatedUser('doctora'), id }, sessionError: null, login: async () => {}, logout: async () => {} }}><AppRouter/></AuthContext.Provider>
+    const view = render(<MemoryRouter initialEntries={['/pacientes/patient-id/historial']}><Session id="account-1"/></MemoryRouter>)
+    expect(await screen.findByRole('heading', { name: 'Previous clinical identity' })).toBeInTheDocument()
+    view.rerender(<MemoryRouter initialEntries={['/pacientes/patient-id/historial']}><Session id="account-2"/></MemoryRouter>)
+    expect(screen.queryByRole('heading', { name: 'Previous clinical identity' })).not.toBeInTheDocument()
+    await waitFor(() => expect(getPatient).toHaveBeenCalledTimes(2))
+  })
+
   it('loads the real history section through the existing patient route for the doctor', async () => {
     vi.mocked(getPatient).mockResolvedValueOnce({ id: 'patient-id', codigo_paciente: '001', nombres: 'Nombre recibido', cedula: '0912345678', telefono: null, direccion: null, fecha_nacimiento: null })
     vi.mocked(getClinicalHistoryByPatient).mockResolvedValueOnce({ id: 'history-id', paciente_id: 'patient-id', sexo: null, lugar_nacimiento: null, antecedentes_enfermedades: null, cirugias: null, medicacion_actual: 'Dato recibido' })

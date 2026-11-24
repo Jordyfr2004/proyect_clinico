@@ -1,5 +1,5 @@
 import { BarChart3, CalendarDays, Camera, ChevronDown, ChevronRight, ClipboardList, Layers3, LayoutDashboard, LogOut, Menu, PanelLeftClose, PanelLeftOpen, Settings, UserRound, UsersRound, Wallet, X, type LucideIcon } from 'lucide-react'
-import { useEffect, useId, useRef, useState, type SVGProps } from 'react'
+import { useContext, useEffect, useId, useRef, useState, type SVGProps } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../features/auth/authContext'
 import type { UserRole } from '../features/auth/authService'
@@ -7,6 +7,7 @@ import { canAccessArea, type RestrictedArea } from '../features/auth/roleAccess'
 import { ProtectedPhoto } from '../features/auth/ProtectedPhoto'
 import { ProfilePhotoControl } from '../features/auth/ProfilePhotoControl'
 import { AccessibleDialog } from '../components/ui/AccessibleDialog'
+import { UnsavedEditorsContext } from '../services/navigationGuardContext'
 
 function ToothNavIcon({ size = 18, strokeWidth = 1.8, ...props }: SVGProps<SVGSVGElement> & { size?: number; strokeWidth?: number }) {
   return <svg {...props} fill="none" height={size} viewBox="0 0 64 72" width={size}><path d="M32 10C24 10 19 5 12 8 4 11 5 23 8 33c3 11 8 30 13 31 5 1 6-18 11-18s6 19 11 18c5-1 10-20 13-31 3-10 4-22-4-25-7-3-12 2-20 2Z" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth={strokeWidth * 2.3}/></svg>
@@ -89,6 +90,7 @@ function Sidebar({ close, compact = false, collapsed = false, toggleCollapse }: 
 
 export function AppLayout() {
   const { user, logout } = useAuth()
+  const unsavedChanges = useContext(UnsavedEditorsContext)
   const [open, setOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [sidebarHovered, setSidebarHovered] = useState(false)
@@ -143,6 +145,7 @@ export function AppLayout() {
 
   const signOut = async () => {
     if (logoutPending.current) return
+    if (unsavedChanges && !window.confirm('Hay cambios sin guardar. ¿Descartarlos y cerrar sesión?')) return
     setHeaderMenuOpen(false)
     logoutPending.current = true
     setLogoutBusy(true)

@@ -10,7 +10,7 @@ import { useAuth } from '../auth/authContext'
 import { createMedicalAppointment, createPersonalEntry, deleteAgendaEntry, getAgendaMonth, updateAgendaEntry, type AgendaEntry, type MedicalAppointmentPayload, type PersonalEntryPayload } from './agendaService'
 import { markClinicalQueriesStale, useClinicalQuery } from '../../services/clinicalQuery'
 import { useClinicalViewState } from '../../services/clinicalViewState'
-import type { Patient } from '../patients/patientService'
+import type { AgendaPatient as Patient } from './agendaService'
 import { AgendaPatientSearch } from './AgendaPatientSearch'
 import { AppointmentSummary } from './AppointmentSummary'
 import './agenda.css'
@@ -44,6 +44,7 @@ function AgendaEntryDialog({ entry, kind, busy, error, onCancel, onSave }: { ent
     onSave({ fecha, hora_inicio: inicio, hora_fin: fin, descripcion: descripcion.trim() || null })
   }
   return <form aria-label={kind === 'edit' ? 'Editar registro de agenda' : 'Eliminar registro de agenda'} noValidate onSubmit={submit}>
+    {entry.nombre_reserva ? <p className="admin-muted mb-3 text-sm">{entry.nombre_reserva} · Reserva sin registro</p> : null}
     {kind === 'delete' ? <p className="admin-body text-sm">¿Eliminar este registro de agenda? Esta acción no se puede deshacer.</p> : <div className="grid gap-4 sm:grid-cols-2">
       <label className="text-sm font-medium text-ink-950 sm:col-span-2">Fecha<input className="admin-input mt-1 w-full text-sm" data-dialog-initial onChange={(event) => setFecha(event.target.value)} required type="date" value={fecha}/></label>
       <label className="text-sm font-medium text-ink-950">Hora de inicio<input className="admin-input mt-1 w-full text-sm" onChange={(event) => setInicio(event.target.value)} required type="time" value={inicio}/></label>
@@ -58,6 +59,8 @@ function AgendaEntryDialog({ entry, kind, busy, error, onCancel, onSave }: { ent
 function AgendaForm({ date, busy, error, onCancel, onSave, onKindChange }: { date: string; busy: boolean; error: string | null; onCancel: () => void; onSave: (choice: EntryChoice) => void; onKindChange: (kind: 'medical' | 'personal') => void }) {
   const [kind, setKind] = useState<'medical' | 'personal'>('medical')
   const [patient, setPatient] = useState<Patient | null>(null)
+  const [reservationMode, setReservationMode] = useState(false)
+  const [reservationName, setReservationName] = useState('')
   const [start, setStart] = useState('')
   const [end, setEnd] = useState('')
   const [description, setDescription] = useState('')
@@ -73,22 +76,24 @@ function AgendaForm({ date, busy, error, onCancel, onSave, onKindChange }: { dat
     event.preventDefault()
     if (busy) return
     if (!start || !end || end <= start) { setValidation('Ingresa un horario válido. La hora final debe ser posterior a la inicial.'); return }
-    if (kind === 'medical' && !patient) { setValidation('Selecciona un paciente de los resultados de búsqueda.'); return }
+    if (kind === 'medical' && !reservationMode && !patient) { setValidation('Selecciona un paciente de los resultados de búsqueda.'); return }
+    if (kind === 'medical' && reservationMode && (!reservationName.trim() || reservationName.trim().length > 255)) { setValidation('Indica el nombre de la reserva (máximo 255 caracteres).'); return }
     if (kind === 'personal' && !description.trim()) { setValidation('La descripción es obligatoria para una actividad personal.'); return }
     setValidation(null)
     if (kind === 'personal') onSave({ kind, values: { fecha: date, hora_inicio: start, hora_fin: end, descripcion: description.trim() } })
-    else onSave({ kind, values: { codigo_paciente: patient!.codigo_paciente, fecha: date, hora_inicio: start, hora_fin: end, descripcion: description.trim() || null } })
+    else onSave({ kind, values: { ...(reservationMode ? { nombre_reserva: reservationName.trim() } : patient?.codigo_paciente ? { codigo_paciente: patient.codigo_paciente } : { nombre_reserva: patient!.nombre_reserva! }), fecha: date, hora_inicio: start, hora_fin: end, descripcion: description.trim() || null } })
   }
   return <form aria-label={kind === 'medical' ? 'Agendar cita médica' : 'Agendar actividad personal'} noValidate onSubmit={submit}>
     <div aria-label="Tipo de registro" className="mb-3 flex flex-wrap gap-2" role="group"><button aria-pressed={kind === 'medical'} className={`admin-secondary min-h-11 rounded-lg px-4 text-sm font-semibold ${kind === 'medical' ? 'border-clinic-600 bg-clinic-50 text-clinic-700' : ''}`} disabled={busy} onClick={() => selectKind('medical')} type="button">Cita médica</button><button aria-pressed={kind === 'personal'} className={`admin-secondary min-h-11 rounded-lg px-4 text-sm font-semibold ${kind === 'personal' ? 'border-clinic-600 bg-clinic-50 text-clinic-700' : ''}`} disabled={busy} onClick={() => selectKind('personal')} type="button">Actividad personal</button></div>
     <p className="admin-body mb-4 text-sm">Fecha seleccionada: <strong>{formatDate(date)}</strong></p>
-    <div className="grid gap-3 sm:grid-cols-2">{kind === 'medical' ? <AgendaPatientSearch disabled={busy} onSelect={(next) => { setPatient(next); setValidation(null) }} selected={patient}/> : null}<label className="text-sm font-medium text-ink-950">Hora de inicio<input className="admin-input mt-1 w-full text-sm" onChange={(event) => setStart(event.target.value)} required type="time" value={start}/></label><label className="text-sm font-medium text-ink-950">Hora de fin<input className="admin-input mt-1 w-full text-sm" onChange={(event) => setEnd(event.target.value)} required type="time" value={end}/></label><label className="text-sm font-medium text-ink-950 sm:col-span-2">{kind === 'medical' ? 'Descripción (opcional)' : 'Descripción'}<textarea className="admin-input mt-1 w-full text-sm" onChange={(event) => setDescription(event.target.value)} required={kind === 'personal'} rows={2} value={description}/></label></div>
+    <div className="grid gap-3 sm:grid-cols-2">{kind === 'medical' ? <><div className="flex flex-wrap gap-2 sm:col-span-2"><button aria-pressed={!reservationMode} className="admin-secondary min-h-10 rounded-lg px-3 text-sm" disabled={busy} onClick={() => { setReservationMode(false); setReservationName(''); setValidation(null) }} type="button">Paciente o reserva existente</button><button aria-pressed={reservationMode} className="admin-secondary min-h-10 rounded-lg px-3 text-sm" disabled={busy} onClick={() => { setReservationMode(true); setPatient(null); setValidation(null) }} type="button">Nueva reserva sin registro</button></div>{reservationMode ? <label className="text-sm font-medium text-ink-950 sm:col-span-2">Nombre de la reserva<input className="admin-input mt-1 w-full text-sm" disabled={busy} maxLength={255} onChange={(event) => setReservationName(event.target.value)} required value={reservationName}/></label> : <AgendaPatientSearch disabled={busy} onSelect={(next) => { setPatient(next); setValidation(null) }} selected={patient}/>}</> : null}<label className="text-sm font-medium text-ink-950">Hora de inicio<input className="admin-input mt-1 w-full text-sm" onChange={(event) => setStart(event.target.value)} required type="time" value={start}/></label><label className="text-sm font-medium text-ink-950">Hora de fin<input className="admin-input mt-1 w-full text-sm" onChange={(event) => setEnd(event.target.value)} required type="time" value={end}/></label><label className="text-sm font-medium text-ink-950 sm:col-span-2">{kind === 'medical' ? 'Descripción (opcional)' : 'Descripción'}<textarea className="admin-input mt-1 w-full text-sm" onChange={(event) => setDescription(event.target.value)} required={kind === 'personal'} rows={2} value={description}/></label></div>
     {validation || error ? <p className="mt-4 text-sm text-red-700" role="alert">{validation ?? error}</p> : null}
     <div className="sticky bottom-0 z-30 mt-5 flex flex-wrap gap-3 border-t border-[#dbe6f2] bg-white pt-4"><button className="admin-primary min-h-11 rounded-lg px-5 text-sm font-semibold disabled:opacity-60" disabled={busy} type="submit">{busy ? 'Guardando…' : kind === 'medical' ? 'Guardar cita' : 'Guardar actividad'}</button><button className="admin-secondary min-h-11 rounded-lg px-5 text-sm font-semibold disabled:opacity-60" disabled={busy} onClick={onCancel} type="button">Cancelar</button></div>
   </form>
 }
 
 export function AgendaPage() {
+  const academicEnabled = import.meta.env.VITE_ENABLE_ACADEMIC_ORCHESTRATION === 'true'
   const location = useLocation()
   const navigate = useNavigate()
   const { user } = useAuth()
@@ -226,6 +231,9 @@ export function AgendaPage() {
       if (entryDialog.entry.tipo === 'cita_medica') {
         void markClinicalQueriesStale(['dashboard-report'])
         void markClinicalQueriesStale(['reports'])
+        void markClinicalQueriesStale(['cash'])
+        void markClinicalQueriesStale(['activities'])
+        void markClinicalQueriesStale(['activities-total'])
       }
       const refreshed = await load()
       setAppointmentSuccess(refreshed ? message : `${message} No fue posible actualizar el calendario; vuelve a cargarlo.`)
@@ -282,10 +290,10 @@ export function AgendaPage() {
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-[#edf5ff] px-3 py-2"><h3 className="flex items-center gap-2 text-sm font-bold text-ink-950"><CalendarDays aria-hidden="true" className="text-clinic-600" size={17}/>{formatDate(group.date)}</h3><span className="admin-muted text-sm">{group.entries.length} {group.entries.length === 1 ? 'registro' : 'registros'}</span></div>
             <ul className="divide-y divide-[#dbe6f2] px-1">{group.entries.map((entry) => <li className="flex flex-wrap items-center gap-3 py-3 sm:gap-4" key={entry.id}>
               <time className="shrink-0 rounded-xl bg-[#e8f2ff] px-3 py-2 text-sm font-bold whitespace-nowrap text-ink-950">{entry.hora_inicio?.slice(0, 5) ?? 'Hora no disponible'}{entry.hora_fin ? ` – ${entry.hora_fin.slice(0, 5)}` : ''}</time>
-              <div className="min-w-[135px] flex-1 border-l border-[#c9daec] pl-3"><span className="admin-pill admin-pill-ready">{entry.tipo === 'personal' ? 'Actividad personal' : 'Cita médica'}</span><p className="mt-1 break-words text-sm font-semibold text-ink-950">{entry.descripcion || (entry.tipo === 'cita_medica' ? entry.paciente?.nombres ?? 'Cita médica' : 'Actividad personal')}</p>{entry.paciente ? <p className="admin-muted mt-0.5 break-words text-sm">{entry.paciente.nombres}</p> : null}</div>
+              <div className="min-w-[135px] flex-1 border-l border-[#c9daec] pl-3"><span className="admin-pill admin-pill-ready">{entry.tipo === 'personal' ? 'Actividad personal' : 'Cita médica'}</span><p className="mt-1 break-words text-sm font-semibold text-ink-950">{entry.descripcion || (entry.tipo === 'cita_medica' ? entry.paciente?.nombres ?? entry.nombre_reserva ?? 'Cita médica' : 'Actividad personal')}</p>{entry.paciente || entry.nombre_reserva ? <p className="admin-muted mt-0.5 break-words text-sm">{entry.paciente?.nombres ?? entry.nombre_reserva}{!entry.paciente_id ? ' · Reserva sin registro' : ''}</p> : null}</div>
               {entry.estado ? <span aria-label={`Estado: ${entry.estado}`} className={`rounded-full px-3 py-1.5 text-xs font-semibold capitalize ${entry.estado === 'completada' ? 'bg-emerald-50 text-emerald-800' : entry.estado === 'cancelada' ? 'bg-red-50 text-red-700' : 'bg-sky-50 text-clinic-700'}`}>{entry.estado}</span> : null}
-              {entry.tipo === 'cita_medica' ? <button className="admin-secondary min-h-10 rounded-lg px-3 text-sm font-semibold" onClick={(event) => { summaryTrigger.current = event.currentTarget; setSummaryId(entry.id) }} type="button">Consultar resumen de cita</button> : null}
-              {user?.role === 'doctora' ? <div className="relative ml-auto"><button aria-expanded={openMenuId === entry.id} aria-label={`Más opciones para ${entry.descripcion || entry.paciente?.nombres || 'registro'}`} className="admin-secondary grid size-10 place-items-center rounded-xl" onClick={(event) => { if (openMenuId === entry.id) { setOpenMenuId(null); return } const bottom = Math.min(recordsList.current?.getBoundingClientRect().bottom ?? window.innerHeight, window.innerHeight); setMenuAbove(bottom - event.currentTarget.getBoundingClientRect().bottom < 110); setOpenMenuId(entry.id) }} type="button"><MoreVertical aria-hidden="true" size={18}/></button>{openMenuId === entry.id ? <div className={`absolute right-0 z-10 min-w-36 rounded-xl border border-[#dbe6f2] bg-white p-1 shadow-lg ${menuAbove ? 'bottom-full mb-1' : 'top-full mt-1'}`}><button className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-ink-950 hover:bg-sky-50" onClick={() => { setOpenMenuId(null); setEntryError(null); setEntryDialog({ kind: 'edit', entry }) }} type="button">Editar</button><button className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-red-700 hover:bg-red-50" onClick={() => { setOpenMenuId(null); setEntryError(null); setEntryDialog({ kind: 'delete', entry }) }} type="button">Eliminar</button></div> : null}</div> : null}
+              {academicEnabled && entry.tipo === 'cita_medica' && entry.paciente_id ? <button className="admin-secondary min-h-10 rounded-lg px-3 text-sm font-semibold" onClick={(event) => { summaryTrigger.current = event.currentTarget; setSummaryId(entry.id) }} type="button">Consultar resumen de cita</button> : null}
+              {user?.role === 'doctora' ? <div className="relative ml-auto"><button aria-expanded={openMenuId === entry.id} aria-label={`Más opciones para ${entry.descripcion || entry.paciente?.nombres || entry.nombre_reserva || 'registro'}`} className="admin-secondary grid size-10 place-items-center rounded-xl" onClick={(event) => { if (openMenuId === entry.id) { setOpenMenuId(null); return } const bottom = Math.min(recordsList.current?.getBoundingClientRect().bottom ?? window.innerHeight, window.innerHeight); setMenuAbove(bottom - event.currentTarget.getBoundingClientRect().bottom < 110); setOpenMenuId(entry.id) }} type="button"><MoreVertical aria-hidden="true" size={18}/></button>{openMenuId === entry.id ? <div className={`absolute right-0 z-10 min-w-36 rounded-xl border border-[#dbe6f2] bg-white p-1 shadow-lg ${menuAbove ? 'bottom-full mb-1' : 'top-full mt-1'}`}><button className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-ink-950 hover:bg-sky-50" onClick={() => { setOpenMenuId(null); setEntryError(null); setEntryDialog({ kind: 'edit', entry }) }} type="button">Editar</button><button className="w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-red-700 hover:bg-red-50" onClick={() => { setOpenMenuId(null); setEntryError(null); setEntryDialog({ kind: 'delete', entry }) }} type="button">Eliminar</button></div> : null}</div> : null}
             </li>)}</ul>
           </div>)}</div>}
         </div>}

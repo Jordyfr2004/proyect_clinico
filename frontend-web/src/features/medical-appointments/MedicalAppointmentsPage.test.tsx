@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { MedicalAppointmentsPage } from './MedicalAppointmentsPage'
+import * as clinicalQuery from '../../services/clinicalQuery'
 import { cancelAppointment, completeAppointment, createMedicalAppointment, createPersonalEntry, deleteAgendaEntry, getAgendaMonth, getPendingRequests, programRequest, registerClinicalData, updateAgendaEntry } from '../agenda/agendaService'
 
 vi.mock('../agenda/agendaService', () => ({ getAgendaMonth: vi.fn(), getPendingRequests: vi.fn(), createMedicalAppointment: vi.fn(), createPersonalEntry: vi.fn(), programRequest: vi.fn(), updateAgendaEntry: vi.fn(), cancelAppointment: vi.fn(), completeAppointment: vi.fn(), deleteAgendaEntry: vi.fn(), registerClinicalData: vi.fn() }))
@@ -19,6 +20,49 @@ async function renderOctober() {
 }
 
 describe('MedicalAppointmentsPage', () => {
+  it.each(['cancel', 'delete'] as const)('identifies reservations in the %s confirmation and uses their appointment ID', async (kind) => {
+    vi.mocked(getAgendaMonth).mockResolvedValue([{ ...medical, paciente_id: null, paciente: null, nombre_reserva: 'Ana Reserva' }])
+    vi.mocked(cancelAppointment).mockResolvedValue('Cancelada')
+    vi.mocked(deleteAgendaEntry).mockResolvedValue('Eliminada')
+    await renderOctober()
+    if (kind === 'cancel') {
+      fireEvent.click(screen.getByRole('button', { name: 'Ver detalles' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Cancelar cita' }))
+    } else {
+      fireEvent.click(screen.getByRole('button', { name: 'Opciones de cita para Ana Reserva' }))
+      fireEvent.click(screen.getByRole('button', { name: 'Eliminar' }))
+    }
+    const dialog = screen.getByRole('dialog')
+    expect(within(dialog).getByText(/Ana Reserva/)).toBeInTheDocument()
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Confirmar' }))
+    await waitFor(() => expect(kind === 'cancel' ? cancelAppointment : deleteAgendaEntry).toHaveBeenCalledWith('medical-1'))
+  })
+
+  it('completes an unregistered reservation without clinical fields or actions', async () => {
+    const stale = vi.spyOn(clinicalQuery, 'markClinicalQueriesStale')
+    vi.mocked(getAgendaMonth).mockResolvedValue([{ ...medical, paciente_id: null, paciente: null, nombre_reserva: 'Ana Reserva' }])
+    vi.mocked(completeAppointment).mockResolvedValue('Reserva completada')
+    await renderOctober()
+    expect(screen.getByText('Ana Reserva')).toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Buscar paciente'), { target: { value: 'ana reserva' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Ver detalles' }))
+    const details = screen.getByRole('region', { name: 'Detalles de la cita' })
+    expect(within(details).queryByText('Diagnóstico')).not.toBeInTheDocument()
+    expect(within(details).queryByRole('button', { name: /datos clínicos/ })).not.toBeInTheDocument()
+    fireEvent.click(within(details).getByRole('button', { name: 'Completar cita' }))
+    const form = screen.getByRole('form', { name: 'Actividad realizada en la cita' })
+    expect(within(form).queryByText(/deben estar registrados/)).not.toBeInTheDocument()
+    fireEvent.change(within(form).getByLabelText('Actividad realizada'), { target: { value: 'Consulta' } })
+    fireEvent.change(within(form).getByLabelText('Precio'), { target: { value: '20' } })
+    fireEvent.submit(form)
+    await waitFor(() => expect(completeAppointment).toHaveBeenCalledWith('medical-1', { actividad: 'Consulta', precio: 20 }))
+    expect(registerClinicalData).not.toHaveBeenCalled()
+    expect(stale).toHaveBeenCalledWith(['cash'])
+    expect(stale).toHaveBeenCalledWith(['activities'])
+    expect(stale).toHaveBeenCalledWith(['activities-total'])
+    stale.mockRestore()
+  })
+
   it('loads the confirmed month and shows only received medical appointments', async () => {
     await renderOctober()
     expect(getAgendaMonth).toHaveBeenCalledWith(10, 2026, expect.any(AbortSignal))

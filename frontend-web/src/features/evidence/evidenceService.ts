@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { apiClient } from '../../services/apiClient'
 
 const evidenceSchema = z.object({
-  id: z.string(), paciente_id: z.string(), tipo: z.enum(['caso_clinico', 'rx']),
+  id: z.string(), paciente_id: z.string(), tipo: z.enum(['caso_clinico', 'rx', 'documento']),
   nombre_archivo: z.string(), mime_type: z.string(),
   tamano: z.number(), descripcion: z.string().nullable(), fecha: z.string(),
   subido_por: z.object({ id: z.string(), name: z.string(), role: z.string() }).nullable().optional(),
@@ -28,7 +28,9 @@ export async function getPatientEvidence(patientId: string, signal?: AbortSignal
   configured()
   const path = `/evidencias-clinicas/paciente/${encodeURIComponent(patientId)}`
   const { data } = signal ? await apiClient.get<unknown>(path, { signal }) : await apiClient.get<unknown>(path)
-  return responseSchema.parse(data).data
+  const response = responseSchema.parse(data)
+  if (response.paciente.id !== patientId || response.data.some((record) => record.paciente_id !== patientId)) throw new Error('Paciente de evidencia no coincide')
+  return response.data
 }
 
 export async function createPatientEvidence(values: EvidenceCreateValues): Promise<string> {
@@ -37,7 +39,7 @@ export async function createPatientEvidence(values: EvidenceCreateValues): Promi
   body.append('paciente_id', values.paciente_id)
   body.append('tipo', values.tipo)
   body.append('archivo', values.archivo)
-  body.append('fecha', values.fecha)
+  if (values.fecha) body.append('fecha', values.fecha)
   if (values.descripcion !== null) body.append('descripcion', values.descripcion)
   const { data } = await apiClient.post<unknown>('/evidencias-clinicas', body)
   return mutationSchema.parse(data).message
@@ -53,4 +55,11 @@ export async function deletePatientEvidence(id: string): Promise<string> {
   configured()
   const { data } = await apiClient.delete<unknown>(`/evidencias-clinicas/${encodeURIComponent(id)}`)
   return messageSchema.parse(data).message
+}
+
+export async function getEvidenceFile(id: string, signal?: AbortSignal): Promise<Blob> {
+  configured()
+  const { data } = await apiClient.get<Blob>(`/evidencias-clinicas/${encodeURIComponent(id)}/archivo`, { responseType: 'blob', ...(signal ? { signal } : {}) })
+  if (!(data instanceof Blob) || !['image/jpeg','image/png','image/webp','application/pdf'].includes(data.type.toLowerCase().split(';')[0])) throw new Error('Formato de archivo no admitido')
+  return data
 }

@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { apiClient } from '../../services/apiClient'
 
 const agendaEntrySchema = z.object({
-  id: z.string(), paciente_id: z.string().nullable(), fecha: z.string().nullable(),
+  id: z.string(), nombre_reserva: z.string().nullable().optional(), paciente_id: z.string().nullable(), fecha: z.string().nullable(),
   hora_inicio: z.string().nullable(), hora_fin: z.string().nullable(),
   tipo: z.enum(['personal', 'cita_medica']), descripcion: z.string().nullable(),
   estado: z.enum(['pendiente', 'programada', 'cancelada', 'completada']).nullable(),
@@ -25,7 +25,7 @@ export type AgendaEntry = z.infer<typeof agendaEntrySchema>
 export type AppointmentSummary = NonNullable<z.infer<typeof appointmentSummarySchema>['data']>
 export type AgendaSlot = { fecha: string; hora_inicio: string; hora_fin: string }
 export type PersonalEntryPayload = AgendaSlot & { descripcion: string }
-export type MedicalAppointmentPayload = AgendaSlot & { codigo_paciente: string; descripcion: string | null }
+export type MedicalAppointmentPayload = AgendaSlot & { descripcion: string | null } & ({ codigo_paciente: string; nombre_reserva?: never } | { nombre_reserva: string; codigo_paciente?: never })
 export type AgendaUpdatePayload = Partial<AgendaSlot & { descripcion: string | null }>
 export type ClinicalDataPayload = { diagnostico: string; tratamiento: string; observacion: string | null }
 export type CompleteAppointmentPayload = { actividad: string; precio: number }
@@ -47,6 +47,7 @@ export async function getPendingRequests(signal?: AbortSignal): Promise<AgendaEn
 }
 
 export async function getAppointmentSummary(id: string, signal?: AbortSignal): Promise<AppointmentSummary | null> {
+  if (import.meta.env.VITE_ENABLE_ACADEMIC_ORCHESTRATION !== 'true') throw new Error('La orquestación académica está deshabilitada.')
   requireApiBaseUrl()
   const { data } = await apiClient.get<unknown>(`/resumen-cita/${encodeURIComponent(id)}`, signal ? { signal } : undefined)
   return appointmentSummarySchema.refine((response) => response.data === null || response.data.cita.id === id, { message: 'El ID de la cita no coincide' }).parse(data).data
@@ -79,4 +80,15 @@ export async function deleteAgendaEntry(id: string): Promise<string> {
   requireApiBaseUrl()
   const { data } = await apiClient.delete<unknown>(`/agenda/${encodeURIComponent(id)}`)
   return messageSchema.parse(data).message
+}
+
+const agendaPatientSchema = z.union([
+  z.object({ id: z.string(), codigo_paciente: z.string(), nombres: z.string(), cedula: z.string().nullable(), registrado: z.literal(true) }),
+  z.object({ id: z.null(), codigo_paciente: z.null(), cedula: z.null(), nombre_reserva: z.string(), registrado: z.literal(false) }),
+])
+export type AgendaPatient = { id: string | null; codigo_paciente: string | null; nombres?: string; nombre_reserva?: string; registrado?: boolean; [key: string]: unknown }
+export async function searchAgendaPatients(params: { buscar?: string } = {}, signal?: AbortSignal): Promise<{ data: AgendaPatient[]; [key: string]: unknown }> {
+  requireApiBaseUrl()
+  const { data } = await apiClient.get<unknown>('/pacientes', { params: { agenda: 1, ...params }, ...(signal ? { signal } : {}) })
+  return z.object({ data: z.array(agendaPatientSchema) }).parse(data)
 }

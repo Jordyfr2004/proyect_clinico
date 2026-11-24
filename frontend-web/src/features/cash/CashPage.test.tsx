@@ -120,3 +120,46 @@ describe('CashPage', () => {
     expect(await screen.findByText(/No fue posible completar la operación/)).toBeInTheDocument()
   })
 })
+
+it('labels income without patient neutrally and shows no income action', async () => {
+  vi.mocked(getCashSummary).mockResolvedValue({ ...summary, movimientos: [{ ...income, nombres: null, codigo_paciente: null, agenda_id: 'agenda-id' }] })
+  renderCash()
+  expect(await screen.findByText('Sin paciente registrado')).toBeInTheDocument()
+  expect(screen.queryByText(/Reserva/)).not.toBeInTheDocument()
+  expect(screen.getByLabelText('Sin acciones disponibles')).toHaveTextContent('\u2014')
+})
+
+it('adapts desktop list height to its viewport position and resizes', async () => {
+  const rect = vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({ top: 350 } as DOMRect)
+  renderCash()
+  const list = await screen.findByRole('region', { name: 'Lista de movimientos' })
+  expect(list.style.maxHeight).toBe(`${Math.max(240, window.innerHeight - 350 - 24)}px`)
+  rect.mockReturnValue({ top: 250 } as DOMRect)
+  fireEvent(window, new Event('resize'))
+  expect(list.style.maxHeight).toBe(`${Math.max(240, window.innerHeight - 250 - 24)}px`)
+  rect.mockRestore()
+})
+
+it('animates received cash data briefly', async () => {
+  const animate = vi.fn(() => ({ cancel: vi.fn() }))
+  const original = HTMLElement.prototype.animate
+  HTMLElement.prototype.animate = animate as unknown as typeof original
+  try {
+    renderCash()
+    await screen.findByText('Limpieza dental')
+    expect(animate).toHaveBeenCalledWith([{ opacity: 0.7 }, { opacity: 1 }], { duration: 240, easing: 'ease-out' })
+  } finally { HTMLElement.prototype.animate = original }
+})
+
+it('skips data animation with reduced motion', async () => {
+  const animate = vi.fn()
+  const original = HTMLElement.prototype.animate
+  const media = window.matchMedia
+  window.matchMedia = vi.fn(() => ({ matches: true })) as unknown as typeof media
+  HTMLElement.prototype.animate = animate
+  try {
+    renderCash()
+    await screen.findByText('Limpieza dental')
+    expect(animate).not.toHaveBeenCalled()
+  } finally { HTMLElement.prototype.animate = original; window.matchMedia = media }
+})

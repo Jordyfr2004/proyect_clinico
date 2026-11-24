@@ -36,3 +36,20 @@ describe('evidenceService', () => {
     expect(remove).toHaveBeenCalledWith('/evidencias-clinicas/evidence-1')
   })
 })
+
+it('accepts official documento metadata', async () => {
+ vi.spyOn(apiClient, 'get').mockResolvedValue({ data: { paciente: { id: 'patient-1', codigo_paciente: '001', nombres: 'Paciente' }, data: [{ ...evidence, tipo: 'documento' }] } })
+ expect((await getPatientEvidence('patient-1'))[0].tipo).toBe('documento')
+})
+it('rejects evidence from another patient', async () => {
+ vi.spyOn(apiClient, 'get').mockResolvedValue({ data: { paciente: { id: 'patient-1', codigo_paciente: '001', nombres: 'Paciente' }, data: [{ ...evidence, paciente_id: 'other' }] } })
+ await expect(getPatientEvidence('patient-1')).rejects.toThrow()
+})
+
+it('downloads an authenticated blob through the official protected file endpoint', async () => {
+ const { getEvidenceFile } = await import('./evidenceService')
+ const blob = new Blob(['image'], { type: 'image/png' })
+ const get = vi.spyOn(apiClient, 'get').mockResolvedValue({ data: blob })
+ expect(await getEvidenceFile('evidence-1')).toBe(blob)
+ expect(get).toHaveBeenCalledWith('/evidencias-clinicas/evidence-1/archivo', { responseType: 'blob' })
+})

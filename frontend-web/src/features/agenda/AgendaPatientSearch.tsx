@@ -2,7 +2,7 @@ import { isAxiosError } from 'axios'
 import { ChevronDown } from 'lucide-react'
 import { useEffect, useId, useRef, useState } from 'react'
 import { useClinicalQuery } from '../../services/clinicalQuery'
-import { getPatients, type Patient } from '../patients/patientService'
+import { searchAgendaPatients, type AgendaPatient as Patient } from './agendaService'
 
 export function AgendaPatientSearch({ selected, onSelect, disabled }: { selected: Patient | null; onSelect: (patient: Patient | null) => void; disabled: boolean }) {
   const [text, setText] = useState('')
@@ -17,7 +17,7 @@ export function AgendaPatientSearch({ selected, onSelect, disabled }: { selected
     return () => window.clearTimeout(timer)
   }, [text])
 
-  const query = useClinicalQuery(['agenda', 'patient-search', term], (signal) => getPatients({ ...(term ? { buscar: term } : {}), page: 1 }, signal), { enabled: open && !disabled })
+  const query = useClinicalQuery(['agenda', 'patient-search', term], (signal) => searchAgendaPatients({ ...(term ? { buscar: term } : {}) }, signal), { enabled: open && !disabled })
   const ready = open && term === text.trim()
   const patients = ready ? query.data?.data ?? [] : []
   useEffect(() => {
@@ -27,7 +27,7 @@ export function AgendaPatientSearch({ selected, onSelect, disabled }: { selected
   }, [active, ready, query.data])
   const choose = (patient: Patient) => {
     onSelect(patient)
-    setText(`${patient.nombres} (${patient.codigo_paciente})`)
+    setText(patient.codigo_paciente ? `${patient.nombres} (${patient.codigo_paciente})` : patient.nombre_reserva ?? '')
     setOpen(false)
   }
 
@@ -60,15 +60,15 @@ export function AgendaPatientSearch({ selected, onSelect, disabled }: { selected
     />
     <button aria-label="Desplegar pacientes" aria-expanded={open} aria-controls={open ? listId : undefined} className="absolute inset-y-1 right-1 grid w-10 place-items-center rounded-lg text-[#526a87] hover:bg-sky-50" disabled={disabled} onClick={() => { setActive(0); setOpen((current) => !current) }} type="button"><ChevronDown aria-hidden="true" size={17}/></button>
     </div>
-    {selected ? <p className="admin-muted mt-2 text-sm" role="status"><strong className="text-ink-950">Paciente seleccionado:</strong> {selected.nombres} · Código: {selected.codigo_paciente}</p> : null}
+    {selected ? <p className="admin-muted mt-2 text-sm" role="status"><strong className="text-ink-950">Paciente seleccionado:</strong> {selected.nombres ?? selected.nombre_reserva} · {selected.codigo_paciente ? `Código: ${selected.codigo_paciente}` : 'Reserva sin registro'}</p> : null}
     {open ? <div className="admin-surface absolute inset-x-0 top-full z-20 mt-1 min-w-0 rounded-xl border border-[#dbe6f2] p-2 shadow-lg">
       {!ready || !query.data && !query.isError ? <p className="admin-muted p-2 text-sm" role="status">{term ? 'Buscando pacientes…' : 'Cargando pacientes…'}</p> : null}
       {ready && query.isError ? <p className="p-2 text-sm text-red-700" role="alert">{isAxiosError(query.error) && !query.error.response ? 'No fue posible comunicarse con el servidor.' : 'No fue posible buscar pacientes.'} <button className="dashboard-retry" onClick={() => { void query.refetch() }} type="button">Reintentar</button></p> : null}
       {ready && query.data && patients.length === 0 ? <p className="admin-muted p-2 text-sm">{term ? 'Sin coincidencias. Prueba otro nombre o código.' : 'No hay pacientes registrados.'}</p> : null}
       <ul className="max-h-44 overflow-x-hidden overflow-y-auto overscroll-contain" id={listId} ref={listRef} role="listbox">
-        {patients.map((patient, index) => <li aria-selected={index === active} className={`cursor-pointer rounded-lg p-2 text-left text-sm ${index === active ? 'bg-clinic-50' : 'hover:bg-sky-50'}`} id={`${listId}-option-${index}`} key={patient.id} onClick={() => choose(patient)} onMouseDown={(event) => event.preventDefault()} role="option"><strong className="block break-words text-ink-950">{patient.nombres}</strong><span className="admin-muted break-all">Código: {patient.codigo_paciente}</span></li>)}
+        {patients.map((patient, index) => <li aria-selected={index === active} className={`cursor-pointer rounded-lg p-2 text-left text-sm ${index === active ? 'bg-clinic-50' : 'hover:bg-sky-50'}`} id={`${listId}-option-${index}`} key={patient.id ?? patient.nombre_reserva} onClick={() => choose(patient)} onMouseDown={(event) => event.preventDefault()} role="option"><strong className="block break-words text-ink-950">{patient.nombres ?? patient.nombre_reserva}</strong><span className="admin-muted break-all">{patient.codigo_paciente ? `Código: ${patient.codigo_paciente}` : 'Reserva sin registro'}</span></li>)}
       </ul>
-      {ready && query.data && query.data.last_page > 1 ? <p className="admin-muted border-t border-[#dbe6f2] p-2 text-xs">Se muestra la primera página. Refina la búsqueda para encontrar otros pacientes.</p> : null}
+      {ready && patients.length >= 20 ? <p className="admin-muted border-t border-[#dbe6f2] p-2 text-xs">Refina la búsqueda para encontrar otros pacientes o reservas.</p> : null}
     </div> : null}
   </div>
 }

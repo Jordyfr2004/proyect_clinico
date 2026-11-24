@@ -1,14 +1,18 @@
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useForm } from 'react-hook-form'
+import { useEffect } from 'react'
+import { useClinicalUnsavedChanges } from './odontogramUnsavedChanges'
 import { createPatientSchema, type CreatePatientFormValues } from './createPatientSchema'
 import type { Patient, UpdatePatientPayload } from './patientService'
 
-export function PatientEditForm({ patient, error, onSave, onCancel }: { patient: Patient; error: string | null; onSave: (values: UpdatePatientPayload) => Promise<boolean>; onCancel: () => void }) {
+export function PatientEditForm({ patient, error, onSave, onCancel, onDirtyChange }: { patient: Patient; error: string | null; onSave: (values: UpdatePatientPayload) => Promise<boolean>; onCancel: () => void; onDirtyChange?: (dirty: boolean) => void }) {
   const initial: CreatePatientFormValues = {
     nombres: patient.nombres, cedula: patient.cedula, telefono: patient.telefono ?? '',
     direccion: patient.direccion ?? '', fecha_nacimiento: patient.fecha_nacimiento?.slice(0, 10) ?? '',
   }
-  const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<CreatePatientFormValues>({ resolver: zodResolver(createPatientSchema), defaultValues: initial })
+  const { register, handleSubmit, formState: { errors, isSubmitting, isDirty } } = useForm<CreatePatientFormValues>({ resolver: zodResolver(createPatientSchema), defaultValues: initial })
+  useClinicalUnsavedChanges(isDirty)
+  useEffect(() => { onDirtyChange?.(isDirty) }, [isDirty, onDirtyChange])
   const submit = async (values: CreatePatientFormValues) => {
     const payload: UpdatePatientPayload = {}
     if (values.nombres !== initial.nombres) payload.nombres = values.nombres
