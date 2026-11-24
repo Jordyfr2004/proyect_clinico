@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+import { Platform } from 'react-native';
 
 import { parseAuthSession, parsePatientUser } from '../parsers';
 import { clearAccessToken, loadAccessToken, saveAccessToken } from '../session-storage';
@@ -20,6 +21,7 @@ const patient = {
   role: 'paciente',
   foto_perfil_url: null,
   paciente_id: 'patient-1',
+  email_verified_at: '2026-01-01T00:00:00Z',
   activo: true,
 };
 
@@ -41,6 +43,7 @@ describe('authentication contracts', () => {
     expect(() => parsePatientUser({ ...patient, role: 'doctora' })).toThrow('exclusiva para pacientes');
     expect(() => parsePatientUser({ ...patient, activo: false })).toThrow('desactivada');
     expect(() => parsePatientUser({ ...patient, paciente_id: null })).toThrow('vinculada');
+    expect(() => parsePatientUser({ ...patient, email_verified_at: null })).toThrow('verificar');
   });
 
   test('parses the direct Laravel login response without inventing fields', () => {
@@ -72,5 +75,17 @@ describe('authentication contracts', () => {
     await expect(clearAccessToken()).resolves.toBeUndefined();
     expect(SecureStore.setItemAsync).toHaveBeenLastCalledWith('clinic.patient.access-token', '');
     await expect(loadAccessToken()).resolves.toBeNull();
+  });
+
+  test('Expo Web keeps credentials only in memory without using native storage', async () => {
+    const original = Platform.OS;
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: 'web' });
+    jest.clearAllMocks();
+    await saveAccessToken('web-token');
+    await expect(loadAccessToken()).resolves.toBe('web-token');
+    expect(SecureStore.setItemAsync).not.toHaveBeenCalled();
+    await clearAccessToken();
+    await expect(loadAccessToken()).resolves.toBeNull();
+    Object.defineProperty(Platform, 'OS', { configurable: true, value: original });
   });
 });

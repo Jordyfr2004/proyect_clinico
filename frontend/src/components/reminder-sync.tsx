@@ -1,9 +1,11 @@
 import { useEffect } from "react";
 import { AppState } from "react-native";
 import { getAppointments } from "@/features/patient/appointments";
+import { subscribeAppointments } from '@/features/patient/appointment-events';
 import {
   cancelAppointmentReminders,
   syncAppointmentReminders,
+  removeAppointmentReminders,
 } from "@/features/patient/reminders";
 
 /**
@@ -16,15 +18,26 @@ import {
 export function ReminderSync() {
   useEffect(() => {
     let active = true;
+    let running = false;
 
     const run = async () => {
+      if (!active || running) return;
+      running = true;
       try {
-        const items = await getAppointments();
-        if (active) await syncAppointmentReminders(items);
+        await getAppointments();
       } catch {
         // Sin conexión o sin permiso: se intentará en la próxima apertura.
-      }
+      } finally { running = false; }
     };
+
+    const unsubscribe = subscribeAppointments(event => {
+      if (!active) return;
+      if (event.type === 'loaded') void syncAppointmentReminders(event.items, () => active).catch(() => undefined);
+      else {
+        if (event.appointmentId) void removeAppointmentReminders(event.appointmentId).catch(() => undefined);
+        void run();
+      }
+    });
 
     void run();
     const subscription = AppState.addEventListener("change", (state) => {
@@ -33,6 +46,7 @@ export function ReminderSync() {
 
     return () => {
       active = false;
+      unsubscribe();
       subscription.remove();
       void cancelAppointmentReminders().catch(() => undefined);
     };

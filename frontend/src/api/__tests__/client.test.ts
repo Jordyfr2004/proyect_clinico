@@ -30,6 +30,7 @@ describe('API client', () => {
   test('rejects an absent or non-http API base URL', () => {
     expect(() => getApiBaseUrl('')).toThrow('EXPO_PUBLIC_API_URL');
     expect(() => getApiBaseUrl('ftp://clinic.example/api')).toThrow('EXPO_PUBLIC_API_URL');
+    expect(() => getApiBaseUrl('http://clinic.example/api', false)).toThrow('HTTPS');
   });
 
   test('sends JSON to the configured base URL with the bearer token', async () => {
@@ -122,6 +123,13 @@ describe('API client', () => {
     } satisfies Partial<NetworkError>);
   });
 
+  test('an interrupted HTTP 200 response body is still a network failure', async () => {
+    const interrupted = response(200, undefined);
+    (interrupted.text as jest.Mock).mockRejectedValue(new TypeError('Network body interrupted'));
+    (fetch as jest.Mock).mockResolvedValue(interrupted);
+    await expect(apiRequest('/user')).rejects.toBeInstanceOf(NetworkError);
+  });
+
   test('rejects malformed JSON returned with a successful status', async () => {
     const malformed = response(200, undefined);
     (malformed.text as jest.Mock).mockResolvedValue('{bad json');
@@ -143,5 +151,35 @@ describe('API client', () => {
     await expect(apiRequest('/slow', { timeoutMs: 1 })).rejects.toMatchObject({
       reason: 'timeout',
     });
+  });
+
+  test('an old 401 cannot close a new session', async () => {
+    let token = 'old';
+    setAccessTokenProvider(() => token);
+    const unauthorized = jest.fn();
+    setUnauthorizedHandler(unauthorized);
+    let finish!: (value: Response) => void;
+    (fetch as jest.Mock).mockReturnValue(new Promise<Response>(resolve => { finish = resolve; }));
+    const pending = apiRequest('/user');
+    token = 'new';
+    finish(response(401, {}));
+    await expect(pending).rejects.toThrow();
+    expect(unauthorized).not.toHaveBeenCalled();
+  });
+
+  test('discards successful data received after changing accounts', async () => {
+    let token = 'old';
+    setAccessTokenProvider(() => token);
+    let finish!: (value: Response) => void;
+    (fetch as jest.Mock).mockReturnValue(new Promise<Response>(resolve => { finish = resolve; }));
+    const pending = apiRequest('/paciente/mi-perfil');
+    token = 'new';
+    finish(response(200, { data: 'old clinical data' }));
+    await expect(pending).rejects.toThrow('sesión');
+  });
+
+  test.each(['//evil.test', '/\\evil.test', '/../outside'])('rejects paths escaping the API base: %s', async path => {
+    await expect(apiRequest(path)).rejects.toThrow();
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

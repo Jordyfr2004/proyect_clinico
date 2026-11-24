@@ -10,6 +10,8 @@ import {
 } from 'react';
 
 import { setAccessTokenProvider, setUnauthorizedHandler } from '@/api/client';
+import { ApiError, NetworkError } from '@/api/errors';
+import { cleanupSession } from './session-cleanup';
 
 import { getCurrentUser, login, logoutRemote, registerPatient, verifyEmail as verifyEmailRemote } from './service';
 import { clearAccessToken, loadAccessToken, saveAccessToken } from './session-storage';
@@ -24,6 +26,8 @@ type AuthContextValue = {
   signUp: (input: RegisterPatientInput) => Promise<string>;
   verifyEmail: (email: string, code: string) => Promise<void>;
   signOut: () => Promise<void>;
+  restoreError: string;
+  retryRestore: () => void;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -32,20 +36,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<AuthStatus>('restoring');
   const [user, setUser] = useState<PatientUser | null>(null);
   const tokenRef = useRef<string | null>(null);
+  const generation = useRef(0);
+  const storageQueue = useRef(Promise.resolve());
+  const [restoreError, setRestoreError] = useState('');
+  const [restoreAttempt, setRestoreAttempt] = useState(0);
+  const retryRestore = useCallback(() => { setRestoreError(''); setRestoreAttempt(value => value + 1); }, []);
+  const store = useCallback((operation: () => Promise<void>) => {
+    const pending = storageQueue.current.catch(() => undefined).then(operation);
+    storageQueue.current = pending;
+    return pending;
+  }, []);
 
   const clearSession = useCallback(async () => {
+    generation.current += 1;
     tokenRef.current = null;
+    setRestoreError('');
     setUser(null);
     setStatus('anonymous');
     try {
-      await clearAccessToken();
+      await Promise.all([store(clearAccessToken), cleanupSession()]);
     } catch {
       // Memory access is revoked even if the platform keystore is temporarily unavailable.
     }
-  }, []);
+  }, [store]);
 
   useEffect(() => {
     let active = true;
+    const operation = ++generation.current;
 
     setAccessTokenProvider(() => tokenRef.current);
     setUnauthorizedHandler(() => clearSession());
@@ -53,45 +70,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     void (async () => {
       try {
         const token = await loadAccessToken();
-        if (!active) return;
+        if (!active || generation.current !== operation) return;
         if (!token) {
+          await cleanupSession();
+          if (!active || generation.current !== operation) return;
           setStatus('anonymous');
           return;
         }
 
         tokenRef.current = token;
         const currentUser = await getCurrentUser();
-        if (!active) return;
+        if (!active || generation.current !== operation) return;
         setUser(currentUser);
         setStatus('authenticated');
-      } catch {
-        tokenRef.current = null;
-        if (active) {
-          setUser(null);
-          setStatus('anonymous');
+      } catch (reason) {
+        if (!active || generation.current !== operation) return;
+        if (reason instanceof NetworkError || (reason instanceof ApiError && (reason.status >= 500 || reason.status === 429))) {
+          setRestoreError(reason.message);
+          return;
         }
-        try {
-          await clearAccessToken();
-        } catch {
-          // A storage failure must not keep protected routes rendered in memory.
-        }
+        await clearSession();
       }
     })();
 
     return () => {
       active = false;
+      generation.current += 1;
     };
-  }, [clearSession]);
+  }, [clearSession, restoreAttempt, store]);
 
-  const acceptSession = useCallback(async (session: AuthSession) => {
-    await saveAccessToken(session.accessToken);
+  const acceptSession = useCallback(async (session: AuthSession, operation: number) => {
+    if (generation.current !== operation) return;
+    await cleanupSession();
+    if (generation.current !== operation) return;
+    await store(() => saveAccessToken(session.accessToken));
+    if (generation.current !== operation) return;
     tokenRef.current = session.accessToken;
     setUser(session.user);
     setStatus('authenticated');
-  }, []);
+  }, [store]);
 
   const signIn = useCallback(async (username: string, password: string) => {
-    await acceptSession(await login(username, password));
+    const operation = ++generation.current;
+    await acceptSession(await login(username, password), operation);
   }, [acceptSession]);
 
   const signUp = useCallback(async (input: RegisterPatientInput) => {
@@ -99,22 +120,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const verifyEmail = useCallback(async (email: string, code: string) => {
-    await acceptSession(await verifyEmailRemote(email, code));
+    const operation = ++generation.current;
+    await acceptSession(await verifyEmailRemote(email, code), operation);
   }, [acceptSession]);
 
   const signOut = useCallback(async () => {
+    const remote = tokenRef.current ? logoutRemote().catch(() => undefined) : Promise.resolve();
+    await clearSession();
     try {
-      if (tokenRef.current) await logoutRemote();
+      await remote;
     } catch {
       // A remote failure must never leave a local bearer token active.
-    } finally {
-      await clearSession();
     }
   }, [clearSession]);
 
   const value = useMemo(
-    () => ({ status, user, signIn, signUp, verifyEmail, signOut }),
-    [status, user, signIn, signUp, verifyEmail, signOut],
+    () => ({ status, user, signIn, signUp, verifyEmail, signOut, restoreError, retryRestore }),
+    [status, user, signIn, signUp, verifyEmail, signOut, restoreError, retryRestore],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

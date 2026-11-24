@@ -1,6 +1,8 @@
+import { useReducedMotionPreference } from "@/hooks/use-reduced-motion";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import { router, useFocusEffect, type Href } from "expo-router";
-import { useCallback, useEffect, useRef, useState } from "react";
+import { router, type Href } from "expo-router";
+import { useCallback, useEffect, useState } from "react";
+import { useAppointmentRefresh } from '@/hooks/use-appointment-refresh';
 import { Modal, Pressable, ScrollView, StyleSheet, Text, View, useWindowDimensions } from "react-native";
 import { Button, LoadingState, Notice, Screen, StatusBadge } from "@/components/ui/patient-ui";
 import { elevation, palette } from "@/constants/theme";
@@ -14,13 +16,14 @@ const actions = [
   { title: "Agendar cita", detail: "Solicita tu próxima cita", icon: "calendar-plus", route: "appointments" },
   { title: "Historial", detail: "Consulta tu información clínica", icon: "file-document-plus-outline", route: "history" },
   { title: "Especialidades", detail: "Conoce nuestros servicios", icon: "tooth-outline", route: "services" },
-  { title: "Mi perfil", detail: "Revisa tus datos personales", icon: "account-outline", route: "profile" },
+  { title: "Mis archivos", detail: "Radiografías y documentos", icon: "folder-outline", route: "documents" },
 ] as const;
 const visit = (route: string) => router.push(`/(private)/(tabs)/${route}` as Href);
 const typeLabel = (item: Appointment) => item.type === "cita_medica" ? "Cita médica" : item.type.replaceAll("_", " ");
 const scheduleLabel = (item: Appointment) => formatScheduledAppointment(item.date?.slice(0, 10) ?? null, item.startTime) ?? "Horario por confirmar";
 
 export default function Home() {
+  const reducedMotion = useReducedMotionPreference();
   const { user } = useAuth();
   const { width, fontScale } = useWindowDimensions();
   const loader = useCallback(() => getAppointments(), []);
@@ -32,11 +35,7 @@ export default function Home() {
     const timer = setInterval(() => setNow(Date.now()), 30_000);
     return () => clearInterval(timer);
   }, []);
-  const firstFocus = useRef(true);
-  useFocusEffect(useCallback(() => {
-    if (firstFocus.current) firstFocus.current = false;
-    else void reload();
-  }, [reload]));
+  useAppointmentRefresh(reload);
   const upcoming = (data ?? []).filter((item) => item.status.toLowerCase() === "programada" && (appointmentStart(item)?.getTime() ?? 0) > now)
     .sort((a, b) => appointmentStart(a)!.getTime() - appointmentStart(b)!.getTime());
   const next = upcoming[0];
@@ -79,7 +78,7 @@ export default function Home() {
       </Pressable>)}</View>
       <View style={styles.sectionHeader}><Text style={[styles.sectionTitle, styles.flex]}>Próximos recordatorios</Text><Pressable accessibilityRole="button" onPress={() => setShowReminders(true)} style={styles.allButton}><Text style={styles.link}>Ver todos</Text><MaterialCommunityIcons name="chevron-right" size={20} color={palette.primary} /></Pressable></View>
       {available && next ? reminder(next) : <View style={styles.reminder}><MaterialCommunityIcons name="calendar-blank-outline" size={28} color={palette.primary} /><Text style={[styles.detail, styles.flex]}>{loading ? "Consultando tus citas…" : error ? "Los recordatorios no están disponibles. Reintenta la consulta." : "No tienes citas próximas para recordar."}</Text></View>}
-      <Modal visible={Boolean(selected) || showReminders} transparent animationType="fade" onRequestClose={() => { setSelected(null); setShowReminders(false); }}>
+      <Modal visible={Boolean(selected) || showReminders} transparent animationType={reducedMotion ? "none" : "fade"} onRequestClose={() => { setSelected(null); setShowReminders(false); }}>
         <View style={styles.backdrop}><View accessibilityViewIsModal style={styles.modal}><ScrollView contentContainerStyle={styles.modalContent}>
           <Text style={styles.sectionTitle}>{selected ? "Detalles de tu cita" : "Recordatorios de citas"}</Text>
           {selected ? <><Text style={styles.heroTitle}>{typeLabel(selected)}</Text><Text style={styles.metaText}>{scheduleLabel(selected)}</Text><StatusBadge status={selected.status} />{selected.description ? <Text style={styles.detail}>{selected.description}</Text> : null}</> : <><Text style={styles.detail}>Tus próximas citas programadas.</Text>{available ? upcoming.length ? upcoming.map(reminder) : <Text style={styles.detail}>No tienes citas próximas para recordar.</Text> : <Text style={styles.detail}>{loading ? "Consultando tus citas…" : "No se pudieron consultar tus citas."}</Text>}</>}

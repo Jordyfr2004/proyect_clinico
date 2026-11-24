@@ -11,4 +11,10 @@ describe('auth form validation', () => {
     expect(validateResetPassword('a@b.com', '123', 'short', 'short')).not.toBeNull();
     expect(validateResetPassword('a@b.com', '123456', 'password', 'password')).toBeNull();
   });
+  test('rejects impossible calendar dates and fields beyond Laravel limits', () => {
+    expect(validateRegistration({ ...valid, fecha_nacimiento: '2000-02-30' })).not.toBeNull();
+    expect(validateRegistration({ ...valid, cedula: '1'.repeat(21) })).not.toBeNull();
+    expect(validateRegistration({ ...valid, nombres: 'A'.repeat(256) })).not.toBeNull();
+    expect(validateResetPassword(`${'a'.repeat(250)}@x.com`, '123456', 'password', 'password')).not.toBeNull();
+  });
 });

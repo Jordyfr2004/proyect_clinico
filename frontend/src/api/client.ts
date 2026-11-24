@@ -11,6 +11,10 @@ export type ApiRequestOptions<T> = Omit<RequestInit, "body" | "headers"> & {
 let accessTokenProvider: () => string | null = () => null;
 let unauthorizedHandler: () => void | Promise<void> = () => undefined;
 
+export class SessionChangedError extends Error {
+  constructor() { super("La sesión cambió. Vuelve a consultar la información."); }
+}
+
 export const setAccessTokenProvider = (provider: () => string | null): void => {
   accessTokenProvider = provider;
 };
@@ -24,7 +28,7 @@ export const setUnauthorizedHandler = (
 export const authenticatedImageSource = (url: string) => {
   const resource = new URL(url);
   const base = new URL(getApiBaseUrl());
-  if (resource.origin !== base.origin)
+  if (resource.origin !== base.origin || resource.username || resource.password)
     throw new Error("La imagen no pertenece al servidor configurado.");
   const token = accessTokenProvider();
   if (!token) throw new Error("No hay una sesión activa.");
@@ -81,7 +85,10 @@ export const apiRequest = async <T>(
   path: string,
   options: ApiRequestOptions<T> = {},
 ): Promise<T> => {
-  if (!path.startsWith("/") || path.startsWith("//")) {
+  const baseUrl = getApiBaseUrl();
+  const url = new URL(`${baseUrl}${path}`);
+  if (!path.startsWith("/") || path.startsWith("//") || path.includes("\\") ||
+      url.origin !== new URL(baseUrl).origin || !url.pathname.startsWith(`${new URL(baseUrl).pathname.replace(/\/$/, "")}/`)) {
     throw new Error("La ruta de API debe ser relativa.");
   }
 
@@ -90,9 +97,13 @@ export const apiRequest = async <T>(
     headers: suppliedHeaders = {},
     timeoutMs = 15000,
     parseResponse,
+    signal,
     ...request
   } = options;
   const controller = new AbortController();
+  const abort = () => controller.abort();
+  signal?.addEventListener("abort", abort, { once: true });
+  if (signal?.aborted) controller.abort();
   const timeout = setTimeout(() => controller.abort(), timeoutMs);
   const token = accessTokenProvider();
   const isFormData =
@@ -101,16 +112,18 @@ export const apiRequest = async <T>(
     Accept: "application/json",
     ...suppliedHeaders,
   };
+  let parsing = false;
 
   if (token) headers.Authorization = `Bearer ${token}`;
   if (body !== undefined && !isFormData)
     headers["Content-Type"] = "application/json";
 
   try {
-    const response = await fetch(`${getApiBaseUrl()}${path}`, {
+    const response = await fetch(url.toString(), {
       ...request,
       headers,
       signal: controller.signal,
+      redirect: "error",
       body:
         body === undefined
           ? undefined
@@ -119,6 +132,7 @@ export const apiRequest = async <T>(
             : JSON.stringify(body),
     });
 
+    if (token !== accessTokenProvider()) throw new SessionChangedError();
     if (!response.ok) {
       if (response.status === 401) await unauthorizedHandler();
       let parsed: unknown;
@@ -138,10 +152,14 @@ export const apiRequest = async <T>(
       );
     }
 
-    if (parseResponse) return await parseResponse(response);
-    return parseJsonText(await response.text()) as T;
+    parsing = true;
+    const value = parseResponse ? await parseResponse(response) : parseJsonText(await response.text()) as T;
+    if (token !== accessTokenProvider()) throw new SessionChangedError();
+    return value;
   } catch (error) {
-    if (error instanceof ApiError || error instanceof ResponseFormatError)
+    if (parsing && error instanceof TypeError) throw new NetworkError('Se interrumpió la conexión al recibir la respuesta. Inténtalo nuevamente.');
+    if (parsing && error instanceof Error && error.name !== 'AbortError') throw error;
+    if (error instanceof ApiError || error instanceof ResponseFormatError || error instanceof SessionChangedError)
       throw error;
     if (error instanceof Error && error.name === "AbortError") {
       throw new NetworkError(
@@ -154,5 +172,6 @@ export const apiRequest = async <T>(
     );
   } finally {
     clearTimeout(timeout);
+    signal?.removeEventListener("abort", abort);
   }
 };

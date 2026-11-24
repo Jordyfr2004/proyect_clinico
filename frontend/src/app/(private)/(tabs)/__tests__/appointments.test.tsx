@@ -1,10 +1,10 @@
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { act, fireEvent, render, screen, waitFor } from '@testing-library/react-native';
 import { Alert } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import Appointments from '../appointments';
 import { cancelAppointment, getAppointments, rescheduleAppointment } from '@/features/patient/appointments';
 
-jest.mock('expo-router', () => ({ router: { push: jest.fn(), back: jest.fn() } }));
+jest.mock('expo-router', () => ({ useFocusEffect: jest.fn(), router: { push: jest.fn(), back: jest.fn() } }));
 jest.mock('@/features/patient/appointments', () => ({
   ...jest.requireActual('@/features/patient/appointments'),
   getAppointments: jest.fn(),
@@ -58,6 +58,14 @@ describe('patient appointments', () => {
     expect(screen.queryByRole('button', { name: 'Reprogramar' })).toBeNull();
   });
 
+  test('a cancelled pending request never looks like a new pending booking', async () => {
+    jest.mocked(getAppointments).mockResolvedValue([{ ...scheduled, status: 'cancelada', date: null, startTime: null, endTime: null }]);
+    renderScreen();
+    await screen.findByText('Cita cancelada');
+    expect(screen.queryByText('Solicitud pendiente de programación')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Cancelar cita' })).toBeNull();
+  });
+
   test('shows the server message when the change is rejected', async () => {
     jest.mocked(getAppointments).mockResolvedValue([scheduled]);
     jest.mocked(cancelAppointment).mockRejectedValue(new Error('La cita ya comenzó o ya pasó; comunícate con el consultorio.'));
@@ -65,5 +73,30 @@ describe('patient appointments', () => {
     fireEvent.press(await screen.findByRole('button', { name: 'Cancelar cita' }));
     await pressAlertButton('Cancelar cita');
     expect(await screen.findByText('La cita ya comenzó o ya pasó; comunícate con el consultorio.')).toBeTruthy();
+  });
+
+  test('a confirmed cancellation followed by refresh failure only offers a read retry', async () => {
+    jest.mocked(getAppointments).mockResolvedValueOnce([scheduled]).mockRejectedValueOnce(new Error('Sin conexión'));
+    jest.mocked(cancelAppointment).mockResolvedValue('Cita cancelada correctamente.');
+    renderScreen();
+    fireEvent.press(await screen.findByRole('button', { name: 'Cancelar cita' }));
+    await pressAlertButton('Cancelar cita');
+    await screen.findByText(/El cambio fue realizado/);
+    expect(screen.queryByRole('button', { name: 'Cancelar cita' })).toBeNull();
+    jest.mocked(getAppointments).mockResolvedValue([]);
+    fireEvent.press(screen.getByRole('button', { name: 'Reintentar' }));
+    await screen.findByText('Aún no tienes citas');
+    expect(cancelAppointment).toHaveBeenCalledTimes(1);
+  });
+
+  test('the optional rescheduling reason is sent without allowing a new date', async () => {
+    jest.mocked(getAppointments).mockResolvedValue([scheduled]);
+    jest.mocked(rescheduleAppointment).mockResolvedValue('Solicitud enviada.');
+    renderScreen();
+    fireEvent.press(await screen.findByRole('button', { name: /Ver cita programada/ }));
+    fireEvent.changeText(screen.getByLabelText('Motivo de reprogramación (opcional)'), '  Viaje  ');
+    fireEvent.press(screen.getByRole('button', { name: 'Reprogramar' }));
+    await pressAlertButton('Reprogramar');
+    await waitFor(() => expect(rescheduleAppointment).toHaveBeenCalledWith('a1', 'Viaje'));
   });
 });

@@ -29,11 +29,13 @@ export const parseHistory = (value: unknown): MedicalHistory =>
       currentMedication: asOptionalString(r, "medicacion_actual"),
     };
   });
-export const getMedicalHistory = async (): Promise<MedicalHistory | null> => {
+export const getMedicalHistory = async (patientId?: string): Promise<MedicalHistory | null> => {
   try {
-    return parseHistory(await apiRequest("/paciente/mi-historial"));
+    const history = parseHistory(await apiRequest("/paciente/mi-historial"));
+    if (patientId && history.patientId !== patientId) throw new Error('El historial no corresponde al paciente autenticado.');
+    return history;
   } catch (error) {
-    if (error instanceof ApiError && error.status === 404) return null;
+    if (error instanceof ApiError && error.status === 404 && error.message === 'No tienes un historial clínico registrado.') return null;
     throw error;
   }
 };

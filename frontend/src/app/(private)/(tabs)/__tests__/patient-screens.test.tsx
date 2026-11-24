@@ -30,11 +30,12 @@ jest.mock("@/features/patient/profile", () => ({
   deleteProfilePhoto: jest.fn(),
 }));
 jest.mock("@/features/patient/appointments", () => ({
+  ...jest.requireActual("@/features/patient/appointments"),
   getAppointments: jest.fn(),
   requestAppointment: jest.fn(),
 }));
 jest.mock("@/api/client", () => ({ authenticatedImageSource: jest.fn() }));
-jest.mock("expo-router", () => ({ router: { back: jest.fn() } }));
+jest.mock("expo-router", () => ({ useFocusEffect: jest.fn(), router: { back: jest.fn() } }));
 jest.mock("expo-image-picker", () => ({
   requestMediaLibraryPermissionsAsync: jest.fn(),
   launchImageLibraryAsync: jest.fn(),
@@ -313,6 +314,18 @@ describe("patient screens", () => {
     ).toBe(true);
   });
 
+  test('releases a pending request latch after the clinic schedules it and a fresh list arrives', async () => {
+    const remote = { data: [] as unknown[], loading: false, error: '', reload: jest.fn().mockResolvedValue({ ok: true, data: [{ status: 'pendiente' }] }) };
+    (useRemote as jest.Mock).mockImplementation(() => remote);
+    (requestAppointment as jest.Mock).mockResolvedValue('Solicitud registrada.');
+    const view = renderScreen(<Appointments />);
+    fireEvent.press(screen.getByRole('button', { name: 'Solicitar una cita' }));
+    await screen.findByText('Solicitud registrada.');
+    remote.data = [{ id: 'a1', patientId: 'p1', date: '2099-10-20', startTime: '10:00:00', endTime: null, type: 'cita_medica', status: 'programada' }];
+    view.rerender(<SafeAreaProvider><Appointments /></SafeAreaProvider>);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Solicitar una cita' })).toBeEnabled());
+  });
+
   test("keeps previous appointments visible when an update fails", () => {
     (useRemote as jest.Mock).mockReturnValue({
       data: [
@@ -388,7 +401,7 @@ describe("patient screens", () => {
     fireEvent.press(screen.getByRole("button", { name: /Ver cita programada/ }));
     expect(screen.getByText("Cita agendada")).toBeTruthy();
     expect(screen.getByText("Miércoles 11 de noviembre, 13:00")).toBeTruthy();
-    expect(screen.queryByText("14:00")).toBeNull();
+    expect(screen.getByText("Hora de fin: 14:00")).toBeTruthy();
     fireEvent.press(screen.getByRole("button", { name: "Cerrar" }));
     expect(screen.queryByText("Cita agendada")).toBeNull();
   });
@@ -454,6 +467,18 @@ describe("patient screens", () => {
 
     expect(screen.getByText("No fue posible cargar el perfil.")).toBeTruthy();
     expect(screen.getByRole("button", { name: "Reintentar" })).toBeTruthy();
+  });
+
+  test('forces a new profile read after saving a photo', async () => {
+    const reload = jest.fn().mockResolvedValue({ ok: true, data: {} });
+    (useRemote as jest.Mock).mockReturnValue({ data: { photoUrl: null, names: 'Test', code: 'TEST' }, loading: false, error: '', reload });
+    jest.mocked(ImagePicker.requestMediaLibraryPermissionsAsync).mockResolvedValue({ granted: true } as never);
+    jest.mocked(ImagePicker.launchImageLibraryAsync).mockResolvedValue({ canceled: false, assets: [{ uri: 'file:///test.jpg', fileName: 'test.jpg', mimeType: 'image/jpeg', fileSize: 100, width: 1, height: 1 }] });
+    jest.mocked(uploadProfilePhoto).mockResolvedValue('Foto de perfil actualizada correctamente.');
+    renderScreen(<Profile />);
+    fireEvent.press(screen.getAllByRole('button', { name: 'Cambiar foto' })[0]);
+    await screen.findByText('Foto de perfil actualizada correctamente.');
+    expect(reload).toHaveBeenCalledWith(true);
   });
 
   test("keeps the confirmed profile visible during a refresh", () => {

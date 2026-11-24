@@ -1,4 +1,6 @@
 import { apiRequest } from "@/api/client";
+import { appendUpload, prepareUpload } from './file-upload';
+import { fileSession } from './file-cache';
 import {
   asOptionalString,
   asRecord,
@@ -33,15 +35,17 @@ export const getProfile = async () =>
 export const uploadProfilePhoto = async (
   uri: string,
   mimeType = "image/jpeg",
+  size?: number,
+  file?: Blob,
 ) => {
+  if (!['image/jpeg', 'image/png', 'image/webp'].includes(mimeType)) throw new Error('La foto debe ser JPG, PNG o WebP.');
+  const current = fileSession();
+  const upload = await prepareUpload({ uri, mimeType, size, file, fileName: `perfil.${mimeType.split('/')[1]}` }, '', 5);
+  if (!current()) throw new Error('La sesión cambió. Vuelve a seleccionar la foto.');
   const form = new FormData();
-  form.append("foto", {
-    uri,
-    name: `perfil.${mimeType.split("/")[1] ?? "jpg"}`,
-    type: mimeType,
-  } as unknown as Blob);
-  await apiRequest("/perfil/foto", { method: "POST", body: form });
+  appendUpload(form, 'foto', upload);
+  return asString(asRecord(await apiRequest("/perfil/foto", { method: "POST", body: form }), 'La respuesta'), 'message');
 };
 export const deleteProfilePhoto = async () => {
-  await apiRequest("/perfil/foto", { method: "DELETE" });
+  return asString(asRecord(await apiRequest("/perfil/foto", { method: "DELETE" }), 'La respuesta'), 'message');
 };

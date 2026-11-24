@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { apiErrorMessage } from "@/api/errors";
+import { useRef, useState } from "react";
 import { router, type Href } from "expo-router";
 import {
   AppHeader,
@@ -13,20 +14,22 @@ export default function ForgotPassword() {
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const submitLock = useRef(false);
   const [busy, setBusy] = useState(false);
   const submit = async () => {
-    if (!email.trim()) return setError("Ingresa tu correo.");
+    if (submitLock.current) return;
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) || email.trim().length > 254) return setError("Ingresa tu correo.");
+    submitLock.current = true;
     setBusy(true);
     setError("");
     try {
       setMessage(await requestPasswordReset(email.trim().toLowerCase()));
     } catch (reason) {
       setError(
-        reason instanceof Error
-          ? reason.message
-          : "No se pudo enviar la solicitud.",
+        apiErrorMessage(reason, "No se pudo enviar la solicitud."),
       );
     } finally {
+      submitLock.current = false;
       setBusy(false);
     }
   };

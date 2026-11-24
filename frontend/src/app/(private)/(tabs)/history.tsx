@@ -1,4 +1,4 @@
-import { router } from "expo-router";
+import { router, type Href } from "expo-router";
 import { useCallback } from "react";
 import {
   AppHeader,
@@ -11,9 +11,11 @@ import {
   Section,
 } from "@/components/ui/patient-ui";
 import { getMedicalHistory } from "@/features/patient/history";
+import { useAuth } from '@/features/auth/auth-context';
 import { useRemote } from "@/hooks/use-remote";
 export default function History() {
-  const loader = useCallback(() => getMedicalHistory(), []);
+  const { user } = useAuth();
+  const loader = useCallback(() => getMedicalHistory(user?.pacienteId), [user?.pacienteId]);
   const { data, loading, error, reload } = useRemote(loader);
   const initialLoading = loading && data === null;
   const unavailable = Boolean(error) && data === null;
@@ -24,6 +26,7 @@ export default function History() {
         subtitle="Información registrada por el personal autorizado."
         onBack={() => router.back()}
       />
+      <Button title="Mis archivos" icon="folder-outline" variant="secondary" onPress={() => router.push('/(private)/(tabs)/documents' as Href)} />
       {initialLoading ? (
         <LoadingState />
       ) : (

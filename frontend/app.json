@@ -37,14 +37,16 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Permite que Portal del Paciente seleccione tu foto de perfil.",
-          "cameraPermission": false,
+          "photosPermission": "Permite seleccionar fotos y radiografias para tu expediente.",
+          "cameraPermission": "Permite fotografiar documentos para tu expediente.",
           "microphonePermission": false
         }
       ],
       "expo-notifications",
-      "@react-native-community/datetimepicker"
-
+      "@react-native-community/datetimepicker",
+      "expo-sharing",
+      "expo-status-bar",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,

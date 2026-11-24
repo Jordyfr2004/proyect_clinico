@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { apiErrorMessage } from "@/api/errors";
+import { useRef, useState } from 'react';
 import { router, useLocalSearchParams } from 'expo-router';
 import { AppHeader, Button, Card, Field, Notice, Screen, TextLink } from '@/components/ui/patient-ui';
 import { useAuth } from '@/features/auth/auth-context';
@@ -11,32 +12,39 @@ export default function VerifyEmail() {
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const [message, setMessage] = useState('');
+  const submitLock = useRef(false);
   const [busy, setBusy] = useState(false);
 
   const submit = async () => {
+    if (submitLock.current) return;
     if (!email) return setError('No se encontró el correo de la cuenta. Vuelve a iniciar sesión.');
     if (!/^\d{6}$/.test(code)) return setError('Ingresa el código de 6 dígitos.');
+    submitLock.current = true;
     setBusy(true);
     setError('');
     try {
       await verifyEmail(email, code);
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'No se pudo verificar el correo.');
+      setError(apiErrorMessage(reason, 'No se pudo verificar el correo.'));
     } finally {
+      submitLock.current = false;
       setBusy(false);
     }
   };
 
   const resend = async () => {
+    if (submitLock.current) return;
     if (!email || busy) return;
+    submitLock.current = true;
     setBusy(true);
     setError('');
     setMessage('');
     try {
       setMessage(await resendVerificationCode(email));
     } catch (reason) {
-      setError(reason instanceof Error ? reason.message : 'No se pudo reenviar el código.');
+      setError(apiErrorMessage(reason, 'No se pudo reenviar el código.'));
     } finally {
+      submitLock.current = false;
       setBusy(false);
     }
   };

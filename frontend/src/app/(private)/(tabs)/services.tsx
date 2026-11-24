@@ -1,3 +1,4 @@
+import { useReducedMotionPreference } from "@/hooks/use-reduced-motion";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
 import { Image } from "expo-image";
 import { useCallback, useMemo, useState } from "react";
@@ -25,6 +26,7 @@ const safeImageUrl = (value: string | null): string | null => {
 const searchable = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase().trim();
 
 export default function Services() {
+  const reducedMotion = useReducedMotionPreference();
   const loadCategories = useCallback(() => getCategories(), []);
   const loadServices = useCallback(() => getServices(), []);
   const categories = useRemote(loadCategories);
@@ -184,7 +186,7 @@ export default function Services() {
           ) : null}
         </>
       )}
-      <Modal visible={detail !== null} transparent animationType="fade" onRequestClose={() => setDetail(null)}>
+      <Modal visible={detail !== null} transparent animationType={reducedMotion ? "none" : "fade"} onRequestClose={() => setDetail(null)}>
         <View style={styles.backdrop}><View style={styles.modal} accessibilityViewIsModal><ScrollView contentContainerStyle={styles.modalContent}>
           {detail ? <>
             <Text style={styles.category}>{detail.category.name}</Text>

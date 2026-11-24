@@ -1,21 +1,20 @@
 import { Redirect, Stack, type Href } from "expo-router";
 import { ReminderSync } from "@/components/reminder-sync";
-import { LoadingState, Screen } from "@/components/ui/patient-ui";
+import { SessionRestoration } from "@/components/session-restoration";
 import { useAuth } from "@/features/auth/auth-context";
 export default function PrivateLayout() {
-  const { status } = useAuth();
+  const { status, user } = useAuth();
   if (status === "restoring")
     return (
-      <Screen scroll={false}>
-        <LoadingState />
-      </Screen>
+      <SessionRestoration />
     );
   if (status !== "authenticated")
     return <Redirect href={"/(public)/login" as Href} />;
   return (
-    <>
+    <SessionScope key={user?.id}>
       <ReminderSync />
       <Stack screenOptions={{ headerShown: false }} />
-    </>
+    </SessionScope>
   );
 }
+function SessionScope({ children }: { children: React.ReactNode }) { return <>{children}</>; }

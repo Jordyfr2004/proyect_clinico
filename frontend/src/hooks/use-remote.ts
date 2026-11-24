@@ -35,7 +35,9 @@ export function useRemote<T>(loader: () => Promise<T>) {
       if (mountedRef.current && requestId === latestRequestRef.current) {
         setSnapshot({ scope: loader, data: value, loading: false, error: '' });
       }
-      return { ok: true as const, data: value };
+      return mountedRef.current && requestId === latestRequestRef.current
+        ? { ok: true as const, data: value }
+        : { ok: false as const };
     } catch (reason) {
       if (mountedRef.current && requestId === latestRequestRef.current) {
         setSnapshot((previous) => ({
@@ -49,7 +51,8 @@ export function useRemote<T>(loader: () => Promise<T>) {
     }
   }, [loader]);
 
-  const reload = useCallback((): Promise<ReloadResult<T>> => {
+  const reload = useCallback((force = false): Promise<ReloadResult<T>> => {
+    if (force) refreshRef.current = null;
     if (refreshRef.current) return refreshRef.current;
     const promise = execute();
     refreshRef.current = promise;

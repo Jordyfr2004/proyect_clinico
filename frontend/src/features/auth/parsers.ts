@@ -11,6 +11,7 @@ export const parsePatientUser = (value: unknown): PatientUser => {
   if (!activo) throw new Error('Esta cuenta se encuentra desactivada.');
   const pacienteId = asOptionalString(user, 'paciente_id');
   if (!pacienteId) throw new Error('La cuenta no está vinculada a un paciente.');
+  if (!asOptionalString(user, 'email_verified_at')) throw new Error('Debes verificar tu correo antes de iniciar sesión.');
 
   return {
     id: asString(user, 'id'),

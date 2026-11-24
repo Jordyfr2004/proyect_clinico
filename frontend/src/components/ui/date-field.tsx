@@ -2,7 +2,7 @@ import DateTimePicker, {
   type DateTimePickerEvent,
 } from "@react-native-community/datetimepicker";
 import MaterialCommunityIcons from "@expo/vector-icons/MaterialCommunityIcons";
-import { useState } from "react";
+import { createElement, useState, type ChangeEvent } from "react";
 import { Platform, Pressable, StyleSheet, Text, View } from "react-native";
 import {
   control,
@@ -58,6 +58,16 @@ export function DateField({
   error?: string;
 }) {
   const [open, setOpen] = useState(false);
+  if (Platform.OS === 'web') return <View style={styles.field}>
+    <Text style={styles.label}>{label}</Text>
+    {createElement('input', {
+      type: 'date', 'aria-label': label, value,
+      max: formatDateForApi(new Date()),
+      onChange: (event: ChangeEvent<HTMLInputElement>) => onChange(event.currentTarget.value),
+      style: { boxSizing: 'border-box', width: '100%', minWidth: 0, minHeight: 48, padding: 12, border: `1px solid ${error ? palette.danger : palette.borderStrong}`, borderRadius: 12, font: 'inherit', color: palette.navy, background: palette.surface },
+    })}
+    {error ? <Text style={styles.error}>{error}</Text> : null}
+  </View>;
   const handleChange = (event: DateTimePickerEvent, date?: Date) => {
     if (Platform.OS === "android") setOpen(false);
     onChange(applyDateSelection(value, event.type, date));

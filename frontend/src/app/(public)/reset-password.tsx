@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { apiErrorMessage } from "@/api/errors";
+import { useRef, useState } from "react";
 import { router, useLocalSearchParams } from "expo-router";
 import {
   AppHeader,
@@ -19,8 +20,10 @@ export default function ResetPassword() {
   const [confirmation, setConfirmation] = useState("");
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  const submitLock = useRef(false);
   const [busy, setBusy] = useState(false);
   const submit = async () => {
+    if (submitLock.current || message) return;
     const validationError = validateResetPassword(
       email,
       code,
@@ -28,6 +31,7 @@ export default function ResetPassword() {
       confirmation,
     );
     if (validationError) return setError(validationError);
+    submitLock.current = true;
     setBusy(true);
     setError("");
     try {
@@ -41,11 +45,10 @@ export default function ResetPassword() {
       );
     } catch (reason) {
       setError(
-        reason instanceof Error
-          ? reason.message
-          : "No se pudo cambiar la contraseña.",
+        apiErrorMessage(reason, "No se pudo cambiar la contraseña."),
       );
     } finally {
+      submitLock.current = false;
       setBusy(false);
     }
   };
@@ -91,8 +94,10 @@ export default function ResetPassword() {
           title="Cambiar contraseña"
           icon="lock-check-outline"
           loading={busy}
+          disabled={Boolean(message)}
           onPress={() => void submit()}
         />
+        {message ? <Button title="Volver al inicio de sesi\u00f3n" variant="secondary" onPress={() => router.replace("/(public)/login")} /> : null}
       </Card>
     </Screen>
   );

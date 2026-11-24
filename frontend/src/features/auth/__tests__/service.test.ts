@@ -20,6 +20,7 @@ const patient = {
   role: 'paciente',
   foto_perfil_url: null,
   paciente_id: 'patient-1',
+  email_verified_at: '2026-01-01T00:00:00Z',
   activo: true,
 };
 

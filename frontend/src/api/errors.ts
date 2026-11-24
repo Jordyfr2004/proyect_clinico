@@ -28,3 +28,11 @@ export class ResponseFormatError extends Error {
     this.name = 'ResponseFormatError';
   }
 }
+
+export const apiErrorMessage = (reason: unknown, fallback: string): string => {
+  if (reason instanceof ApiError) {
+    const fields = Object.values(reason.fieldErrors).flat().filter(Boolean);
+    if (fields.length) return fields.join('\n');
+  }
+  return reason instanceof Error ? reason.message : fallback;
+};

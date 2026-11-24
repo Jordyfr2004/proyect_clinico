@@ -1,4 +1,5 @@
 import type { Appointment } from "./appointments";
+import { clinicAppointmentStart } from './appointment-display';
 
 /**
  * Lógica PURA de recordatorios: decide QUÉ avisos hay que programar.
@@ -25,11 +26,7 @@ export const REMINDER_ID_PREFIX = "cita-";
 
 /** Convierte fecha ("2026-10-20" o ISO) + hora ("10:00:00") en un Date local. */
 export const appointmentStart = (item: Appointment): Date | null => {
-  if (!item.date || !item.startTime) return null;
-  const start = new Date(
-    `${item.date.slice(0, 10)}T${item.startTime.slice(0, 5)}:00`,
-  );
-  return Number.isNaN(start.getTime()) ? null : start;
+  return clinicAppointmentStart(item.date, item.startTime);
 };
 
 const hourLabel = (item: Appointment) => (item.startTime ?? "").slice(0, 5);

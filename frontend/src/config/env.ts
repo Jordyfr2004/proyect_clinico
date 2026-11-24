@@ -1,4 +1,4 @@
-export const getApiBaseUrl = (value = process.env.EXPO_PUBLIC_API_URL): string => {
+export const getApiBaseUrl = (value = process.env.EXPO_PUBLIC_API_URL, development = typeof __DEV__ !== 'undefined' && __DEV__): string => {
   const candidate = value?.trim();
   if (!candidate) {
     throw new Error('Configura EXPO_PUBLIC_API_URL antes de iniciar la aplicación.');
@@ -14,6 +14,7 @@ export const getApiBaseUrl = (value = process.env.EXPO_PUBLIC_API_URL): string =
   if (!['http:', 'https:'].includes(url.protocol) || url.username || url.password) {
     throw new Error('EXPO_PUBLIC_API_URL debe ser una dirección HTTP(S) válida.');
   }
+  if (!development && url.protocol !== 'https:') throw new Error('La API de producción debe usar HTTPS.');
 
   url.hash = '';
   url.search = '';

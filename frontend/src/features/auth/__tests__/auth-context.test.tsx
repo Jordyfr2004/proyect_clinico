@@ -5,6 +5,8 @@ import { AuthProvider, useAuth } from '../auth-context';
 import * as authService from '../service';
 import * as sessionStorage from '../session-storage';
 import { setUnauthorizedHandler } from '@/api/client';
+import { NetworkError } from '@/api/errors';
+import { registerSessionCleanup } from '../session-cleanup';
 
 jest.mock('../service');
 jest.mock('../session-storage');
@@ -140,5 +142,38 @@ describe('AuthProvider', () => {
     });
     await waitFor(() => expect(screen.getByTestId('status').props.children).toBe('anonymous'));
     expect(screen.getByTestId('name').props.children).toBe('sin usuario');
+  });
+
+  test('keeps stored credentials when restoration fails because the server is offline', async () => {
+    jest.mocked(sessionStorage.loadAccessToken).mockResolvedValue('stored-token');
+    jest.mocked(authService.getCurrentUser).mockRejectedValue(new NetworkError('Sin conexión.'));
+    render(<AuthProvider><Probe /></AuthProvider>);
+    await waitFor(() => expect(authService.getCurrentUser).toHaveBeenCalled());
+    await act(async () => {});
+    expect(sessionStorage.clearAccessToken).not.toHaveBeenCalled();
+    expect(screen.getByTestId('name').props.children).toBe('sin usuario');
+  });
+
+  test('a login completed after logout cannot restore the previous session', async () => {
+    let finish!: (value: Awaited<ReturnType<typeof authService.login>>) => void;
+    jest.mocked(authService.login).mockReturnValue(new Promise(resolve => { finish = resolve; }));
+    render(<AuthProvider><Probe /></AuthProvider>);
+    await waitFor(() => expect(screen.getByTestId('status').props.children).toBe('anonymous'));
+    fireEvent.press(screen.getByText('Ingresar'));
+    fireEvent.press(screen.getByText('Salir'));
+    await act(async () => { finish({ accessToken: 'late', tokenType: 'Bearer', user }); });
+    expect(screen.getByTestId('status').props.children).toBe('anonymous');
+    expect(sessionStorage.saveAccessToken).not.toHaveBeenCalled();
+  });
+
+  test('invalid identity on restoration removes reminders and clinical files as well as the token', async () => {
+    const cleanup = jest.fn();
+    const unregister = registerSessionCleanup(cleanup);
+    jest.mocked(sessionStorage.loadAccessToken).mockResolvedValue('inactive-user');
+    jest.mocked(authService.getCurrentUser).mockRejectedValue(new Error('Esta cuenta se encuentra desactivada.'));
+    render(<AuthProvider><Probe /></AuthProvider>);
+    await waitFor(() => expect(screen.getByTestId('status').props.children).toBe('anonymous'));
+    expect(cleanup).toHaveBeenCalled();
+    unregister();
   });
 });

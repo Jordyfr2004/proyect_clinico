@@ -1,14 +1,12 @@
 import { Redirect, type Href } from "expo-router";
-import { LoadingState, Screen } from "@/components/ui/patient-ui";
+import { SessionRestoration } from "@/components/session-restoration";
 import { useAuth } from "@/features/auth/auth-context";
 
 export default function Index() {
   const { status } = useAuth();
   if (status === "restoring")
     return (
-      <Screen scroll={false}>
-        <LoadingState />
-      </Screen>
+      <SessionRestoration />
     );
   return (
     <Redirect

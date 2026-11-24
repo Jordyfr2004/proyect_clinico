@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { apiErrorMessage } from "@/api/errors";
+import { useRef, useState } from "react";
 import { router } from "expo-router";
 import {
   AppHeader,
@@ -28,12 +29,15 @@ export default function Register() {
   const { signUp } = useAuth();
   const [form, setForm] = useState(empty);
   const [error, setError] = useState("");
+  const submitLock = useRef(false);
   const [busy, setBusy] = useState(false);
   const field = (key: keyof RegisterPatientInput) => (value: string) =>
     setForm((old) => ({ ...old, [key]: value }));
   const submit = async () => {
+    if (submitLock.current) return;
     const validationError = validateRegistration(form);
     if (validationError) return setError(validationError);
+    submitLock.current = true;
     setBusy(true);
     setError("");
     try {
@@ -41,11 +45,10 @@ export default function Register() {
       router.replace({ pathname: '/(public)/verify-email', params: { email } });
     } catch (reason) {
       setError(
-        reason instanceof Error
-          ? reason.message
-          : "No se pudo completar el registro.",
+        apiErrorMessage(reason, "No se pudo completar el registro."),
       );
     } finally {
+      submitLock.current = false;
       setBusy(false);
     }
   };

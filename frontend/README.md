@@ -1,77 +1,26 @@
-# App móvil del paciente (Expo)
+# Portal móvil del paciente
 
-El paciente la usa para:
-- iniciar sesión y registrarse;
-- consultar, solicitar, cancelar y reprogramar sus citas;
-- ver su historia clínica y sus recetas;
-- ver y subir radiografías;
-- consultar los servicios del consultorio.
+Aplicación React Native / Expo 58 para pacientes de la clínica. Incluye autenticación con verificación de correo, recuperación de acceso, citas, catálogo, historial, archivos clínicos y perfil. Conserva los diseños de Inicio y Servicios y los aportes de los colaboradores.
 
-Usa la misma API y la misma base de datos que la web, **siempre a través del balanceador**.
+## Desarrollo
 
-## Conectarla al sistema
+1. Desde `frontend/`, ejecutar `npm ci --legacy-peer-deps`. El flag conserva Testing Library 13 frente al peer opcional de Expo Router; ver la documentación de integración.
+2. Crear `.env.local` con `EXPO_PUBLIC_API_URL` apuntando al balanceador/API Laravel real, incluyendo `/api`. Confirmar la dirección vigente con el equipo. El host del ejemplo no respondió como API en la revisión del 24/11/2026.
+3. Ejecutar `npx expo start` y abrir una compilación de desarrollo compatible con los módulos nativos de SDK 58. Para Web: `npm run web`.
 
-1. Instala la app **Tailscale** en el celular e inicia sesión en la misma red del equipo.
-2. En `frontend/.env`: `EXPO_PUBLIC_API_URL=http://100.102.99.114/api` (en el aula: `http://192.168.1.10/api`).
-3. `npm ci` y `npx expo start`, y abre el proyecto con Expo Go. Si el celular no está en la misma red Wi-Fi que el computador, usa `npx expo start --tunnel`.
+En dispositivos físicos, localhost apunta al teléfono. Si se utiliza la red privada del equipo, el teléfono debe tener acceso a esa red (por ejemplo, Tailscale). HTTP se permite solo en desarrollo; las exportaciones de producción requieren HTTPS.
 
-Pruebas: `npm test` · Tipos: `npx tsc --noEmit` · Lint: `npx expo lint`
+## Verificación
 
----
-
-# Welcome to your Expo app 👋
-
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
-
-## Get started
-
-1. Install dependencies
-
-   ```bash
-   npm install
-   ```
-
-2. Start the app
-
-   ```bash
-   npx expo start
-   ```
-
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
-
-```bash
-npm run reset-project
+```text
+npm run lint
+npm test
+npx tsc --noEmit
+npx expo-doctor
+npx expo export --platform all --max-workers 2
+git diff --check
 ```
 
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
+Las exportaciones Android/iOS no reemplazan probar cámara, archivos, notificaciones y permisos en dispositivos. Web conserva el token solo en memoria y requiere login tras recargar. No hay modo sin conexión ni datos clínicos de demostración.
 
-### Other setup steps
-
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
+[Matriz de contratos, reglas y límites](docs/mobile-integration.md) · [Resultados del cierre](docs/mobile-closure-results.md)

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { router, type Href } from "expo-router";
 import {
   AuthHeader,
@@ -11,17 +11,20 @@ import {
   TextLink,
 } from "@/components/ui/patient-ui";
 import { useAuth } from "@/features/auth/auth-context";
-import { ApiError } from "@/api/errors";
+import { ApiError, apiErrorMessage } from "@/api/errors";
 
 export default function Login() {
   const { signIn } = useAuth();
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const submitLock = useRef(false);
   const [busy, setBusy] = useState(false);
   const submit = async () => {
+    if (submitLock.current) return;
     if (!username.trim() || !password)
       return setError("Ingresa tu cédula y contraseña.");
+    submitLock.current = true;
     setBusy(true);
     setError("");
     try {
@@ -32,9 +35,10 @@ export default function Login() {
         return;
       }
       setError(
-        reason instanceof Error ? reason.message : "No se pudo iniciar sesión.",
+        apiErrorMessage(reason, "No se pudo iniciar sesión."),
       );
     } finally {
+      submitLock.current = false;
       setBusy(false);
     }
   };

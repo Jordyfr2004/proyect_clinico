@@ -64,6 +64,16 @@ describe("patient API contracts", () => {
     await expect(getMedicalHistory()).resolves.toBeNull();
   });
 
+  test('rejects a clinical history belonging to a different patient', async () => {
+    (apiRequest as jest.Mock).mockResolvedValueOnce({ data: { id: 'h', paciente_id: 'other' } });
+    await expect(getMedicalHistory('p1')).rejects.toThrow('paciente');
+  });
+
+  test('does not describe an unlinked account as an empty clinical history', async () => {
+    (apiRequest as jest.Mock).mockRejectedValueOnce(new ApiError(404, 'La cuenta no está vinculada a un paciente.'));
+    await expect(getMedicalHistory('p1')).rejects.toThrow('vinculada');
+  });
+
   test("parses profile and catalog envelopes", () => {
     expect(
       parseProfile({
