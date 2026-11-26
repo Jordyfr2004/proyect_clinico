@@ -1,0 +1,54 @@
+{
+    "resourceType": "Appointment",
+    "id": "01a1e46b-f922-7116-b7ff-9816ce220944",
+    "meta": {
+        "profile": [
+            "http://hl7.org/fhir/StructureDefinition/Appointment"
+        ]
+    },
+    "identifier": [
+        {
+            "system": "urn:proyect-clinico:agenda",
+            "value": "01a1e46b-f922-7116-b7ff-9816ce220944"
+        }
+    ],
+    "status": "booked",
+    "serviceCategory": [
+        {
+            "coding": [
+                {
+                    "system": "http://terminology.hl7.org/CodeSystem/service-category",
+                    "code": "10",
+                    "display": "Dental"
+                }
+            ]
+        }
+    ],
+    "appointmentType": {
+        "coding": [
+            {
+                "system": "http://terminology.hl7.org/CodeSystem/v2-0276",
+                "code": "ROUTINE",
+                "display": "Routine appointment - default if not valued"
+            }
+        ]
+    },
+    "description": "Control de ortodoncia",
+    "start": "2026-11-20T10:00:00-05:00",
+    "end": "2026-11-20T10:30:00-05:00",
+    "created": "2026-11-16T07:54:03-05:00",
+    "participant": [
+        {
+            "actor": {
+                "type": "Patient",
+                "identifier": {
+                    "system": "urn:proyect-clinico:codigo-paciente",
+                    "value": "001"
+                },
+                "display": "María López"
+            },
+            "required": "required",
+            "status": "accepted"
+        }
+    ]
+}

@@ -2,7 +2,10 @@
 
 namespace App\Http\Controllers\Api\Agenda;
 
+use App\DTO\Agenda\CitaMedicaRequestDTO;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Agenda\CrearCitaMedicaRequest;
+use App\Http\Resources\Agenda\CitaMedicaResource;
 use App\Services\AgendaService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -90,47 +93,23 @@ class AgendaController extends Controller
         ], 201);
     }
 
+    /**
+     * Registrar cita médica (Práctica 2.2 – contrato JSON).
+     *
+     * 1. CrearCitaMedicaRequest valida el JSON de entrada (422 si falla).
+     * 2. CitaMedicaRequestDTO deserializa los datos validados.
+     * 3. AgendaService ejecuta la regla de negocio (choque de horarios, auditoría).
+     * 4. CitaMedicaResource serializa la respuesta con el contrato publicado.
+     */
     public function crearCitaMedica(
-        Request $request
+        CrearCitaMedicaRequest $request
     ): JsonResponse {
-        $datos = $request->validate([
-            'codigo_paciente' => [
-                'nullable',
-                'string',
-                'exists:pacientes,codigo_paciente',
-                'required_without:nombre_reserva',
-                'prohibits:nombre_reserva',
-            ],
-            'nombre_reserva' => [
-                'nullable',
-                'string',
-                'max:255',
-                'required_without:codigo_paciente',
-                'prohibits:codigo_paciente',
-            ],
-            'fecha' => [
-                'required',
-                'date',
-            ],
-            'hora_inicio' => [
-                'required',
-                'date_format:H:i',
-            ],
-            'hora_fin' => [
-                'required',
-                'date_format:H:i',
-                'after:hora_inicio',
-            ],
-            'descripcion' => [
-                'nullable',
-                'string',
-            ],
-        ]);
+        $dto = CitaMedicaRequestDTO::fromRequest($request);
 
         $resultado = $this
             ->agendaService
             ->crearCitaMedica(
-                $datos,
+                $dto->toArray(),
                 $request->user()
             );
 
@@ -142,7 +121,8 @@ class AgendaController extends Controller
 
         return response()->json([
             'message' => 'Cita médica registrada correctamente.',
-            'data' => $resultado['registro'],
+            'data' => CitaMedicaResource::make($resultado['registro'])
+                ->resolve($request),
         ], 201);
     }
 

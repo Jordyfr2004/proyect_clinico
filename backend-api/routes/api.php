@@ -25,6 +25,7 @@ use App\Http\Controllers\Api\Notificacion\NotificacionController;
 use App\Http\Controllers\Api\Actividad\ActividadController;
 
 use App\Http\Controllers\Api\Agenda\AgendaController;
+use App\Http\Controllers\Api\Semantica\CitaFhirController;
 
 use App\Http\Controllers\Api\Clinica\EvidenciaClinicaController;
 
@@ -391,6 +392,21 @@ Route::prefix('agenda')->group(function () {
     });
 
 });
+
+// Capa de intercambio semántico: citas como recursos HL7 FHIR R4 (doctora)
+Route::prefix('semantica')
+    ->middleware(['auth:sanctum', 'role:doctora'])
+    ->group(function () {
+
+        Route::get('/vocabulario', [CitaFhirController::class, 'vocabulario']);
+
+        Route::get('/fhir/Appointment', [CitaFhirController::class, 'buscar']);
+
+        Route::post('/fhir/Appointment', [CitaFhirController::class, 'importar']);
+
+        Route::get('/fhir/Appointment/{id}', [CitaFhirController::class, 'mostrar']);
+
+    });
 
 //Caja
 Route::prefix('egresos')->group(function () {

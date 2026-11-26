@@ -1,0 +1,30 @@
+{
+    "resourceType": "Appointment",
+    "status": "booked",
+    "serviceCategory": [
+        {
+            "coding": [
+                {
+                    "system": "http://terminology.hl7.org/CodeSystem/service-category",
+                    "code": "10",
+                    "display": "Dental"
+                }
+            ]
+        }
+    ],
+    "description": "Control de ortodoncia",
+    "start": "2026-11-20T15:00:00Z",
+    "end": "2026-11-20T15:30:00Z",
+    "participant": [
+        {
+            "actor": {
+                "type": "Patient",
+                "identifier": {
+                    "system": "urn:proyect-clinico:cedula-ecuador",
+                    "value": "1312345678"
+                }
+            },
+            "status": "accepted"
+        }
+    ]
+}
